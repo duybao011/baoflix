@@ -121,7 +121,7 @@ export default async function MovieDetailPage({ params }: PageProps) {
       <div className="mt-6">
         <h3 className="mb-2 font-black">Nội dung</h3>
 
-        <p className="max-w-4xl leading-7 text-slate-300">
+        <p className="max-w-4xl whitespace-pre-line leading-7 text-slate-300">
           {stripHtml(movie.content) || "Chưa có mô tả."}
         </p>
       </div>

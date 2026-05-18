@@ -108,10 +108,18 @@ function appendFilterParams(
 export function getImageUrl(url?: string) {
   if (!url) return "/placeholder.png";
 
+  // Ảnh local trong thư mục public
+  // Ví dụ: /custom-posters/poster.jpg
+  if (url.startsWith("/")) {
+    return url;
+  }
+
+  // Ảnh full URL
   if (url.startsWith("http")) {
     return url;
   }
 
+  // Ảnh từ KKPhim
   return `${IMAGE_BASE}/${url.replace(/^\/+/, "")}`;
 }
 
@@ -119,6 +127,11 @@ export function getWebpImageUrl(url?: string) {
   const imageUrl = getImageUrl(url);
 
   if (imageUrl === "/placeholder.png") {
+    return imageUrl;
+  }
+
+  // Không convert ảnh local qua API KKPhim
+  if (imageUrl.startsWith("/")) {
     return imageUrl;
   }
 
