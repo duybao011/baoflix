@@ -16,6 +16,7 @@ const navItems = [
   { label: "Lồng tiếng", href: "/danh-sach/phim-long-tieng" },
   { label: "Yêu thích", href: "/yeu-thich" },
   { label: "Lịch sử", href: "/lich-su" },
+  { label: "Phim riêng", href: "/ca-nhan" },
 ];
 
 export default function Header() {

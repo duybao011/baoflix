@@ -1,5 +1,6 @@
 const API_BASE = "https://phimapi.com";
 const IMAGE_BASE = "https://phimimg.com";
+import { getCustomMovieBySlug } from "@/data/custom-movies";
 
 export type MovieItem = {
   _id?: string;
@@ -133,6 +134,12 @@ export async function getLatestMovies(page = 1) {
 }
 
 export async function getMovieDetail(slug: string) {
+  const customMovie = getCustomMovieBySlug(slug);
+
+  if (customMovie) {
+    return customMovie as MovieDetailResponse;
+  }
+
   return fetchJson<MovieDetailResponse>(`/phim/${slug}`);
 }
 
