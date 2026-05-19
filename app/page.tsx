@@ -1,7 +1,8 @@
 import Link from "next/link";
 import MovieGrid from "@/components/MovieGrid";
-import { getImageUrl, getLatestMovies, getMoviesByList } from "@/lib/kkphim";
 import ContinueWatching from "@/components/ContinueWatching";
+import PersonalDashboard from "@/components/PersonalDashboard";
+import { getImageUrl, getLatestMovies, getMoviesByList } from "@/lib/kkphim";
 
 export default async function HomePage() {
   const [latest, phimBo, phimLe, hoatHinh] = await Promise.all([
@@ -38,7 +39,7 @@ export default async function HomePage() {
 
             <div className="flex flex-col justify-center">
               <p className="mb-3 text-sm font-bold uppercase tracking-[0.3em] text-red-400">
-                Phim mới cập nhật
+                BảoFlix
               </p>
 
               <h1 className="max-w-3xl text-4xl font-black tracking-tight md:text-6xl">
@@ -46,7 +47,7 @@ export default async function HomePage() {
               </h1>
 
               <p className="mt-3 max-w-2xl text-slate-300">
-                {hero.origin_name || "Xem phim nhanh, giao diện gọn, dành riêng cho fen."}
+                {hero.origin_name || "App xem phim cá nhân của fen."}
               </p>
 
               <div className="mt-6 flex flex-wrap gap-3">
@@ -58,10 +59,17 @@ export default async function HomePage() {
                 </Link>
 
                 <Link
-                  href="/tim-kiem"
+                  href="/loc"
                   className="rounded-2xl border border-white/15 bg-white/10 px-6 py-3 font-bold hover:bg-white/15"
                 >
-                  Tìm phim
+                  Bộ lọc
+                </Link>
+
+                <Link
+                  href="/ca-nhan"
+                  className="rounded-2xl border border-white/15 bg-white/10 px-6 py-3 font-bold hover:bg-white/15"
+                >
+                  Phim riêng
                 </Link>
               </div>
             </div>
@@ -69,9 +77,10 @@ export default async function HomePage() {
         </section>
       )}
 
-	<ContinueWatching />
+      <PersonalDashboard />
 
-      <MovieGrid title="Mới cập nhật" movies={latest.slice(0, 18)} />
+      <ContinueWatching />
+
       <MovieGrid title="Phim bộ" movies={phimBo.items} />
       <MovieGrid title="Phim lẻ" movies={phimLe.items} />
       <MovieGrid title="Hoạt hình" movies={hoatHinh.items} />
