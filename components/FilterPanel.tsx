@@ -6,6 +6,7 @@ import { Taxonomy } from "@/lib/kkphim";
 
 type CurrentFilters = {
   type?: string;
+  subtype?: string;
   category?: string;
   country?: string;
   year?: string;
@@ -56,7 +57,6 @@ const priorityGenreSlugs = [
   "gia-dinh",
   "kinh-di",
   "tai-lieu",
-  "hoat-hinh",
   "chieu-rap",
 ];
 
@@ -74,7 +74,6 @@ const priorityGenreNames = [
   "Gia Đình",
   "Kinh Dị",
   "Tài Liệu",
-  "Hoạt Hình",
   "Chiếu rạp",
 ];
 
@@ -84,6 +83,12 @@ const movieTypes = [
   { label: "Phim bộ", value: "phim-bo" },
   { label: "TV Shows", value: "tv-shows" },
   { label: "Hoạt hình", value: "hoat-hinh" },
+];
+
+const animationSubtypes = [
+  { label: "Tất cả hoạt hình", value: "tat-ca" },
+  { label: "Hoạt hình phim lẻ", value: "phim-le" },
+  { label: "Hoạt hình phim bộ", value: "phim-bo" },
 ];
 
 const languageModes = [
@@ -137,7 +142,15 @@ function normalizeText(text?: string) {
     .trim();
 }
 
-function sortByPriority(items: Taxonomy[], prioritySlugs: string[], priorityNames: string[]) {
+function toSlugLike(text?: string) {
+  return normalizeText(text).replace(/\s+/g, "-");
+}
+
+function sortByPriority(
+  items: Taxonomy[],
+  prioritySlugs: string[],
+  priorityNames: string[]
+) {
   const priorityMap = new Map<string, number>();
 
   prioritySlugs.forEach((slug, index) => {
@@ -145,7 +158,7 @@ function sortByPriority(items: Taxonomy[], prioritySlugs: string[], priorityName
   });
 
   priorityNames.forEach((name, index) => {
-    priorityMap.set(normalizeText(name).replace(/\s+/g, "-"), index);
+    priorityMap.set(toSlugLike(name), index);
   });
 
   const priorityItems: Taxonomy[] = [];
@@ -153,7 +166,7 @@ function sortByPriority(items: Taxonomy[], prioritySlugs: string[], priorityName
 
   items.forEach((item) => {
     const slugKey = item.slug;
-    const nameKey = normalizeText(item.name).replace(/\s+/g, "-");
+    const nameKey = toSlugLike(item.name);
 
     if (priorityMap.has(slugKey) || priorityMap.has(nameKey)) {
       priorityItems.push(item);
@@ -163,8 +176,11 @@ function sortByPriority(items: Taxonomy[], prioritySlugs: string[], priorityName
   });
 
   priorityItems.sort((a, b) => {
-    const aKey = priorityMap.get(a.slug) ?? priorityMap.get(normalizeText(a.name).replace(/\s+/g, "-")) ?? 999;
-    const bKey = priorityMap.get(b.slug) ?? priorityMap.get(normalizeText(b.name).replace(/\s+/g, "-")) ?? 999;
+    const aKey =
+      priorityMap.get(a.slug) ?? priorityMap.get(toSlugLike(a.name)) ?? 999;
+
+    const bKey =
+      priorityMap.get(b.slug) ?? priorityMap.get(toSlugLike(b.name)) ?? 999;
 
     return aKey - bKey;
   });
@@ -250,6 +266,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
   }`;
 
   const [type, setType] = useState(current.type || "tat-ca");
+  const [subtype, setSubtype] = useState(current.subtype || "tat-ca");
   const [category, setCategory] = useState(current.category || "tat-ca");
   const [country, setCountry] = useState(current.country || "tat-ca");
   const [year, setYear] = useState(current.year || "tat-ca");
@@ -262,11 +279,26 @@ export default function FilterPanel({ genres, countries, current }: Props) {
   }, []);
 
   const sortedCountries = useMemo(() => {
-    return sortByPriority(countries, priorityCountrySlugs, priorityCountryNames);
+    return sortByPriority(
+      countries,
+      priorityCountrySlugs,
+      priorityCountryNames
+    );
   }, [countries]);
 
   const sortedGenres = useMemo(() => {
-    return sortByPriority(genres, priorityGenreSlugs, priorityGenreNames);
+    const genresWithoutAnimation = genres.filter((item) => {
+      const slug = item.slug;
+      const nameSlug = toSlugLike(item.name);
+
+      return slug !== "hoat-hinh" && nameSlug !== "hoat-hinh";
+    });
+
+    return sortByPriority(
+      genresWithoutAnimation,
+      priorityGenreSlugs,
+      priorityGenreNames
+    );
   }, [genres]);
 
   const countryIsOther =
@@ -281,6 +313,11 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     const params = new URLSearchParams();
 
     if (type !== "tat-ca") params.set("type", type);
+
+    if (type === "hoat-hinh" && subtype !== "tat-ca") {
+      params.set("subtype", subtype);
+    }
+
     if (category !== "tat-ca") params.set("category", category);
     if (country !== "tat-ca") params.set("country", country);
     if (year !== "tat-ca") params.set("year", year);
@@ -293,11 +330,13 @@ export default function FilterPanel({ genres, countries, current }: Props) {
       params.set("sort_type", selectedSort.sort_type);
     }
 
-    router.push(`/loc?${params.toString()}`);
+    const query = params.toString();
+    router.push(query ? `/loc?${query}` : "/loc");
   }
 
   function clearFilter() {
     setType("tat-ca");
+    setSubtype("tat-ca");
     setCategory("tat-ca");
     setCountry("tat-ca");
     setYear("tat-ca");
@@ -344,6 +383,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 active={type === item.value}
                 onClick={() => {
                   setType(item.value);
+                  setSubtype("tat-ca");
                   applyQuickMode(item.value);
                 }}
               >
@@ -376,6 +416,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 onChange={(value) => setCountry(value)}
               >
                 <option value="tat-ca">Quốc gia khác</option>
+
                 {sortedCountries.otherItems.map((item) => (
                   <option key={item.slug} value={item.slug}>
                     {item.name}
@@ -390,12 +431,32 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.value}
                 active={type === item.value}
-                onClick={() => setType(item.value)}
+                onClick={() => {
+                  setType(item.value);
+
+                  if (item.value !== "hoat-hinh") {
+                    setSubtype("tat-ca");
+                  }
+                }}
               >
                 {item.label}
               </OptionButton>
             ))}
           </FilterRow>
+
+          {type === "hoat-hinh" && (
+            <FilterRow label="Dạng hoạt hình">
+              {animationSubtypes.map((item) => (
+                <OptionButton
+                  key={item.value}
+                  active={subtype === item.value}
+                  onClick={() => setSubtype(item.value)}
+                >
+                  {item.label}
+                </OptionButton>
+              ))}
+            </FilterRow>
+          )}
 
           <FilterRow label="Ngôn ngữ">
             {languageModes.map((item) => (
@@ -433,6 +494,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 onChange={(value) => setCategory(value)}
               >
                 <option value="tat-ca">Thể loại khác</option>
+
                 {sortedGenres.otherItems.map((item) => (
                   <option key={item.slug} value={item.slug}>
                     {item.name}

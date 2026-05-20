@@ -1,16 +1,12 @@
 import FilterPanel from "@/components/FilterPanel";
 import MovieGrid from "@/components/MovieGrid";
 import Pagination from "@/components/Pagination";
-import {
-  getCountries,
-  getFilteredMovies,
-  getGenres,
-  FilterValues,
-} from "@/lib/kkphim";
+import { getCountries, getFilteredMovies, getGenres } from "@/lib/kkphim";
 
 type PageProps = {
   searchParams: Promise<{
     type?: string;
+    subtype?: string;
     category?: string;
     country?: string;
     year?: string;
@@ -26,47 +22,48 @@ export default async function FilterPage({ searchParams }: PageProps) {
 
   const page = Number(params.page || 1);
 
-  const filters: FilterValues = {
+  const current = {
     type: params.type || "tat-ca",
+    subtype: params.subtype || "tat-ca",
     category: params.category || "tat-ca",
     country: params.country || "tat-ca",
     year: params.year || "tat-ca",
     sort_lang: params.sort_lang || "tat-ca",
     sort_field: params.sort_field || "modified.time",
     sort_type: params.sort_type || "desc",
-    page,
-    limit: 36,
   };
 
   const [genres, countries, result] = await Promise.all([
     getGenres(),
     getCountries(),
-    getFilteredMovies(filters),
+    getFilteredMovies({
+      ...current,
+      page,
+      limit: 36,
+    }),
   ]);
 
+  const currentPage = Number(result.pagination?.currentPage || page);
   const totalPages = Number(result.pagination?.totalPages || 0);
 
   return (
     <div>
-      <h1 className="mb-4 text-3xl font-black">Bộ lọc phim</h1>
+      <h1 className="mb-2 text-3xl font-black">Bộ lọc phim</h1>
 
-      <FilterPanel genres={genres} countries={countries} current={filters} />
+      <p className="mb-6 text-slate-400">
+        Lọc theo quốc gia, loại phim, dạng hoạt hình, ngôn ngữ, thể loại, năm và
+        sắp xếp.
+      </p>
 
-      <MovieGrid title={result.title} movies={result.items} />
+      <FilterPanel genres={genres} countries={countries} current={current} />
+
+      <MovieGrid title={result.title || "Kết quả lọc"} movies={result.items} />
 
       <Pagination
         basePath="/loc"
-        currentPage={page}
+        currentPage={currentPage}
         totalPages={totalPages}
-        searchParams={{
-          type: params.type,
-          category: params.category,
-          country: params.country,
-          year: params.year,
-          sort_lang: params.sort_lang,
-          sort_field: params.sort_field,
-          sort_type: params.sort_type,
-        }}
+        searchParams={current}
       />
     </div>
   );

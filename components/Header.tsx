@@ -7,6 +7,8 @@ const navItems = [
   { label: "Quốc gia", href: "/quoc-gia" },
   { label: "Diễn viên", href: "/dien-vien" },
   { label: "Bộ lọc", href: "/loc" },
+  { label: "Gu của tôi", href: "/gu-cua-toi" },
+  { label: "Thêm phim", href: "/ca-nhan/them" },
   { label: "Phim lẻ", href: "/danh-sach/phim-le" },
   { label: "Phim bộ", href: "/danh-sach/phim-bo" },
   { label: "TV Shows", href: "/danh-sach/tv-shows" },
