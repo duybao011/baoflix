@@ -16,9 +16,12 @@ type PageProps = {
 export default function CustomMovieWatchPage({ params }: PageProps) {
   const { slug } = use(params);
   const searchParams = useSearchParams();
+
+  const season = Number(searchParams.get("season") || 0);
   const tap = Number(searchParams.get("tap") || 0);
 
   const [movieData, setMovieData] = useState<StoredCustomMovie | null>(null);
+  const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
 
   useEffect(() => {
     setMovieData(getCustomMovieBySlugClient(slug) || null);
@@ -33,7 +36,13 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
   }
 
   const movie = movieData.movie;
-  const episodes = movieData.episodes?.[0]?.server_data ?? [];
+  const seasons = movieData.episodes ?? [];
+
+  const safeSeasonIndex =
+    Number.isNaN(season) || season < 0 || season >= seasons.length ? 0 : season;
+
+  const currentSeason = seasons[safeSeasonIndex];
+  const episodes = currentSeason?.server_data ?? [];
 
   const safeIndex =
     Number.isNaN(tap) || tap < 0 || tap >= episodes.length ? 0 : tap;
@@ -41,11 +50,17 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
   const episode = episodes[safeIndex];
 
   const previousHref =
-    safeIndex > 0 ? `/ca-nhan/${movie.slug}/xem?tap=${safeIndex - 1}` : "";
+    safeIndex > 0
+      ? `/ca-nhan/${movie.slug}/xem?season=${safeSeasonIndex}&tap=${
+          safeIndex - 1
+        }`
+      : "";
 
   const nextHref =
     safeIndex < episodes.length - 1
-      ? `/ca-nhan/${movie.slug}/xem?tap=${safeIndex + 1}`
+      ? `/ca-nhan/${movie.slug}/xem?season=${safeSeasonIndex}&tap=${
+          safeIndex + 1
+        }`
       : "";
 
   return (
@@ -59,6 +74,31 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
       <p className="mt-1 text-slate-400">
         Đang xem: {episode?.name || "Chưa có tập"}
       </p>
+
+      <span className="mt-1 block text-sm text-yellow-300">
+        {currentSeason?.server_name || `Mùa ${safeSeasonIndex + 1}`}
+      </span>
+
+      <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+        <h2 className="mb-3 text-lg font-black">Chọn mùa</h2>
+
+        <div className="flex flex-wrap gap-2">
+          {seasons.map((seasonItem, index) => (
+            <Link
+              key={`${seasonItem.server_name}-${index}`}
+              href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
+              className={[
+                "rounded-xl border px-4 py-2 text-sm font-bold",
+                index === safeSeasonIndex
+                  ? "border-yellow-300 bg-yellow-300 text-black"
+                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+              ].join(" ")}
+            >
+              {seasonItem.server_name || `Mùa ${index + 1}`}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-black">
         {episode?.link_embed ? (
@@ -95,12 +135,13 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
           </button>
         )}
 
-        <Link
-          href={`/ca-nhan/${movie.slug}`}
+        <button
+          type="button"
+          onClick={() => setEpisodePanelOpen(true)}
           className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
         >
           Danh sách tập
-        </Link>
+        </button>
 
         {nextHref ? (
           <Link
@@ -118,6 +159,140 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
           </button>
         )}
       </section>
+
+      {episodePanelOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6">
+          <section className="max-h-[85vh] w-full max-w-5xl overflow-y-auto rounded-t-3xl border border-white/10 bg-[#0b0f19] p-5 shadow-2xl md:rounded-3xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-black">Chọn tập</h2>
+
+                <p className="mt-1 text-sm text-slate-400">
+                  Chọn mùa hoặc tập khác mà không cần quay lại trang chi tiết.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setEpisodePanelOpen(false)}
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="mb-3 text-lg font-black">Mùa</h3>
+
+              <div className="flex flex-wrap gap-2">
+                {seasons.map((seasonItem, index) => (
+                  <Link
+                    key={`${seasonItem.server_name}-${index}`}
+                    href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
+                    onClick={() => setEpisodePanelOpen(false)}
+                    className={[
+                      "rounded-xl border px-4 py-2 text-sm font-bold",
+                      index === safeSeasonIndex
+                        ? "border-yellow-300 bg-yellow-300 text-black"
+                        : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                    ].join(" ")}
+                  >
+                    {seasonItem.server_name || `Mùa ${index + 1}`}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {seasons.map((seasonItem, seasonIndex) => {
+                const seasonEpisodes = seasonItem.server_data ?? [];
+
+                return (
+                  <div
+                    key={`${seasonItem.server_name}-${seasonIndex}`}
+                    className={[
+                      "rounded-3xl border p-4",
+                      seasonIndex === safeSeasonIndex
+                        ? "border-yellow-300/40 bg-yellow-300/5"
+                        : "border-white/10 bg-white/[0.03]",
+                    ].join(" ")}
+                  >
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-black">
+                          {seasonItem.server_name || `Mùa ${seasonIndex + 1}`}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          {seasonEpisodes.length} tập
+                        </p>
+                      </div>
+
+                      {seasonEpisodes.length > 0 && (
+                        <Link
+                          href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=0`}
+                          onClick={() => setEpisodePanelOpen(false)}
+                          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
+                        >
+                          Xem mùa này
+                        </Link>
+                      )}
+                    </div>
+
+                    {seasonEpisodes.length === 0 ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
+                        Mùa này chưa có tập.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                        {seasonEpisodes.map((episodeItem, episodeIndex) => {
+                          const active =
+                            seasonIndex === safeSeasonIndex &&
+                            episodeIndex === safeIndex;
+
+                          return (
+                            <Link
+                              key={`${seasonIndex}-${episodeItem.name}-${episodeIndex}`}
+                              href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
+                              onClick={() => setEpisodePanelOpen(false)}
+                              className={[
+                                "rounded-xl border px-3 py-3 text-center text-sm font-bold",
+                                active
+                                  ? "border-red-500 bg-red-600 text-white"
+                                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                              ].join(" ")}
+                            >
+                              {episodeItem.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href={`/ca-nhan/${movie.slug}/quan-ly`}
+                onClick={() => setEpisodePanelOpen(false)}
+                className="rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
+              >
+                Quản lý mùa / thêm tập
+              </Link>
+
+              <Link
+                href={`/ca-nhan/${movie.slug}`}
+                onClick={() => setEpisodePanelOpen(false)}
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
+              >
+                Về trang chi tiết
+              </Link>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

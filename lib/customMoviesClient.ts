@@ -17,11 +17,13 @@ export function driveToPreviewUrl(url: string) {
   if (!raw) return "";
 
   const fileMatch = raw.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+
   if (fileMatch?.[1]) {
     return `https://drive.google.com/file/d/${fileMatch[1]}/preview`;
   }
 
   const idMatch = raw.match(/[?&]id=([^&]+)/);
+
   if (idMatch?.[1]) {
     return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
   }
@@ -55,13 +57,112 @@ export function deleteCustomMovie(slug: string) {
 export function upsertCustomMovie(movie: StoredCustomMovie) {
   const movies = readCustomMovies();
 
+  const oldMovie = movies.find((item) => item.movie.slug === movie.movie.slug);
+
+  const nextMovie: StoredCustomMovie = {
+    ...movie,
+    createdAt: oldMovie?.createdAt || movie.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
+
   const next = [
-    movie,
+    nextMovie,
     ...movies.filter((item) => item.movie.slug !== movie.movie.slug),
   ];
 
   saveCustomMovies(next);
+
   return next;
+}
+
+function parseSeasonsFromText(name: string, episodesText: string) {
+  const lines = episodesText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const seasons: {
+    server_name: string;
+    server_data: {
+      name: string;
+      slug: string;
+      filename: string;
+      link_embed: string;
+      link_m3u8: string;
+    }[];
+  }[] = [];
+
+  let currentSeason = {
+    server_name: "Mùa 1",
+    server_data: [] as {
+      name: string;
+      slug: string;
+      filename: string;
+      link_embed: string;
+      link_m3u8: string;
+    }[],
+  };
+
+  function pushCurrentSeason() {
+    if (currentSeason.server_data.length > 0) {
+      seasons.push(currentSeason);
+    }
+  }
+
+  lines.forEach((line) => {
+    if (line.startsWith("#")) {
+      pushCurrentSeason();
+
+      currentSeason = {
+        server_name:
+          line.replace(/^#+/, "").trim() || `Mùa ${seasons.length + 1}`,
+        server_data: [],
+      };
+
+      return;
+    }
+
+    const index = currentSeason.server_data.length + 1;
+
+    let episodeName = `Tập ${String(index).padStart(2, "0")}`;
+    let linkRaw = line;
+
+    if (line.includes("|")) {
+      const parts = line.split("|");
+      episodeName = parts[0]?.trim() || episodeName;
+      linkRaw = parts.slice(1).join("|").trim();
+    }
+
+    const link = driveToPreviewUrl(linkRaw || "");
+
+    currentSeason.server_data.push({
+      name: episodeName,
+      slug: slugify(episodeName),
+      filename: `${name} - ${currentSeason.server_name} - ${episodeName}`,
+      link_embed: link,
+      link_m3u8: "",
+    });
+  });
+
+  pushCurrentSeason();
+
+  return seasons.length > 0
+    ? seasons
+    : [
+        {
+          server_name: "Mùa 1",
+          server_data: [],
+        },
+      ];
+}
+
+function countEpisodes(
+  seasons: {
+    server_name: string;
+    server_data: unknown[];
+  }[]
+) {
+  return seasons.reduce((total, season) => total + season.server_data.length, 0);
 }
 
 export function createCustomMovieFromForm(input: {
@@ -82,31 +183,8 @@ export function createCustomMovieFromForm(input: {
   const name = input.name.trim();
   const slug = input.slug?.trim() || slugify(name);
 
-  const episodeLines = input.episodesText
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-const episodes = episodeLines.map((line, index) => {
-  let episodeName = `Tập ${String(index + 1).padStart(2, "0")}`;
-  let linkRaw = line;
-
-  if (line.includes("|")) {
-    const parts = line.split("|");
-    episodeName = parts[0]?.trim() || episodeName;
-    linkRaw = parts.slice(1).join("|").trim();
-  }
-
-  const link = driveToPreviewUrl(linkRaw || "");
-
-  return {
-    name: episodeName,
-    slug: slugify(episodeName),
-    filename: `${name} - ${episodeName}`,
-    link_embed: link,
-    link_m3u8: "",
-  };
-});
+  const seasons = parseSeasonsFromText(name, input.episodesText);
+  const totalEpisodes = countEpisodes(seasons);
 
   const categoryList = (input.categories || "Phim riêng")
     .split(",")
@@ -134,15 +212,19 @@ const episodes = episodeLines.map((line, index) => {
       slug,
       origin_name: input.originName?.trim() || name,
       poster_url: input.posterUrl?.trim() || "/placeholder.png",
-      thumb_url: input.thumbUrl?.trim() || input.posterUrl?.trim() || "/placeholder.png",
-      episode_current: `${episodes.length} tập`,
-      episode_total: String(episodes.length),
+      thumb_url:
+        input.thumbUrl?.trim() ||
+        input.posterUrl?.trim() ||
+        "/placeholder.png",
+      episode_current: `${totalEpisodes} tập`,
+      episode_total: String(totalEpisodes),
       quality: "HD",
       lang: "Phim riêng",
       type: "series",
       status: "ongoing",
       year: Number.isFinite(yearNumber) ? yearNumber : undefined,
-      content: input.content?.trim() || "Phim riêng do bạn tự thêm vào BảoFlix.",
+      content:
+        input.content?.trim() || "Phim riêng do bạn tự thêm vào BảoFlix.",
       category: categoryList,
       country: [
         {
@@ -153,12 +235,7 @@ const episodes = episodeLines.map((line, index) => {
       actor: actorList,
       director: [],
     },
-    episodes: [
-      {
-        server_name: "Nguồn riêng",
-        server_data: episodes,
-      },
-    ],
+    episodes: seasons,
   };
 
   return response;

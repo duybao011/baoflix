@@ -41,8 +41,10 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
   }
 
   const movie = movieData.movie;
-  const server = movieData.episodes?.[0];
-  const episodes = server?.server_data ?? [];
+  const seasons = movieData.episodes ?? [];
+  const firstSeason = seasons[0];
+  const firstEpisodes = firstSeason?.server_data ?? [];
+
   const actors = getPeopleList(movie.actor);
   const directors = getPeopleList(movie.director);
 
@@ -148,14 +150,15 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
       <div className="mb-5 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black">Danh sách tập</h2>
+
           <p className="mt-1 text-sm text-slate-400">
-            Nguồn: {server?.server_name || "Nguồn riêng"}
+            Có {seasons.length} mùa trong phim riêng này.
           </p>
         </div>
 
-        {episodes.length > 0 && (
+        {firstEpisodes.length > 0 && (
           <Link
-            href={`/ca-nhan/${movie.slug}/xem?tap=0`}
+            href={`/ca-nhan/${movie.slug}/xem?season=0&tap=0`}
             className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold hover:bg-red-500"
           >
             Xem ngay
@@ -163,23 +166,66 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
         )}
       </div>
 
-      {episodes.length === 0 ? (
+      {seasons.length === 0 ? (
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-slate-400">
           Phim này chưa có tập.
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-          {episodes.map((episode, index) => (
-            <Link
-              key={`${episode.name}-${index}`}
-              href={`/ca-nhan/${movie.slug}/xem?tap=${index}`}
-              className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm hover:bg-red-600"
-            >
-              {episode.name}
-            </Link>
-          ))}
+        <div className="space-y-6">
+          {seasons.map((season, seasonIndex) => {
+            const episodes = season.server_data ?? [];
+
+            return (
+              <div
+                key={`${season.server_name}-${seasonIndex}`}
+                className="rounded-3xl border border-white/10 bg-black/20 p-4"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-black">
+                      {season.server_name || `Mùa ${seasonIndex + 1}`}
+                    </h3>
+
+                    <p className="mt-1 text-sm text-slate-400">
+                      {episodes.length} tập
+                    </p>
+                  </div>
+
+                  {episodes.length > 0 && (
+                    <Link
+                      href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=0`}
+                      className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
+                    >
+                      Xem mùa này
+                    </Link>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  {episodes.map((episode, episodeIndex) => (
+                    <Link
+                      key={`${seasonIndex}-${episode.name}-${episodeIndex}`}
+                      href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
+                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm hover:bg-red-600"
+                    >
+                      {episode.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
+
+      <div className="mt-6">
+        <Link
+          href={`/ca-nhan/${movie.slug}/quan-ly`}
+          className="inline-block rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
+        >
+          Quản lý mùa / thêm tập
+        </Link>
+      </div>
     </section>
   );
 
@@ -228,6 +274,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
   const relatedTab = (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
       <h2 className="text-2xl font-black">Liên quan</h2>
+
       <p className="mt-2 text-slate-400">
         Phim riêng thêm bằng giao diện hiện chưa có gợi ý liên quan. Sau này có
         thể gợi ý theo quốc gia/thể loại giống phim thường.
@@ -248,7 +295,10 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
       </aside>
 
       <section>
-        <Link href="/ca-nhan" className="text-sm text-red-300 hover:text-red-200">
+        <Link
+          href="/ca-nhan"
+          className="text-sm text-red-300 hover:text-red-200"
+        >
           ← Quay lại phim riêng
         </Link>
 
