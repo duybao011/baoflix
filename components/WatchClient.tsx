@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import HlsPlayer from "@/components/HlsPlayer";
 import { Episode, MovieDetail } from "@/lib/kkphim";
+import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 
 const HISTORY_KEY = "baoflix_history";
 const WATCHED_KEY = "baoflix_watched_episodes";
@@ -158,23 +159,25 @@ export default function WatchClient({
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-white/10 bg-black shadow-2xl">
-        {embedUrl ? (
-          <iframe
-            src={embedUrl}
-            allowFullScreen
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            className="aspect-video w-full"
-            title={`${movie.name} - ${episode.name}`}
-          />
-        ) : hlsUrl ? (
-          <HlsPlayer src={hlsUrl} />
-        ) : (
-          <div className="flex aspect-video items-center justify-center p-8 text-center text-slate-400">
-            Tập này chưa có link embed hoặc m3u8.
-          </div>
-        )}
+<div className="baoflix-player-fill">
+  <FullscreenPlayerBox>
+    {episode?.link_embed ? (
+      <iframe
+        src={episode.link_embed}
+        allowFullScreen
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        className="h-full w-full"
+        title={`${movie.name} - ${episode.name}`}
+      />
+    ) : episode?.link_m3u8 ? (
+      <HlsPlayer src={episode.link_m3u8} />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center text-slate-400">
+        Tập này chưa có link phát.
       </div>
+    )}
+  </FullscreenPlayerBox>
+</div>
 
       <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         {previousHref ? (

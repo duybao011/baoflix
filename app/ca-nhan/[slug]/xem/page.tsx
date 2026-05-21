@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import HlsPlayer from "@/components/HlsPlayer";
+import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 import {
   getCustomMovieBySlugClient,
   StoredCustomMovie,
@@ -100,23 +101,25 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
         </div>
       </section>
 
-      <div className="mt-5 overflow-hidden rounded-3xl border border-white/10 bg-black">
-        {episode?.link_embed ? (
-          <iframe
-            src={episode.link_embed}
-            allowFullScreen
-            allow="autoplay; encrypted-media; picture-in-picture"
-            className="aspect-video w-full"
-            title={`${movie.name} - ${episode.name}`}
-          />
-        ) : episode?.link_m3u8 ? (
-          <HlsPlayer src={episode.link_m3u8} />
-        ) : (
-          <div className="flex aspect-video items-center justify-center text-slate-400">
-            Tập này chưa có link phát.
-          </div>
-        )}
+<div className="mt-5 baoflix-player-fill">
+  <FullscreenPlayerBox>
+    {episode?.link_embed ? (
+      <iframe
+        src={episode.link_embed}
+        allowFullScreen
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        className="h-full w-full"
+        title={`${movie.name} - ${episode.name}`}
+      />
+    ) : episode?.link_m3u8 ? (
+      <HlsPlayer src={episode.link_m3u8} />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center text-slate-400">
+        Tập này chưa có link phát.
       </div>
+    )}
+  </FullscreenPlayerBox>
+</div>
 
       <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         {previousHref ? (

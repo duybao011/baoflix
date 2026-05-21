@@ -66,7 +66,7 @@ export default function HlsPlayer({ src }: { src: string }) {
         ref={videoRef}
         controls
         playsInline
-        className="aspect-video w-full bg-black"
+        className="h-full w-full bg-black object-contain"
       />
 
       {error && (

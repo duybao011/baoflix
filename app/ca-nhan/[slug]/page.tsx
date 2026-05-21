@@ -219,12 +219,21 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
       )}
 
       <div className="mt-6">
-        <Link
-          href={`/ca-nhan/${movie.slug}/quan-ly`}
-          className="inline-block rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
-        >
-          Quản lý mùa / thêm tập
-        </Link>
+<div className="mt-6 flex flex-wrap gap-3">
+  <Link
+    href={`/ca-nhan/${movie.slug}/quan-ly`}
+    className="inline-block rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
+  >
+    Quản lý mùa / thêm tập
+  </Link>
+
+  <Link
+    href={`/ca-nhan/${movie.slug}/xuat-code`}
+    className="inline-block rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white hover:bg-white/10"
+  >
+    Xuất thành code
+  </Link>
+</div>
       </div>
     </section>
   );
