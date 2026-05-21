@@ -9,6 +9,11 @@ import {
   getCustomMovieBySlugClient,
   StoredCustomMovie,
 } from "@/lib/customMoviesClient";
+import {
+  getCustomWatchedKey,
+  saveCustomWatchHistory,
+  saveWatchedEpisode,
+} from "@/lib/watchStore";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -23,6 +28,7 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
 
   const [movieData, setMovieData] = useState<StoredCustomMovie | null>(null);
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
+  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
 
   useEffect(() => {
     setMovieData(getCustomMovieBySlugClient(slug) || null);
@@ -50,6 +56,32 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
 
   const episode = episodes[safeIndex];
 
+  const currentWatchedKey = getCustomWatchedKey(
+    movie.slug,
+    safeSeasonIndex,
+    safeIndex
+  );
+
+  useEffect(() => {
+    const next = saveWatchedEpisode(currentWatchedKey);
+    setWatchedEpisodes(next);
+
+    saveCustomWatchHistory({
+      movie,
+      seasonIndex: safeSeasonIndex,
+      episodeIndex: safeIndex,
+      seasonName: currentSeason?.server_name,
+      episodeName: episode?.name,
+    });
+  }, [
+    currentWatchedKey,
+    movie,
+    safeSeasonIndex,
+    safeIndex,
+    currentSeason?.server_name,
+    episode?.name,
+  ]);
+
   const previousHref =
     safeIndex > 0
       ? `/ca-nhan/${movie.slug}/xem?season=${safeSeasonIndex}&tap=${
@@ -63,6 +95,8 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
           safeIndex + 1
         }`
       : "";
+
+  const watchTimeKey = `baoflix_custom_watch_time_${movie.slug}_season_${safeSeasonIndex}_episode_${safeIndex}`;
 
   return (
     <div>
@@ -101,25 +135,29 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
         </div>
       </section>
 
-<div className="mt-5 baoflix-player-fill">
-  <FullscreenPlayerBox>
-    {episode?.link_embed ? (
-      <iframe
-        src={episode.link_embed}
-        allowFullScreen
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        className="h-full w-full"
-        title={`${movie.name} - ${episode.name}`}
-      />
-    ) : episode?.link_m3u8 ? (
-      <HlsPlayer src={episode.link_m3u8} />
-    ) : (
-      <div className="flex h-full w-full items-center justify-center text-slate-400">
-        Tập này chưa có link phát.
+      <div className="baoflix-player-fill mt-5">
+        <FullscreenPlayerBox>
+          {episode?.link_embed ? (
+            <iframe
+              src={episode.link_embed}
+              allowFullScreen
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              className="h-full w-full"
+              title={`${movie.name} - ${episode.name}`}
+            />
+          ) : episode?.link_m3u8 ? (
+            <HlsPlayer
+              src={episode.link_m3u8}
+              storageKey={watchTimeKey}
+              autoResume
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">
+              Tập này chưa có link phát.
+            </div>
+          )}
+        </FullscreenPlayerBox>
       </div>
-    )}
-  </FullscreenPlayerBox>
-</div>
 
       <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         {previousHref ? (
@@ -253,6 +291,14 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
                             seasonIndex === safeSeasonIndex &&
                             episodeIndex === safeIndex;
 
+                          const watchedKey = getCustomWatchedKey(
+                            movie.slug,
+                            seasonIndex,
+                            episodeIndex
+                          );
+
+                          const watched = watchedEpisodes.includes(watchedKey);
+
                           return (
                             <Link
                               key={`${seasonIndex}-${episodeItem.name}-${episodeIndex}`}
@@ -265,7 +311,12 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
                                   : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
                               ].join(" ")}
                             >
-                              {episodeItem.name}
+                              <span className="inline-flex items-center justify-center gap-1">
+                                {watched && (
+                                  <span className="text-yellow-300">✓</span>
+                                )}
+                                <span>{episodeItem.name}</span>
+                              </span>
                             </Link>
                           );
                         })}

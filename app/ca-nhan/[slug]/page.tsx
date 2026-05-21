@@ -8,6 +8,10 @@ import {
   StoredCustomMovie,
 } from "@/lib/customMoviesClient";
 import { getImageUrl, getPeopleList, stripHtml } from "@/lib/kkphim";
+import {
+  getCustomWatchedKey,
+  readWatchedEpisodes,
+} from "@/lib/watchStore";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -15,11 +19,29 @@ type PageProps = {
 
 export default function CustomMovieDetailPage({ params }: PageProps) {
   const { slug } = use(params);
+
   const [movieData, setMovieData] = useState<StoredCustomMovie | null>(null);
+  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
 
   useEffect(() => {
     setMovieData(getCustomMovieBySlugClient(slug) || null);
   }, [slug]);
+
+  useEffect(() => {
+    setWatchedEpisodes(readWatchedEpisodes());
+
+    function refreshWatchedEpisodes() {
+      setWatchedEpisodes(readWatchedEpisodes());
+    }
+
+    window.addEventListener("storage", refreshWatchedEpisodes);
+    window.addEventListener("focus", refreshWatchedEpisodes);
+
+    return () => {
+      window.removeEventListener("storage", refreshWatchedEpisodes);
+      window.removeEventListener("focus", refreshWatchedEpisodes);
+    };
+  }, []);
 
   if (!movieData) {
     return (
@@ -32,7 +54,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
         <Link
           href="/ca-nhan"
-          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold"
+          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
         >
           Quay lại phim riêng
         </Link>
@@ -201,39 +223,58 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                  {episodes.map((episode, episodeIndex) => (
-                    <Link
-                      key={`${seasonIndex}-${episode.name}-${episodeIndex}`}
-                      href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm hover:bg-red-600"
-                    >
-                      {episode.name}
-                    </Link>
-                  ))}
-                </div>
+                {episodes.length === 0 ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
+                    Mùa này chưa có tập.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                    {episodes.map((episode, episodeIndex) => {
+                      const watched = watchedEpisodes.includes(
+                        getCustomWatchedKey(
+                          movie.slug,
+                          seasonIndex,
+                          episodeIndex
+                        )
+                      );
+
+                      return (
+                        <Link
+                          key={`${seasonIndex}-${episode.name}-${episodeIndex}`}
+                          href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
+                          className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600"
+                        >
+                          <span className="inline-flex items-center justify-center gap-1">
+                            {watched && (
+                              <span className="text-yellow-300">✓</span>
+                            )}
+                            <span>{episode.name}</span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      <div className="mt-6">
-<div className="mt-6 flex flex-wrap gap-3">
-  <Link
-    href={`/ca-nhan/${movie.slug}/quan-ly`}
-    className="inline-block rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
-  >
-    Quản lý mùa / thêm tập
-  </Link>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href={`/ca-nhan/${movie.slug}/quan-ly`}
+          className="inline-block rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-200 hover:bg-yellow-300 hover:text-black"
+        >
+          Quản lý mùa / thêm tập
+        </Link>
 
-  <Link
-    href={`/ca-nhan/${movie.slug}/xuat-code`}
-    className="inline-block rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black text-white hover:bg-white/10"
-  >
-    Xuất thành code
-  </Link>
-</div>
+        <Link
+          href="/ca-nhan/them"
+          className="inline-block rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
+        >
+          + Thêm phim khác
+        </Link>
       </div>
     </section>
   );

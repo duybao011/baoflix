@@ -3,39 +3,38 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import HlsPlayer from "@/components/HlsPlayer";
-import { Episode, MovieDetail } from "@/lib/kkphim";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
+import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
+import {
+  getNormalWatchedKey,
+  readWatchedEpisodes,
+  saveNormalWatchHistory,
+  saveWatchedEpisode,
+} from "@/lib/watchStore";
 
-const HISTORY_KEY = "baoflix_history";
-const WATCHED_KEY = "baoflix_watched_episodes";
-
-type EpisodeServer = {
-  server_name: string;
-  server_data: Episode[];
-};
-
-type Props = {
+type WatchClientProps = {
   movie: MovieDetail;
   servers: EpisodeServer[];
   currentServerIndex: number;
   currentEpisodeIndex: number;
 };
 
-function makeWatchedKey(
+function getEpisodeUrl(
   movieSlug: string,
   serverIndex: number,
   episodeIndex: number
 ) {
-  return `${movieSlug}::${serverIndex}::${episodeIndex}`;
+  return `/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`;
 }
 
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
+function normalizeServerName(name?: string) {
+  const text = String(name || "").toLowerCase();
+
+  if (text.includes("lồng") || text.includes("long")) return "Lồng tiếng";
+  if (text.includes("thuyết") || text.includes("thuyet")) return "Thuyết minh";
+  if (text.includes("vietsub") || text.includes("sub")) return "Vietsub";
+
+  return name || "Server";
 }
 
 export default function WatchClient({
@@ -43,141 +42,186 @@ export default function WatchClient({
   servers,
   currentServerIndex,
   currentEpisodeIndex,
-}: Props) {
-  const [watchedKeys, setWatchedKeys] = useState<Set<string>>(new Set());
+}: WatchClientProps) {
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
+  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
 
-  const currentServer = servers[currentServerIndex] ?? servers[0];
+  const safeServerIndex =
+    Number.isNaN(currentServerIndex) ||
+    currentServerIndex < 0 ||
+    currentServerIndex >= servers.length
+      ? 0
+      : currentServerIndex;
+
+  const currentServer = servers[safeServerIndex];
   const episodes = currentServer?.server_data ?? [];
-  const episode = episodes[currentEpisodeIndex] ?? episodes[0];
 
-  const embedUrl = useMemo(() => episode?.link_embed || "", [episode]);
-  const hlsUrl = useMemo(() => episode?.link_m3u8 || "", [episode]);
+  const safeEpisodeIndex =
+    Number.isNaN(currentEpisodeIndex) ||
+    currentEpisodeIndex < 0 ||
+    currentEpisodeIndex >= episodes.length
+      ? 0
+      : currentEpisodeIndex;
+
+  const episode = episodes[safeEpisodeIndex];
+
+  const currentWatchedKey = getNormalWatchedKey(
+    movie.slug,
+    safeServerIndex,
+    safeEpisodeIndex
+  );
+
+  useEffect(() => {
+    const next = saveWatchedEpisode(currentWatchedKey);
+    setWatchedEpisodes(next);
+
+    saveNormalWatchHistory({
+      movie,
+      serverIndex: safeServerIndex,
+      episodeIndex: safeEpisodeIndex,
+      serverName: currentServer?.server_name,
+      episodeName: episode?.name,
+    });
+  }, [
+    currentWatchedKey,
+    movie,
+    safeServerIndex,
+    safeEpisodeIndex,
+    currentServer?.server_name,
+    episode?.name,
+  ]);
 
   const previousHref =
-    currentEpisodeIndex > 0
-      ? `/xem/${movie.slug}?server=${currentServerIndex}&tap=${
-          currentEpisodeIndex - 1
-        }`
+    safeEpisodeIndex > 0
+      ? getEpisodeUrl(movie.slug, safeServerIndex, safeEpisodeIndex - 1)
       : "";
 
   const nextHref =
-    currentEpisodeIndex < episodes.length - 1
-      ? `/xem/${movie.slug}?server=${currentServerIndex}&tap=${
-          currentEpisodeIndex + 1
-        }`
+    safeEpisodeIndex < episodes.length - 1
+      ? getEpisodeUrl(movie.slug, safeServerIndex, safeEpisodeIndex + 1)
       : "";
 
-  useEffect(() => {
-    const list = readJson<string[]>(WATCHED_KEY, []);
-    setWatchedKeys(new Set(list));
-  }, []);
+  const watchTimeKey = `baoflix_watch_time_${movie.slug}_episode_${safeEpisodeIndex}`;
 
-  useEffect(() => {
-    if (!movie || !episode || !currentServer) return;
+  const sameEpisodeServerLinks = useMemo(() => {
+    return servers
+      .map((server, index) => {
+        const serverEpisode = server.server_data?.[safeEpisodeIndex];
 
-    const historyList = readJson<any[]>(HISTORY_KEY, []);
+        if (!serverEpisode) return null;
 
-    const nextHistoryItem = {
-      slug: movie.slug,
-      name: movie.name,
-      origin_name: movie.origin_name,
-      poster_url: movie.poster_url,
-      thumb_url: movie.thumb_url,
-      year: movie.year,
-      lang: movie.lang,
-      quality: movie.quality,
-      type: movie.type,
-      category: movie.category,
-      country: movie.country,
-      episodeName: episode.name,
-      episodeIndex: currentEpisodeIndex,
-      serverIndex: currentServerIndex,
-      serverName: currentServer.server_name,
-      watchedAt: new Date().toISOString(),
-    };
-
-    const nextHistory = [
-      nextHistoryItem,
-      ...historyList.filter((item: any) => item.slug !== movie.slug),
-    ].slice(0, 50);
-
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
-
-    const watchedList = readJson<string[]>(WATCHED_KEY, []);
-    const nextWatchedSet = new Set(watchedList);
-
-    nextWatchedSet.add(
-      makeWatchedKey(movie.slug, currentServerIndex, currentEpisodeIndex)
-    );
-
-    const nextWatchedList = Array.from(nextWatchedSet).slice(-1000);
-
-    localStorage.setItem(WATCHED_KEY, JSON.stringify(nextWatchedList));
-    setWatchedKeys(new Set(nextWatchedList));
-  }, [movie, episode, currentEpisodeIndex, currentServerIndex, currentServer]);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setEpisodePanelOpen(false);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
-
-  if (!currentServer || !episode) {
-    return (
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-        Phim này chưa có tập để xem.
-      </div>
-    );
-  }
+        return {
+          server,
+          serverIndex: index,
+          episode: serverEpisode,
+          href: getEpisodeUrl(movie.slug, index, safeEpisodeIndex),
+        };
+      })
+      .filter(Boolean) as {
+      server: EpisodeServer;
+      serverIndex: number;
+      episode: NonNullable<typeof episode>;
+      href: string;
+    }[];
+  }, [servers, safeEpisodeIndex, movie.slug]);
 
   return (
     <div>
-      <div className="mb-5">
-        <Link
-          href={`/phim/${movie.slug}`}
-          className="text-sm text-red-300 hover:text-red-200"
+      <Link href={`/phim/${movie.slug}`} className="text-sm text-red-300">
+        ← Quay lại chi tiết phim
+      </Link>
+
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black">{movie.name}</h1>
+
+          <p className="mt-1 text-slate-400">
+            {movie.origin_name || "Đang cập nhật"}
+          </p>
+
+          <div className="mt-3 flex flex-wrap gap-2 text-sm">
+            <span className="rounded-full bg-red-600 px-3 py-1">
+              {episode?.name || "Chưa có tập"}
+            </span>
+
+            <span className="rounded-full bg-white/10 px-3 py-1">
+              {normalizeServerName(currentServer?.server_name)}
+            </span>
+
+            {movie.quality && (
+              <span className="rounded-full bg-white/10 px-3 py-1">
+                {movie.quality}
+              </span>
+            )}
+
+            {movie.lang && (
+              <span className="rounded-full bg-white/10 px-3 py-1">
+                {movie.lang}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setEpisodePanelOpen(true)}
+          className="rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500"
         >
-          ← Quay lại chi tiết phim
-        </Link>
-
-        <h1 className="mt-2 text-3xl font-black">{movie.name}</h1>
-
-        <p className="mt-1 text-slate-400">Đang xem: {episode.name}</p>
-
-        <p className="mt-1 text-sm text-yellow-300">
-          Nguồn:{" "}
-          {currentServer.server_name || `Server ${currentServerIndex + 1}`}
-        </p>
+          Chọn tập
+        </button>
       </div>
 
-<div className="baoflix-player-fill">
-  <FullscreenPlayerBox>
-    {episode?.link_embed ? (
-      <iframe
-        src={episode.link_embed}
-        allowFullScreen
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-        className="h-full w-full"
-        title={`${movie.name} - ${episode.name}`}
-      />
-    ) : episode?.link_m3u8 ? (
-      <HlsPlayer src={episode.link_m3u8} />
-    ) : (
-      <div className="flex h-full w-full items-center justify-center text-slate-400">
-        Tập này chưa có link phát.
+      {sameEpisodeServerLinks.length > 1 && (
+        <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-lg font-black">Đổi phiên bản</h2>
+
+          <p className="mb-3 text-sm text-slate-400">
+            Với iframe/player ngoài, thời gian xem có thể không đồng bộ hoàn
+            toàn. Nếu nguồn có m3u8 trực tiếp thì app có thể tự resume.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            {sameEpisodeServerLinks.map((item) => (
+              <Link
+                key={`${item.serverIndex}-${item.episode.name}`}
+                href={item.href}
+                className={[
+                  "rounded-xl border px-4 py-2 text-sm font-bold",
+                  item.serverIndex === safeServerIndex
+                    ? "border-yellow-300 bg-yellow-300 text-black"
+                    : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                ].join(" ")}
+              >
+                {normalizeServerName(item.server.server_name)}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <div className="baoflix-player-fill mt-5">
+        <FullscreenPlayerBox>
+          {episode?.link_embed ? (
+            <iframe
+              src={episode.link_embed}
+              allowFullScreen
+              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+              className="h-full w-full"
+              title={`${movie.name} - ${episode.name}`}
+            />
+          ) : episode?.link_m3u8 ? (
+            <HlsPlayer
+              src={episode.link_m3u8}
+              storageKey={watchTimeKey}
+              autoResume
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-slate-400">
+              Tập này chưa có link phát.
+            </div>
+          )}
+        </FullscreenPlayerBox>
       </div>
-    )}
-  </FullscreenPlayerBox>
-</div>
 
       <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         {previousHref ? (
@@ -190,7 +234,7 @@ export default function WatchClient({
         ) : (
           <button
             disabled
-            className="cursor-not-allowed rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold opacity-40"
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold opacity-40"
           >
             ← Tập trước
           </button>
@@ -199,9 +243,9 @@ export default function WatchClient({
         <button
           type="button"
           onClick={() => setEpisodePanelOpen(true)}
-          className="rounded-2xl bg-yellow-300 px-5 py-3 font-black text-black hover:bg-yellow-200"
+          className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
         >
-          Tập phim
+          Danh sách tập
         </button>
 
         {nextHref ? (
@@ -214,40 +258,20 @@ export default function WatchClient({
         ) : (
           <button
             disabled
-            className="cursor-not-allowed rounded-2xl bg-red-600 px-5 py-3 font-bold opacity-40"
+            className="rounded-2xl bg-red-600 px-5 py-3 font-bold opacity-40"
           >
             Tập sau →
           </button>
         )}
       </section>
 
-      <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 className="text-lg font-black">Đang phát</h2>
-
-        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          <span className="rounded-full bg-red-600 px-3 py-1">
-            {episode.name}
-          </span>
-
-          <span className="rounded-full bg-yellow-300 px-3 py-1 text-black">
-            {currentServer.server_name || `Server ${currentServerIndex + 1}`}
-          </span>
-        </div>
-      </section>
-
       {episodePanelOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm">
-          <button
-            type="button"
-            aria-label="Đóng panel"
-            onClick={() => setEpisodePanelOpen(false)}
-            className="absolute inset-0 h-full w-full"
-          />
-
-          <div className="absolute bottom-0 left-0 right-0 max-h-[82vh] overflow-y-auto rounded-t-[2rem] border-t border-white/10 bg-[#0b0f19] p-4 shadow-2xl md:left-1/2 md:max-w-5xl md:-translate-x-1/2">
-            <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6">
+          <section className="max-h-[85vh] w-full max-w-6xl overflow-y-auto rounded-t-3xl border border-white/10 bg-[#0b0f19] p-5 shadow-2xl md:rounded-3xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-black">Chọn tập</h2>
+
                 <p className="mt-1 text-sm text-slate-400">
                   Đổi server hoặc chọn tập khác mà không cần quay lại trang chi
                   tiết.
@@ -257,74 +281,142 @@ export default function WatchClient({
               <button
                 type="button"
                 onClick={() => setEpisodePanelOpen(false)}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
               >
                 Đóng
               </button>
             </div>
 
-            <section className="mb-6">
-              <h3 className="mb-3 font-black">Phiên bản</h3>
+            <div className="mb-6">
+              <h3 className="mb-3 text-lg font-black">Phiên bản</h3>
 
               <div className="flex flex-wrap gap-2">
-                {servers.map((server, serverIndex) => (
-                  <Link
-                    key={`${server.server_name}-${serverIndex}`}
-                    href={`/xem/${movie.slug}?server=${serverIndex}&tap=0`}
-                    onClick={() => setEpisodePanelOpen(false)}
-                    className={[
-                      "rounded-xl border px-4 py-2 text-sm font-bold",
-                      serverIndex === currentServerIndex
-                        ? "border-yellow-300 bg-yellow-300 text-black"
-                        : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-                    ].join(" ")}
-                  >
-                    {server.server_name || `Server ${serverIndex + 1}`}
-                  </Link>
-                ))}
-              </div>
-            </section>
-
-            <section>
-              <h3 className="mb-3 font-black">
-                Tập phim -{" "}
-                {currentServer.server_name || `Server ${currentServerIndex + 1}`}
-              </h3>
-
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-10">
-                {episodes.map((item, episodeIndex) => {
-                  const watched = watchedKeys.has(
-                    makeWatchedKey(
-                      movie.slug,
-                      currentServerIndex,
-                      episodeIndex
-                    )
+                {servers.map((server, serverIndex) => {
+                  const hasCurrentEpisode = Boolean(
+                    server.server_data?.[safeEpisodeIndex]
                   );
 
                   return (
                     <Link
-                      key={`${currentServerIndex}-${item.name}-${episodeIndex}`}
-                      href={`/xem/${movie.slug}?server=${currentServerIndex}&tap=${episodeIndex}`}
+                      key={`${server.server_name}-${serverIndex}`}
+                      href={getEpisodeUrl(
+                        movie.slug,
+                        serverIndex,
+                        hasCurrentEpisode ? safeEpisodeIndex : 0
+                      )}
                       onClick={() => setEpisodePanelOpen(false)}
                       className={[
-                        "rounded-xl border px-3 py-3 text-center text-sm",
-                        episodeIndex === currentEpisodeIndex
-                          ? "border-red-500 bg-red-600 text-white"
-                          : watched
-                            ? "border-emerald-400/50 bg-emerald-400/15 text-emerald-200"
-                            : "border-white/10 bg-white/5 hover:bg-white/10",
+                        "rounded-xl border px-4 py-2 text-sm font-bold",
+                        serverIndex === safeServerIndex
+                          ? "border-yellow-300 bg-yellow-300 text-black"
+                          : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
                       ].join(" ")}
                     >
-                      {watched && episodeIndex !== currentEpisodeIndex
-                        ? "✓ "
-                        : ""}
-                      {item.name}
+                      {normalizeServerName(server.server_name)}
                     </Link>
                   );
                 })}
               </div>
-            </section>
-          </div>
+            </div>
+
+            <div className="space-y-6">
+              {servers.map((server, serverIndex) => {
+                const serverEpisodes = server.server_data ?? [];
+
+                return (
+                  <div
+                    key={`${server.server_name}-${serverIndex}`}
+                    className={[
+                      "rounded-3xl border p-4",
+                      serverIndex === safeServerIndex
+                        ? "border-yellow-300/40 bg-yellow-300/5"
+                        : "border-white/10 bg-white/[0.03]",
+                    ].join(" ")}
+                  >
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-xl font-black">
+                          {normalizeServerName(server.server_name)}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          {serverEpisodes.length} tập
+                        </p>
+                      </div>
+
+                      {serverEpisodes.length > 0 && (
+                        <Link
+                          href={getEpisodeUrl(movie.slug, serverIndex, 0)}
+                          onClick={() => setEpisodePanelOpen(false)}
+                          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
+                        >
+                          Xem server này
+                        </Link>
+                      )}
+                    </div>
+
+                    {serverEpisodes.length === 0 ? (
+                      <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
+                        Server này chưa có tập.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                        {serverEpisodes.map((episodeItem, episodeIndex) => {
+                          const active =
+                            serverIndex === safeServerIndex &&
+                            episodeIndex === safeEpisodeIndex;
+
+                          const watchedKey = getNormalWatchedKey(
+                            movie.slug,
+                            serverIndex,
+                            episodeIndex
+                          );
+
+                          const watched =
+                            watchedEpisodes.includes(watchedKey);
+
+                          return (
+                            <Link
+                              key={`${serverIndex}-${episodeItem.name}-${episodeIndex}`}
+                              href={getEpisodeUrl(
+                                movie.slug,
+                                serverIndex,
+                                episodeIndex
+                              )}
+                              onClick={() => setEpisodePanelOpen(false)}
+                              className={[
+                                "rounded-xl border px-3 py-3 text-center text-sm font-bold",
+                                active
+                                  ? "border-red-500 bg-red-600 text-white"
+                                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                              ].join(" ")}
+                            >
+                              <span className="inline-flex items-center justify-center gap-1">
+                                {watched && (
+                                  <span className="text-yellow-300">✓</span>
+                                )}
+                                <span>{episodeItem.name}</span>
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href={`/phim/${movie.slug}`}
+                onClick={() => setEpisodePanelOpen(false)}
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
+              >
+                Về trang chi tiết
+              </Link>
+            </div>
+          </section>
         </div>
       )}
     </div>

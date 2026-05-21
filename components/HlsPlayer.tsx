@@ -1,79 +1,123 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import Hls from "hls.js";
+import { useEffect, useRef } from "react";
 
-export default function HlsPlayer({ src }: { src: string }) {
+type HlsPlayerProps = {
+  src: string;
+  storageKey?: string;
+  autoResume?: boolean;
+};
+
+export default function HlsPlayer({
+  src,
+  storageKey,
+  autoResume = true,
+}: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [error, setError] = useState("");
+  const hasSeekedRef = useRef(false);
 
   useEffect(() => {
-    if (!src) return;
+    const video = videoRef.current;
 
-    let hls: any;
-    let cancelled = false;
+    if (!video || !src) return;
 
-    async function setupPlayer() {
-      const video = videoRef.current;
+    hasSeekedRef.current = false;
 
-      if (!video) return;
+    function getSavedTime() {
+      if (!storageKey || !autoResume) return 0;
 
-      setError("");
+      try {
+        const raw = localStorage.getItem(storageKey);
+        const value = raw ? Number(raw) : 0;
 
-      if (video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = src;
-        return;
-      }
+        if (Number.isFinite(value) && value > 5) {
+          return value;
+        }
 
-      const HlsModule = await import("hls.js");
-
-      if (cancelled) return;
-
-      const Hls = HlsModule.default;
-
-      if (Hls.isSupported()) {
-        hls = new Hls({
-          enableWorker: true,
-          lowLatencyMode: true,
-        });
-
-        hls.loadSource(src);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.ERROR, (_event: any, data: any) => {
-          if (data?.fatal) {
-            setError("Không phát được link m3u8 này.");
-          }
-        });
-      } else {
-        setError("Trình duyệt này không hỗ trợ HLS.");
+        return 0;
+      } catch {
+        return 0;
       }
     }
 
-    setupPlayer();
+    function seekToSavedTime() {
+      if (hasSeekedRef.current) return;
+
+      const savedTime = getSavedTime();
+
+      if (savedTime > 0 && Number.isFinite(video.duration)) {
+        const safeTime = Math.min(savedTime, Math.max(video.duration - 3, 0));
+        video.currentTime = safeTime;
+        hasSeekedRef.current = true;
+      } else if (savedTime > 0) {
+        video.currentTime = savedTime;
+        hasSeekedRef.current = true;
+      }
+    }
+
+    let hls: Hls | null = null;
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = src;
+
+      video.addEventListener("loadedmetadata", seekToSavedTime);
+      video.addEventListener("canplay", seekToSavedTime);
+    } else if (Hls.isSupported()) {
+      hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: false,
+      });
+
+      hls.loadSource(src);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        seekToSavedTime();
+      });
+
+      video.addEventListener("loadedmetadata", seekToSavedTime);
+      video.addEventListener("canplay", seekToSavedTime);
+    } else {
+      video.src = src;
+    }
+
+    function saveTime() {
+      if (!storageKey) return;
+      if (!video.currentTime || video.currentTime < 1) return;
+
+      try {
+        localStorage.setItem(storageKey, String(Math.floor(video.currentTime)));
+      } catch {
+        // bỏ qua lỗi localStorage
+      }
+    }
+
+    video.addEventListener("timeupdate", saveTime);
+    video.addEventListener("pause", saveTime);
+    video.addEventListener("ended", saveTime);
 
     return () => {
-      cancelled = true;
+      saveTime();
+
+      video.removeEventListener("timeupdate", saveTime);
+      video.removeEventListener("pause", saveTime);
+      video.removeEventListener("ended", saveTime);
+      video.removeEventListener("loadedmetadata", seekToSavedTime);
+      video.removeEventListener("canplay", seekToSavedTime);
 
       if (hls) {
         hls.destroy();
       }
     };
-  }, [src]);
+  }, [src, storageKey, autoResume]);
 
   return (
-    <div className="relative bg-black">
-      <video
-        ref={videoRef}
-        controls
-        playsInline
-        className="h-full w-full bg-black object-contain"
-      />
-
-      {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6 text-center text-sm text-red-300">
-          {error}
-        </div>
-      )}
-    </div>
+    <video
+      ref={videoRef}
+      controls
+      playsInline
+      className="h-full w-full bg-black object-contain"
+    />
   );
 }
