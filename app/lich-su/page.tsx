@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getImageUrl, Taxonomy } from "@/lib/kkphim";
+import {
+  readWatchHistory,
+  removeWatchHistoryItem,
+  clearWatchHistory,
+} from "@/lib/watchStore";
 
 const KEY = "baoflix_history";
 

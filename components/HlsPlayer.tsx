@@ -18,9 +18,11 @@ export default function HlsPlayer({
   const hasSeekedRef = useRef(false);
 
   useEffect(() => {
-    const video = videoRef.current;
+const videoElement = videoRef.current;
 
-    if (!video || !src) return;
+if (!videoElement || !src) return;
+
+const video = videoElement;
 
     hasSeekedRef.current = false;
 

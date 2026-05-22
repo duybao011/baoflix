@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import {
+  readWatchHistory,
+  removeWatchHistoryItem,
+  clearWatchHistory,
+} from "@/lib/watchStore";
 
 const HISTORY_KEY = "baoflix_history";
 const FAVORITE_KEY = "baoflix_favorites";

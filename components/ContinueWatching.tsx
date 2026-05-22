@@ -3,87 +3,144 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getImageUrl } from "@/lib/kkphim";
+import {
+  readWatchHistory,
+  removeWatchHistoryItem,
+  type WatchHistoryItem,
+} from "@/lib/watchStore";
 
-const HISTORY_KEY = "baoflix_history";
+function getHistoryHref(item: WatchHistoryItem) {
+  if (item.href) {
+    return item.href;
+  }
 
-type HistoryItem = {
-  slug: string;
-  name: string;
-  origin_name?: string;
-  poster_url?: string;
-  thumb_url?: string;
-  episodeName: string;
-  episodeIndex: number;
-  serverIndex?: number;
-  serverName?: string;
-  watchedAt: string;
-};
+  if (item.isCustom) {
+    return `/ca-nhan/${item.slug}/xem?season=${item.seasonIndex ?? 0}&tap=${
+      item.episodeIndex ?? 0
+    }`;
+  }
+
+  return `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${
+    item.episodeIndex ?? 0
+  }`;
+}
+
+function getSourceLabel(item: WatchHistoryItem) {
+  if (item.isCustom) {
+    return item.seasonName || "Phim riêng";
+  }
+
+  return item.serverName || "Server";
+}
 
 export default function ContinueWatching() {
-  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [history, setHistory] = useState<WatchHistoryItem[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      const list: HistoryItem[] = raw ? JSON.parse(raw) : [];
-      setItems(list.slice(0, 12));
-    } catch {
-      setItems([]);
+    setHistory(readWatchHistory());
+
+    function refreshHistory() {
+      setHistory(readWatchHistory());
     }
+
+    window.addEventListener("storage", refreshHistory);
+    window.addEventListener("focus", refreshHistory);
+
+    return () => {
+      window.removeEventListener("storage", refreshHistory);
+      window.removeEventListener("focus", refreshHistory);
+    };
   }, []);
 
-  if (!items.length) return null;
+  function deleteItem(item: WatchHistoryItem) {
+    const next = removeWatchHistoryItem({
+      slug: item.slug,
+      isCustom: item.isCustom,
+    });
+
+    setHistory(next);
+  }
+
+  if (!history.length) {
+    return null;
+  }
 
   return (
-    <section className="py-8">
-      <div className="mb-5 flex items-center justify-between gap-4">
+    <section className="mb-10">
+      <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-black">Tiếp tục xem</h2>
+          <h2 className="text-2xl font-black">Xem tiếp</h2>
+
           <p className="mt-1 text-sm text-slate-400">
-            Quay lại đúng tập và đúng server fen xem gần nhất.
+            Những phim bạn đang xem dở.
           </p>
         </div>
 
         <Link
           href="/lich-su"
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
         >
           Xem lịch sử
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items.map((item) => (
-          <Link
-            key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
-            href={`/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex}`}
-            className="flex gap-4 rounded-3xl border border-white/10 bg-white/5 p-3 hover:bg-white/10"
-          >
-            <img
-              src={getImageUrl(item.poster_url || item.thumb_url)}
-              alt={item.name}
-              className="h-28 w-20 rounded-2xl object-cover"
-            />
+      <div className="grid gap-4">
+        {history.slice(0, 8).map((item) => {
+          const href = getHistoryHref(item);
+          const image = getImageUrl(item.poster_url || item.thumb_url);
+          const sourceLabel = getSourceLabel(item);
 
-            <div className="flex min-w-0 flex-col justify-center">
-              <h3 className="line-clamp-2 font-bold">{item.name}</h3>
+          return (
+            <div
+              key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
+              className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] p-3 transition hover:bg-white/[0.07]"
+            >
+              <Link href={href} className="flex gap-4">
+                <div className="h-28 w-20 shrink-0 overflow-hidden rounded-2xl bg-white/5">
+                  <img
+                    src={image}
+                    alt={item.name}
+                    className="h-full w-full object-cover transition group-hover:scale-105"
+                  />
+                </div>
 
-              <p className="mt-1 line-clamp-1 text-sm text-slate-400">
-                {item.origin_name}
-              </p>
+                <div className="min-w-0 flex-1 py-1">
+                  <h3 className="line-clamp-1 font-black text-white">
+                    {item.name}
+                  </h3>
 
-              <p className="mt-2 text-sm text-red-300">
-                Xem tiếp: {item.episodeName}
-              </p>
+                  {item.origin_name && (
+                    <p className="mt-1 line-clamp-1 text-sm text-slate-400">
+                      {item.origin_name}
+                    </p>
+                  )}
 
-              {item.serverName && (
-                <p className="mt-1 text-xs text-yellow-300">
-                  {item.serverName}
-                </p>
-              )}
+                  <p className="mt-3 text-sm font-bold text-red-300">
+                    Xem tiếp: {item.episodeName || "Tập đang xem"}
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-yellow-300">
+                    Nguồn: {sourceLabel}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-400">
+                    {item.year && <span>{item.year}</span>}
+                    {item.lang && <span>{item.lang}</span>}
+                    {item.quality && <span>{item.quality}</span>}
+                  </div>
+                </div>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => deleteItem(item)}
+                className="absolute right-3 top-3 rounded-xl border border-white/10 bg-black/50 px-3 py-2 text-xs font-bold text-white opacity-100 hover:bg-red-600 md:opacity-0 md:group-hover:opacity-100"
+              >
+                Xóa
+              </button>
             </div>
-          </Link>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

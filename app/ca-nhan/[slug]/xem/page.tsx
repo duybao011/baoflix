@@ -19,6 +19,12 @@ type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+type CustomMovieWatchContentProps = {
+  movieData: StoredCustomMovie;
+  season: number;
+  tap: number;
+};
+
 export default function CustomMovieWatchPage({ params }: PageProps) {
   const { slug } = use(params);
   const searchParams = useSearchParams();
@@ -27,8 +33,6 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
   const tap = Number(searchParams.get("tap") || 0);
 
   const [movieData, setMovieData] = useState<StoredCustomMovie | null>(null);
-  const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
-  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
 
   useEffect(() => {
     setMovieData(getCustomMovieBySlugClient(slug) || null);
@@ -37,10 +41,32 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
   if (!movieData) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-        Không tìm thấy phim riêng.
+        <h1 className="text-2xl font-black">Không tìm thấy phim riêng</h1>
+
+        <p className="mt-2 text-slate-400">
+          Phim này có thể nằm trên thiết bị khác hoặc đã bị xóa.
+        </p>
+
+        <Link
+          href="/ca-nhan"
+          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
+        >
+          Quay lại phim riêng
+        </Link>
       </div>
     );
   }
+
+  return <CustomMovieWatchContent movieData={movieData} season={season} tap={tap} />;
+}
+
+function CustomMovieWatchContent({
+  movieData,
+  season,
+  tap,
+}: CustomMovieWatchContentProps) {
+  const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
+  const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
 
   const movie = movieData.movie;
   const seasons = movieData.episodes ?? [];
@@ -117,22 +143,26 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
       <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="mb-3 text-lg font-black">Chọn mùa</h2>
 
-        <div className="flex flex-wrap gap-2">
-          {seasons.map((seasonItem, index) => (
-            <Link
-              key={`${seasonItem.server_name}-${index}`}
-              href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
-              className={[
-                "rounded-xl border px-4 py-2 text-sm font-bold",
-                index === safeSeasonIndex
-                  ? "border-yellow-300 bg-yellow-300 text-black"
-                  : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-              ].join(" ")}
-            >
-              {seasonItem.server_name || `Mùa ${index + 1}`}
-            </Link>
-          ))}
-        </div>
+        {seasons.length === 0 ? (
+          <p className="text-sm text-slate-400">Phim này chưa có mùa/tập.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {seasons.map((seasonItem, index) => (
+              <Link
+                key={`${seasonItem.server_name}-${index}`}
+                href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
+                className={[
+                  "rounded-xl border px-4 py-2 text-sm font-bold",
+                  index === safeSeasonIndex
+                    ? "border-yellow-300 bg-yellow-300 text-black"
+                    : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                ].join(" ")}
+              >
+                {seasonItem.server_name || `Mùa ${index + 1}`}
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="baoflix-player-fill mt-5">
@@ -225,23 +255,27 @@ export default function CustomMovieWatchPage({ params }: PageProps) {
             <div className="mb-6">
               <h3 className="mb-3 text-lg font-black">Mùa</h3>
 
-              <div className="flex flex-wrap gap-2">
-                {seasons.map((seasonItem, index) => (
-                  <Link
-                    key={`${seasonItem.server_name}-${index}`}
-                    href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
-                    onClick={() => setEpisodePanelOpen(false)}
-                    className={[
-                      "rounded-xl border px-4 py-2 text-sm font-bold",
-                      index === safeSeasonIndex
-                        ? "border-yellow-300 bg-yellow-300 text-black"
-                        : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-                    ].join(" ")}
-                  >
-                    {seasonItem.server_name || `Mùa ${index + 1}`}
-                  </Link>
-                ))}
-              </div>
+              {seasons.length === 0 ? (
+                <p className="text-sm text-slate-400">Chưa có mùa nào.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {seasons.map((seasonItem, index) => (
+                    <Link
+                      key={`${seasonItem.server_name}-${index}`}
+                      href={`/ca-nhan/${movie.slug}/xem?season=${index}&tap=0`}
+                      onClick={() => setEpisodePanelOpen(false)}
+                      className={[
+                        "rounded-xl border px-4 py-2 text-sm font-bold",
+                        index === safeSeasonIndex
+                          ? "border-yellow-300 bg-yellow-300 text-black"
+                          : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                      ].join(" ")}
+                    >
+                      {seasonItem.server_name || `Mùa ${index + 1}`}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-6">
