@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getImageUrl } from "@/lib/kkphim";
 
 type NavItem = {
@@ -47,6 +47,20 @@ const quickNavItems: NavItem[] = [
   { label: "Yêu thích", href: "/yeu-thich" },
   { label: "Lịch sử", href: "/lich-su" },
   { label: "Phim riêng", href: "/ca-nhan" },
+  { label: "TV Mode", href: "/tv" },
+];
+
+const tvModeNavItems: NavItem[] = [
+  { label: "Trang chủ", href: "/" },
+  { label: "TV Mode", href: "/tv", highlight: true },
+  { label: "Tìm kiếm", href: "/tim-kiem" },
+  { label: "Bộ lọc", href: "/loc" },
+  { label: "Phim Hàn", href: "/loc?country=han-quoc" },
+  { label: "Phim Nhật", href: "/loc?country=nhat-ban" },
+  { label: "Phim bộ Trung", href: "/loc?type=phim-bo&country=trung-quoc" },
+  { label: "Yêu thích", href: "/yeu-thich" },
+  { label: "Lịch sử", href: "/lich-su" },
+  { label: "Phim riêng", href: "/ca-nhan" },
 ];
 
 function readSearchHistory() {
@@ -86,18 +100,26 @@ function clearSearchHistory() {
 function SearchForm({
   compact,
   onDone,
+  autoFocus,
+  initialKeyword,
 }: {
   compact?: boolean;
   onDone?: () => void;
+  autoFocus?: boolean;
+  initialKeyword?: string;
 }) {
   const router = useRouter();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(initialKeyword || "");
   const [history, setHistory] = useState<string[]>([]);
   const [focused, setFocused] = useState(false);
   const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
   const [loadingSuggest, setLoadingSuggest] = useState(false);
+
+  useEffect(() => {
+    setKeyword(initialKeyword || "");
+  }, [initialKeyword]);
 
   useEffect(() => {
     setHistory(readSearchHistory());
@@ -188,7 +210,7 @@ function SearchForm({
 
     const next = saveSearchHistory(q);
     setHistory(next);
-    setKeyword("");
+    setKeyword(q);
     setFocused(false);
     setSuggestions([]);
 
@@ -245,6 +267,7 @@ function SearchForm({
       <form onSubmit={submit} className="flex w-full items-center gap-2">
         <input
           value={keyword}
+          autoFocus={autoFocus}
           onFocus={() => setFocused(true)}
           onChange={(event) => {
             setKeyword(event.target.value);
@@ -396,23 +419,35 @@ function NavButton({ item, onClick }: { item: NavItem; onClick?: () => void }) {
 }
 
 export default function Header() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-useEffect(() => {
-  if (!menuOpen) return;
+const isSearchPage = pathname === "/tim-kiem";
+const isTvMode = pathname === "/tv";
+const currentKeyword = searchParams.get("q") || searchParams.get("keyword") || "";
+const desktopNavItems = isTvMode ? tvModeNavItems : [...mainNavItems, ...quickNavItems];
+const mobileMainItems = isTvMode ? tvModeNavItems : mainNavItems;
+const mobileQuickItems = isTvMode ? quickNavItems.slice(0, 8) : quickNavItems;
 
-  const oldOverflow = document.body.style.overflow;
-  const oldTouchAction = document.body.style.touchAction;
+  const showMobileSearch = searchOpen || isSearchPage;
 
-  document.body.style.overflow = "hidden";
-  document.body.style.touchAction = "none";
+  useEffect(() => {
+    if (!menuOpen) return;
 
-  return () => {
-    document.body.style.overflow = oldOverflow;
-    document.body.style.touchAction = oldTouchAction;
-  };
-}, [menuOpen]);
+    const oldOverflow = document.body.style.overflow;
+    const oldTouchAction = document.body.style.touchAction;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+
+    return () => {
+      document.body.style.overflow = oldOverflow;
+      document.body.style.touchAction = oldTouchAction;
+    };
+  }, [menuOpen]);
 
   function closePanels() {
     setMenuOpen(false);
@@ -433,16 +468,18 @@ useEffect(() => {
             </Link>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchOpen((value) => !value);
-                  setMenuOpen(false);
-                }}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
-              >
-                Tìm
-              </button>
+              {!isSearchPage && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchOpen((value) => !value);
+                    setMenuOpen(false);
+                  }}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
+                >
+                  Tìm
+                </button>
+              )}
 
               <button
                 type="button"
@@ -457,9 +494,13 @@ useEffect(() => {
             </div>
           </div>
 
-          {searchOpen && (
+          {showMobileSearch && (
             <div className="mt-3 lg:hidden">
-              <SearchForm compact onDone={closePanels} />
+              <SearchForm
+                compact
+                initialKeyword={currentKeyword}
+                onDone={closePanels}
+              />
             </div>
           )}
 
@@ -472,95 +513,95 @@ useEffect(() => {
                 <span className="text-red-500">Bảo</span>Flix
               </Link>
 
-              <SearchForm />
+              <SearchForm initialKeyword={currentKeyword} />
             </div>
 
             <nav className="mt-4 flex flex-wrap gap-2">
-              {[...mainNavItems, ...quickNavItems].map((item) => (
-                <NavButton key={`${item.href}-${item.label}`} item={item} />
-              ))}
+             {desktopNavItems.map((item) => (
+  <NavButton key={`${item.href}-${item.label}`} item={item} />
+))}
             </nav>
           </div>
         </div>
       </header>
 
-{menuOpen && (
-  <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden">
-    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#070b14]">
-      <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-4">
-        <Link
-          href="/"
-          onClick={closePanels}
-          className="text-2xl font-black tracking-tight text-white"
-        >
-          <span className="text-red-500">Bảo</span>Flix
-        </Link>
-
-        <button
-          type="button"
-          onClick={closePanels}
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white"
-        >
-          Đóng
-        </button>
-      </div>
-
-      <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5"
-        style={{
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
-        <section>
-          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-            Tìm nhanh
-          </h2>
-
-          <SearchForm compact onDone={closePanels} />
-        </section>
-
-        <section className="mt-7">
-          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-            Điều hướng
-          </h2>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {mainNavItems.map((item) => (
-              <NavButton
-                key={`${item.href}-${item.label}`}
-                item={item}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden">
+          <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#070b14]">
+            <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4">
+              <Link
+                href="/"
                 onClick={closePanels}
-              />
-            ))}
-          </div>
-        </section>
+                className="text-2xl font-black tracking-tight text-white"
+              >
+                <span className="text-red-500">Bảo</span>Flix
+              </Link>
 
-        <section className="mt-7">
-          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-            Xem nhanh
-          </h2>
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {quickNavItems.map((item) => (
-              <NavButton
-                key={`${item.href}-${item.label}`}
-                item={item}
+              <button
+                type="button"
                 onClick={closePanels}
-              />
-            ))}
-          </div>
-        </section>
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white"
+              >
+                Đóng
+              </button>
+            </div>
 
-        <section className="mt-7 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-          <h2 className="text-lg font-black">Gợi ý cho iPhone / TV</h2>
+            <div
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5"
+              style={{
+                WebkitOverflowScrolling: "touch",
+              }}
+            >
+              <section>
+                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+                  Tìm nhanh
+                </h2>
 
-          <p className="mt-2 text-sm leading-6 text-slate-400">
-            Menu này dùng nút to hơn để dễ bấm bằng tay hoặc remote. Khi đóng
-            APK/WebView, phần này sẽ đỡ phải kéo ngang như header cũ.
-          </p>
-        </section>
+                <SearchForm compact onDone={closePanels} />
+              </section>
 
-        <div className="h-10" />
+              <section className="mt-7">
+                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+                  Điều hướng
+                </h2>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {mobileMainItems.map((item) => (
+                    <NavButton
+                      key={`${item.href}-${item.label}`}
+                      item={item}
+                      onClick={closePanels}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="mt-7">
+                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+                  Xem nhanh
+                </h2>
+
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {mobileQuickItems.map((item) => (
+                    <NavButton
+                      key={`${item.href}-${item.label}`}
+                      item={item}
+                      onClick={closePanels}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section className="mt-7 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                <h2 className="text-lg font-black">Gợi ý cho iPhone / TV</h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  Menu này dùng nút to hơn để dễ bấm bằng tay hoặc remote. Khi
+                  đóng APK/WebView, phần này sẽ đỡ phải kéo ngang như header cũ.
+                </p>
+              </section>
+
+              <div className="h-10" />
             </div>
           </div>
         </div>

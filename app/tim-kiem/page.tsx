@@ -1,6 +1,7 @@
 import Link from "next/link";
 import MovieGrid from "@/components/MovieGrid";
 import Pagination from "@/components/Pagination";
+import SearchEmptyState from "@/components/SearchEmptyState";
 import {
   getCountries,
   searchMovies,
@@ -60,34 +61,18 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const params = await searchParams;
 
   const q = (params.q || params.keyword || "").trim();
-
-  const pageNumber = Number(params.page || 1);
-  const page = Number.isFinite(pageNumber) && pageNumber > 0 ? pageNumber : 1;
+  const page = Number(params.page || 1);
 
   const country = params.country || "tat-ca";
   const sortLang = params.sort_lang || "tat-ca";
   const category = params.category || "tat-ca";
   const year = params.year || "tat-ca";
 
-  const countries = await getCountries();
-
   if (!q) {
-    return (
-      <div>
-        <h1 className="mb-2 text-3xl font-black">Tìm kiếm phim</h1>
-
-        <p className="mb-6 text-slate-400">
-          Nhập tên phim vào ô tìm kiếm phía trên để bắt đầu.
-        </p>
-
-        <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6">
-          <p className="text-slate-300">
-            Fen có thể tìm theo tên Việt, tên gốc hoặc một phần tên phim.
-          </p>
-        </div>
-      </div>
-    );
+    return <SearchEmptyState />;
   }
+
+  const countries = await getCountries();
 
   const searchResult = await searchMovies(q, page, 36, {
     country: country !== "tat-ca" ? country : undefined,
@@ -96,7 +81,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
     year: year !== "tat-ca" ? year : undefined,
   });
 
-  const filteredMovies = smartFilterMoviesByKeyword(searchResult.items || [], q);
+  const filteredMovies = smartFilterMoviesByKeyword(searchResult.items, q);
 
   const result = {
     ...searchResult,
@@ -119,10 +104,10 @@ export default async function SearchPage({ searchParams }: PageProps) {
         </div>
 
         <Link
-          href="/"
+          href="/tim-kiem"
           className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
         >
-          Về trang chủ
+          Tìm từ khóa khác
         </Link>
       </div>
 
@@ -229,20 +214,18 @@ export default async function SearchPage({ searchParams }: PageProps) {
             movies={result.items}
           />
 
-          {totalPages > 1 && (
-            <Pagination
-              basePath="/tim-kiem"
-              currentPage={currentPage}
-              totalPages={totalPages}
-              searchParams={{
-                q,
-                country: country === "tat-ca" ? undefined : country,
-                sort_lang: sortLang === "tat-ca" ? undefined : sortLang,
-                category: category === "tat-ca" ? undefined : category,
-                year: year === "tat-ca" ? undefined : year,
-              }}
-            />
-          )}
+          <Pagination
+            basePath="/tim-kiem"
+            currentPage={currentPage}
+            totalPages={totalPages}
+            searchParams={{
+              q,
+              country,
+              sort_lang: sortLang,
+              category,
+              year,
+            }}
+          />
         </>
       ) : (
         <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-8 text-center">

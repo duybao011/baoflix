@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
 import Header from "@/components/Header";
 import PwaRegister from "@/components/PwaRegister";
 import MobileBackButton from "@/components/MobileBackButton";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import TvModeFloatingButton from "@/components/TvModeFloatingButton";
 
 export const metadata: Metadata = {
   title: "BảoFlix",
@@ -26,12 +28,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" data-scroll-behavior="smooth">
       <body>
-	<PwaRegister />
-        <Header />
-  	<MobileBackButton />
-  	<MobileBottomNav />
+        <PwaRegister />
+
+        <Suspense
+          fallback={
+            <div className="h-[73px] border-b border-white/10 bg-[#070b14]" />
+          }
+        >
+          <Header />
+        </Suspense>
+
+        <MobileBackButton />
+        <MobileBottomNav />
+	<TvModeFloatingButton />
 
         <main className="mx-auto min-h-screen max-w-7xl px-4 pb-28 pt-6 sm:px-6 lg:px-8">
           {children}
