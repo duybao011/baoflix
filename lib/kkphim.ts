@@ -2,6 +2,7 @@ import { getCustomMovieBySlug } from "@/data/custom-movies";
 
 const API_BASE = "https://phimapi.com";
 const IMAGE_BASE = "https://phimimg.com";
+const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
 export type Taxonomy = {
   name: string;
@@ -94,14 +95,7 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 function extractItems(data: any): MovieItem[] {
-  const items =
-    data?.items ||
-    data?.data?.items ||
-    data?.data?.data?.items ||
-    data?.data ||
-    [];
-
-  return Array.isArray(items) ? items : [];
+  return data?.items || data?.data?.items || data?.data || [];
 }
 
 function getTitle(data: any, fallback: string) {
@@ -109,7 +103,6 @@ function getTitle(data: any, fallback: string) {
     data?.titlePage ||
     data?.data?.titlePage ||
     data?.data?.seoOnPage?.titleHead ||
-    data?.seoOnPage?.titleHead ||
     fallback
   );
 }
@@ -335,7 +328,7 @@ async function getAggregatedAnimationBySubtype(
 export async function getGenres() {
   try {
     const data = await fetchJson<Taxonomy[]>("/the-loai");
-    return Array.isArray(data) ? data : [];
+    return data || [];
   } catch {
     return [];
   }
@@ -344,7 +337,7 @@ export async function getGenres() {
 export async function getCountries() {
   try {
     const data = await fetchJson<Taxonomy[]>("/quoc-gia");
-    return Array.isArray(data) ? data : [];
+    return data || [];
   } catch {
     return [];
   }
@@ -359,6 +352,28 @@ export async function getLatestMovies(page = 1) {
     return extractItems(data);
   } catch {
     return [];
+  }
+}
+
+export async function getLatestMovieListResult(
+  page = 1,
+  limit = 36
+): Promise<MovieListResult> {
+  try {
+    const data = await fetchJson<any>(
+      `/danh-sach/phim-moi-cap-nhat?page=${page}`
+    );
+
+    const items = extractItems(data).slice(0, limit);
+
+    return {
+      title: getTitle(data, "Phim mới cập nhật"),
+      items,
+      pagination: getPagination(data),
+    };
+  } catch (error) {
+    console.warn("Lỗi lấy phim mới cập nhật:", error);
+    return emptyMovieResult("Phim mới cập nhật", page);
   }
 }
 
@@ -377,13 +392,9 @@ export async function getMoviesByList(
 
   appendFilterParams(params, filters);
 
-  try {
-    const data = await fetchJson<any>(`/v1/api/danh-sach/${typeList}?${params}`);
-    return buildListResult(data, `Danh sách: ${typeList}`);
-  } catch (error) {
-    console.warn("Lỗi lấy danh sách:", typeList, error);
-    return emptyMovieResult(`Danh sách: ${typeList}`, page);
-  }
+  const data = await fetchJson<any>(`/v1/api/danh-sach/${typeList}?${params}`);
+
+  return buildListResult(data, `Danh sách: ${typeList}`);
 }
 
 export async function getMoviesByGenre(
@@ -404,13 +415,9 @@ export async function getMoviesByGenre(
     category: undefined,
   });
 
-  try {
-    const data = await fetchJson<any>(`/v1/api/the-loai/${genreSlug}?${params}`);
-    return buildListResult(data, `Thể loại: ${genreSlug}`);
-  } catch (error) {
-    console.warn("Lỗi lấy thể loại:", genreSlug, error);
-    return emptyMovieResult(`Thể loại: ${genreSlug}`, page);
-  }
+  const data = await fetchJson<any>(`/v1/api/the-loai/${genreSlug}?${params}`);
+
+  return buildListResult(data, `Thể loại: ${genreSlug}`);
 }
 
 export async function getMoviesByCountry(
@@ -431,13 +438,9 @@ export async function getMoviesByCountry(
     country: undefined,
   });
 
-  try {
-    const data = await fetchJson<any>(`/v1/api/quoc-gia/${countrySlug}?${params}`);
-    return buildListResult(data, `Quốc gia: ${countrySlug}`);
-  } catch (error) {
-    console.warn("Lỗi lấy quốc gia:", countrySlug, error);
-    return emptyMovieResult(`Quốc gia: ${countrySlug}`, page);
-  }
+  const data = await fetchJson<any>(`/v1/api/quoc-gia/${countrySlug}?${params}`);
+
+  return buildListResult(data, `Quốc gia: ${countrySlug}`);
 }
 
 export async function getMoviesByYear(
@@ -458,13 +461,9 @@ export async function getMoviesByYear(
     year: undefined,
   });
 
-  try {
-    const data = await fetchJson<any>(`/v1/api/nam/${year}?${params}`);
-    return buildListResult(data, `Năm: ${year}`);
-  } catch (error) {
-    console.warn("Lỗi lấy năm:", year, error);
-    return emptyMovieResult(`Năm: ${year}`, page);
-  }
+  const data = await fetchJson<any>(`/v1/api/nam/${year}?${params}`);
+
+  return buildListResult(data, `Năm: ${year}`);
 }
 
 export async function getFilteredMovies(
@@ -561,16 +560,7 @@ export async function getFilteredMovies(
     }
   }
 
-  try {
-    return await getMoviesByList("phim-moi-cap-nhat", page, limit, {
-      sort_field: commonFilters.sort_field,
-      sort_type: commonFilters.sort_type,
-      sort_lang: commonFilters.sort_lang,
-    });
-  } catch (error) {
-    console.warn("Lỗi lấy mặc định:", error);
-    return emptyMovieResult("Kết quả lọc", page);
-  }
+  return await getLatestMovieListResult(page, limit);
 }
 
 export async function searchMovies(
@@ -636,7 +626,7 @@ export async function getMoviesFromSlugs(slugs: string[]) {
 }
 
 export function getImageUrl(url?: string) {
-  if (!url) return "/placeholder.png";
+  if (!url) return PLACEHOLDER_IMAGE;
 
   if (url.startsWith("/")) {
     return url;
@@ -652,7 +642,7 @@ export function getImageUrl(url?: string) {
 export function getWebpImageUrl(url?: string) {
   const imageUrl = getImageUrl(url);
 
-  if (imageUrl === "/placeholder.png") {
+  if (imageUrl === PLACEHOLDER_IMAGE) {
     return imageUrl;
   }
 
@@ -701,10 +691,6 @@ function normalizeSearchText(text?: string) {
     .trim();
 }
 
-function escapeRegExp(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function tokenizeSearchText(text?: string) {
   return normalizeSearchText(text).split(" ").filter(Boolean);
 }
@@ -726,14 +712,14 @@ function hasPhraseMatch(title: string, keyword: string) {
 
   if (!normalizedKeyword) return true;
 
-  const pattern = new RegExp(`(^|\\s)${escapeRegExp(normalizedKeyword)}(\\s|$)`, "i");
+  const pattern = new RegExp(`(^|\\s)${normalizedKeyword}(\\s|$)`, "i");
   return pattern.test(normalizedTitle);
 }
 
 export function smartFilterMoviesByKeyword<T extends MovieItem>(
   moviesInput: T[] | { items?: T[] } | null | undefined,
   keyword: string
-): T[] {
+) {
   const movies: T[] = Array.isArray(moviesInput)
     ? moviesInput
     : Array.isArray(moviesInput?.items)
@@ -742,9 +728,7 @@ export function smartFilterMoviesByKeyword<T extends MovieItem>(
 
   const q = normalizeSearchText(keyword);
 
-  if (!q) {
-    return movies;
-  }
+  if (!q) return movies;
 
   const strictMatches = movies.filter((movie) => {
     const name = movie.name || "";
