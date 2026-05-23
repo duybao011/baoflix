@@ -399,6 +399,21 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
+useEffect(() => {
+  if (!menuOpen) return;
+
+  const oldOverflow = document.body.style.overflow;
+  const oldTouchAction = document.body.style.touchAction;
+
+  document.body.style.overflow = "hidden";
+  document.body.style.touchAction = "none";
+
+  return () => {
+    document.body.style.overflow = oldOverflow;
+    document.body.style.touchAction = oldTouchAction;
+  };
+}, [menuOpen]);
+
   function closePanels() {
     setMenuOpen(false);
     setSearchOpen(false);
@@ -469,76 +484,83 @@ export default function Header() {
         </div>
       </header>
 
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm lg:hidden">
-          <div className="flex min-h-screen flex-col bg-[#070b14]">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-4">
-              <Link
-                href="/"
+{menuOpen && (
+  <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden">
+    <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#070b14]">
+      <div className="shrink-0 flex items-center justify-between border-b border-white/10 px-4 py-4">
+        <Link
+          href="/"
+          onClick={closePanels}
+          className="text-2xl font-black tracking-tight text-white"
+        >
+          <span className="text-red-500">Bảo</span>Flix
+        </Link>
+
+        <button
+          type="button"
+          onClick={closePanels}
+          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white"
+        >
+          Đóng
+        </button>
+      </div>
+
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5"
+        style={{
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <section>
+          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+            Tìm nhanh
+          </h2>
+
+          <SearchForm compact onDone={closePanels} />
+        </section>
+
+        <section className="mt-7">
+          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+            Điều hướng
+          </h2>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {mainNavItems.map((item) => (
+              <NavButton
+                key={`${item.href}-${item.label}`}
+                item={item}
                 onClick={closePanels}
-                className="text-2xl font-black tracking-tight text-white"
-              >
-                <span className="text-red-500">Bảo</span>Flix
-              </Link>
+              />
+            ))}
+          </div>
+        </section>
 
-              <button
-                type="button"
+        <section className="mt-7">
+          <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
+            Xem nhanh
+          </h2>
+
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {quickNavItems.map((item) => (
+              <NavButton
+                key={`${item.href}-${item.label}`}
+                item={item}
                 onClick={closePanels}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white"
-              >
-                Đóng
-              </button>
-            </div>
+              />
+            ))}
+          </div>
+        </section>
 
-            <div className="flex-1 overflow-y-auto px-4 py-5">
-              <section>
-                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-                  Tìm nhanh
-                </h2>
+        <section className="mt-7 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+          <h2 className="text-lg font-black">Gợi ý cho iPhone / TV</h2>
 
-                <SearchForm compact onDone={closePanels} />
-              </section>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            Menu này dùng nút to hơn để dễ bấm bằng tay hoặc remote. Khi đóng
+            APK/WebView, phần này sẽ đỡ phải kéo ngang như header cũ.
+          </p>
+        </section>
 
-              <section className="mt-7">
-                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-                  Điều hướng
-                </h2>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {mainNavItems.map((item) => (
-                    <NavButton
-                      key={`${item.href}-${item.label}`}
-                      item={item}
-                      onClick={closePanels}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="mt-7">
-                <h2 className="mb-3 text-sm font-black uppercase tracking-[0.2em] text-slate-400">
-                  Xem nhanh
-                </h2>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {quickNavItems.map((item) => (
-                    <NavButton
-                      key={`${item.href}-${item.label}`}
-                      item={item}
-                      onClick={closePanels}
-                    />
-                  ))}
-                </div>
-              </section>
-
-              <section className="mt-7 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                <h2 className="text-lg font-black">Gợi ý cho iPhone / TV</h2>
-
-                <p className="mt-2 text-sm leading-6 text-slate-400">
-                  Menu này dùng nút to hơn để dễ bấm bằng tay hoặc remote. Khi
-                  đóng APK/WebView, phần này sẽ đỡ phải kéo ngang như header cũ.
-                </p>
-              </section>
+        <div className="h-10" />
             </div>
           </div>
         </div>
