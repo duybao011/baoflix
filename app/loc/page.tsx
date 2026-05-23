@@ -47,7 +47,7 @@ export default async function FilterPage({ searchParams }: PageProps) {
   const totalPages = Number(result.pagination?.totalPages || 0);
 
   return (
-    <div>
+    <div data-tv-scope="loc-page" data-tv-lock="true">
       <h1 className="mb-2 text-3xl font-black">Bộ lọc phim</h1>
 
       <p className="mb-6 text-slate-400">

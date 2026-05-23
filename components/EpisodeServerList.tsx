@@ -5,6 +5,11 @@ import { useEffect, useMemo, useState } from "react";
 import type { EpisodeServer } from "@/lib/kkphim";
 import { getNormalWatchedKey, readWatchedEpisodes } from "@/lib/watchStore";
 
+type ValidServer = {
+  server: EpisodeServer;
+  originalIndex: number;
+};
+
 export default function EpisodeServerList({
   movieSlug,
   servers,
@@ -30,17 +35,22 @@ export default function EpisodeServerList({
     };
   }, []);
 
-  const validServers = useMemo(() => {
-    return (servers || []).filter((server) => {
-      return (server.server_data ?? []).length > 0;
-    });
+  const validServers = useMemo<ValidServer[]>(() => {
+    return (servers || [])
+      .map((server, originalIndex) => ({
+        server,
+        originalIndex,
+      }))
+      .filter((item) => {
+        return (item.server.server_data ?? []).length > 0;
+      });
   }, [servers]);
 
   const isSingleMovieLayout = useMemo(() => {
     if (!validServers.length) return false;
 
-    return validServers.every((server) => {
-      const episodes = server.server_data ?? [];
+    return validServers.every((item) => {
+      const episodes = item.server.server_data ?? [];
       return episodes.length <= 1;
     });
   }, [validServers]);
@@ -65,9 +75,12 @@ export default function EpisodeServerList({
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {validServers.map((server, serverIndex) => {
+        <div data-tv-row className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {validServers.map((item, visibleIndex) => {
+            const server = item.server;
+            const serverIndex = item.originalIndex;
             const episode = server.server_data?.[0];
+
             const watchedKey = getNormalWatchedKey(movieSlug, serverIndex, 0);
             const watched = watchedEpisodes.includes(watchedKey);
 
@@ -75,7 +88,8 @@ export default function EpisodeServerList({
               <Link
                 key={`${server.server_name}-${serverIndex}`}
                 href={`/xem/${movieSlug}?server=${serverIndex}&tap=0`}
-                className="group rounded-3xl border border-white/10 bg-black/20 p-4 transition hover:border-red-500/50 hover:bg-red-600/10"
+                data-tv-default={visibleIndex === 0 ? true : undefined}
+                className="group rounded-3xl border border-white/10 bg-black/20 p-4 transition hover:border-red-500/50 hover:bg-red-600/10 focus-visible:border-yellow-300 focus-visible:bg-yellow-300/10"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -117,6 +131,12 @@ export default function EpisodeServerList({
       {servers.map((server, serverIndex) => {
         const episodes = server.server_data ?? [];
 
+        const hasPreviousPlayableEpisode = servers
+          .slice(0, serverIndex)
+          .some((previousServer) => {
+            return (previousServer.server_data ?? []).length > 0;
+          });
+
         return (
           <div
             key={`${server.server_name}-${serverIndex}`}
@@ -136,6 +156,8 @@ export default function EpisodeServerList({
               {episodes.length > 0 && (
                 <Link
                   href={`/xem/${movieSlug}?server=${serverIndex}&tap=0`}
+                  data-tv-skip
+                  tabIndex={-1}
                   className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
                 >
                   Xem server này
@@ -148,7 +170,10 @@ export default function EpisodeServerList({
                 Server này chưa có tập.
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+              <div
+                data-tv-row
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
+              >
                 {episodes.map((episode, episodeIndex) => {
                   const watchedKey = getNormalWatchedKey(
                     movieSlug,
@@ -158,11 +183,15 @@ export default function EpisodeServerList({
 
                   const watched = watchedEpisodes.includes(watchedKey);
 
+                  const shouldBeDefault =
+                    !hasPreviousPlayableEpisode && episodeIndex === 0;
+
                   return (
                     <Link
                       key={`${serverIndex}-${episode.name}-${episodeIndex}`}
                       href={`/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`}
-                      className="flex min-h-[54px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600"
+                      data-tv-default={shouldBeDefault ? true : undefined}
+                      className="flex min-h-[54px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
                     >
                       <span className="inline-flex items-center justify-center gap-1">
                         {watched && (

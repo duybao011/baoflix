@@ -201,7 +201,10 @@ function FilterRow({
   children: React.ReactNode;
 }) {
   return (
-    <div className="grid gap-3 border-b border-white/10 py-4 md:grid-cols-[150px_1fr]">
+    <div
+      data-tv-row
+      className="grid gap-3 border-b border-white/10 py-4 md:grid-cols-[150px_1fr]"
+    >
       <div className="font-bold text-slate-100">{label}:</div>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
@@ -538,7 +541,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             <OptionButton disabled>Lượt xem</OptionButton>
           </FilterRow>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div data-tv-row className="mt-6 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={applyFilter}

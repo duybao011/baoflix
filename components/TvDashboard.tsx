@@ -116,7 +116,7 @@ function TvMovieCard({
     <Link
       href={href}
       className={[
-        "group block overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-3 transition duration-200 hover:-translate-y-1 hover:border-red-500/70 hover:bg-white/[0.08] focus-visible:-translate-y-1 focus-visible:border-yellow-300 focus-visible:bg-white/[0.08]",
+        "group block overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-3 transition duration-200 hover:-translate-y-1 hover:border-red-500/70 hover:bg-white/[0.08] focus-visible:-translate-y-1 focus-visible:scale-[1.03] focus-visible:border-yellow-300 focus-visible:bg-white/[0.08] md:p-4",
         large ? "md:p-4" : "",
       ].join(" ")}
     >
@@ -294,7 +294,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
   const otherHistory = history.slice(1, 7);
 
   return (
-    <div className="space-y-10">
+    <div className="baoflix-tv-page space-y-10">
       <section className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-5 md:p-8">
         <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-center">
           <div>
@@ -402,7 +402,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
           <ContinueHero item={firstContinue} />
 
           {otherHistory.length > 0 && (
-            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
               {otherHistory.map((item) => (
                 <TvMovieCard
                   key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
@@ -450,7 +450,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             href="/loc?type=phim-bo&country=trung-quoc"
           />
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
             {chineseSeries.slice(0, 14).map((movie) => (
               <TvMovieCard
                 key={movie.slug}

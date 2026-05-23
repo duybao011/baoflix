@@ -138,3 +138,111 @@ video {
     padding-bottom: 0.75rem;
   }
 }
+
+/* =========================
+   BảoFlix TV TCL Optimization
+========================= */
+
+.baoflix-fullscreen-player:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+.baoflix-fullscreen-player:fullscreen .baoflix-fullscreen-inner {
+  width: 100vw;
+  height: 100dvh;
+}
+
+.baoflix-fullscreen-player:-webkit-full-screen {
+  width: 100vw;
+  height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  background: #000;
+}
+
+.baoflix-fullscreen-player:-webkit-full-screen .baoflix-fullscreen-inner {
+  width: 100vw;
+  height: 100dvh;
+}
+
+/* TV mode: dễ nhìn hơn khi ngồi xa màn hình */
+@media (min-width: 1024px) {
+  .baoflix-tv-page {
+    font-size: 1.08rem;
+  }
+
+  .baoflix-tv-page a,
+  .baoflix-tv-page button {
+    scroll-margin: 7rem;
+  }
+
+  .baoflix-tv-page a:focus-visible,
+  .baoflix-tv-page button:focus-visible,
+  .baoflix-tv-page input:focus-visible {
+    transform: translateY(-3px) scale(1.03);
+    border-color: #facc15;
+    box-shadow:
+      0 0 0 4px rgba(250, 204, 21, 0.22),
+      0 18px 45px rgba(0, 0, 0, 0.45);
+  }
+
+  .baoflix-tv-page input {
+    min-height: 4.25rem;
+    font-size: 1.25rem;
+  }
+
+  .baoflix-tv-page h1 {
+    letter-spacing: -0.04em;
+  }
+
+  .baoflix-tv-page h2 {
+    letter-spacing: -0.03em;
+  }
+}
+
+/* TV/remote: animation nhẹ hơn, focus rõ hơn */
+@media (min-width: 1280px) {
+  .baoflix-tv-page {
+    padding-bottom: 3rem;
+  }
+
+  .baoflix-tv-page img {
+    transform: translateZ(0);
+  }
+}
+
+/* =========================
+   BảoFlix TV Focus System
+========================= */
+
+[data-tv-scope] a:focus-visible,
+[data-tv-scope] button:focus-visible,
+[data-tv-scope] input:focus-visible,
+[data-tv-scope] select:focus-visible,
+[data-tv-scope] textarea:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 3px;
+  transform: translateY(-2px) scale(1.03);
+  box-shadow:
+    0 0 0 4px rgba(250, 204, 21, 0.18),
+    0 16px 36px rgba(0, 0, 0, 0.45);
+}
+
+@media (min-width: 1024px) {
+  [data-tv-scope] a,
+  [data-tv-scope] button,
+  [data-tv-scope] select {
+    scroll-margin: 8rem;
+  }
+}
+
+/* TV remote không focus vào nút phụ trong movie card */
+[data-tv-scope] [data-tv-skip]:focus-visible {
+  outline: none;
+  box-shadow: none;
+  transform: none;
+}

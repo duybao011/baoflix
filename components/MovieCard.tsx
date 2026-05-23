@@ -45,8 +45,12 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
   }
 
   return (
-    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg transition hover:-translate-y-1 hover:bg-white/[0.07]">
-      <Link href={`/phim/${movie.slug}`} className="block">
+    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg transition hover:-translate-y-1 hover:bg-white/[0.07] focus-within:border-yellow-300">
+      <Link
+        href={`/phim/${movie.slug}`}
+        className="block"
+        aria-label={`Mở phim ${movie.name}`}
+      >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
           <img
             src={getCardImageUrl(movie.poster_url || movie.thumb_url)}
@@ -69,8 +73,11 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
         </div>
       </Link>
 
+      {/* PC/mobile only: remote TV bỏ qua nút này */}
       <button
         type="button"
+        data-tv-skip
+        tabIndex={-1}
         onClick={() => setOpen((value) => !value)}
         className="absolute right-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-black/75 text-sm font-black text-white backdrop-blur hover:bg-red-600"
         aria-label="Thông tin nhanh"
@@ -95,6 +102,7 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
         </div>
       </div>
 
+      {/* Overlay này vẫn dùng cho PC/mobile. TV remote sẽ không đi vào các nút bên trong. */}
       <div
         className={[
           "absolute inset-2 z-10 flex-col justify-end rounded-2xl bg-black/85 p-3 backdrop-blur-md transition",
@@ -103,6 +111,8 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
       >
         <button
           type="button"
+          data-tv-skip
+          tabIndex={-1}
           onClick={() => setOpen(false)}
           className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs hover:bg-red-600 md:hidden"
           aria-label="Đóng"
@@ -149,6 +159,8 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
         <div className="grid gap-2">
           <Link
             href={`/phim/${movie.slug}`}
+            data-tv-skip
+            tabIndex={-1}
             className="rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black hover:bg-red-500"
           >
             Chi tiết
@@ -156,6 +168,8 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
 
           <Link
             href={`/xem/${movie.slug}?server=0&tap=0`}
+            data-tv-skip
+            tabIndex={-1}
             className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-center text-xs font-bold hover:bg-white/20"
           >
             Xem ngay
@@ -163,6 +177,8 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
 
           <button
             type="button"
+            data-tv-skip
+            tabIndex={-1}
             onClick={toggleFavorite}
             className={[
               "rounded-xl px-3 py-2 text-xs font-bold",

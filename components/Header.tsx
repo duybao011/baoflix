@@ -253,6 +253,16 @@ function SearchForm({
     setHistory([]);
   }
 
+  function handleSearchBlur() {
+    window.setTimeout(() => {
+      if (!wrapperRef.current) return;
+
+      if (!wrapperRef.current.contains(document.activeElement)) {
+        setFocused(false);
+      }
+    }, 0);
+  }
+
   const showDropdown =
     focused &&
     (keyword.trim().length > 0 ||
@@ -262,6 +272,7 @@ function SearchForm({
   return (
     <div
       ref={wrapperRef}
+      onBlur={handleSearchBlur}
       className={["relative w-full", compact ? "" : "max-w-[560px]"].join(" ")}
     >
       <form onSubmit={submit} className="flex w-full items-center gap-2">
@@ -425,12 +436,17 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-const isSearchPage = pathname === "/tim-kiem";
-const isTvMode = pathname === "/tv";
-const currentKeyword = searchParams.get("q") || searchParams.get("keyword") || "";
-const desktopNavItems = isTvMode ? tvModeNavItems : [...mainNavItems, ...quickNavItems];
-const mobileMainItems = isTvMode ? tvModeNavItems : mainNavItems;
-const mobileQuickItems = isTvMode ? quickNavItems.slice(0, 8) : quickNavItems;
+  const isSearchPage = pathname === "/tim-kiem";
+  const isTvMode = pathname === "/tv";
+  const currentKeyword =
+    searchParams.get("q") || searchParams.get("keyword") || "";
+
+  const desktopNavItems = isTvMode
+    ? tvModeNavItems
+    : [...mainNavItems, ...quickNavItems];
+
+  const mobileMainItems = isTvMode ? tvModeNavItems : mainNavItems;
+  const mobileQuickItems = isTvMode ? quickNavItems.slice(0, 8) : quickNavItems;
 
   const showMobileSearch = searchOpen || isSearchPage;
 
@@ -517,9 +533,9 @@ const mobileQuickItems = isTvMode ? quickNavItems.slice(0, 8) : quickNavItems;
             </div>
 
             <nav className="mt-4 flex flex-wrap gap-2">
-             {desktopNavItems.map((item) => (
-  <NavButton key={`${item.href}-${item.label}`} item={item} />
-))}
+              {desktopNavItems.map((item) => (
+                <NavButton key={`${item.href}-${item.label}`} item={item} />
+              ))}
             </nav>
           </div>
         </div>

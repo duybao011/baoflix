@@ -37,6 +37,30 @@ function normalizeServerName(name?: string) {
   return name || "Server";
 }
 
+function focusTvDefaultInModal() {
+  const modal = document.querySelector<HTMLElement>(
+    "[data-tv-modal='episode-panel']"
+  );
+
+  if (!modal) return;
+
+  const target =
+    modal.querySelector<HTMLElement>("[data-tv-default]") ||
+    modal.querySelector<HTMLElement>("a[href], button:not([disabled])");
+
+  if (!target) return;
+
+  target.focus({
+    preventScroll: true,
+  });
+
+  target.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+    inline: "center",
+  });
+}
+
 export default function WatchClient({
   movie,
   servers,
@@ -100,7 +124,12 @@ export default function WatchClient({
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
 
+    const timer = window.setTimeout(() => {
+      focusTvDefaultInModal();
+    }, 100);
+
     return () => {
+      window.clearTimeout(timer);
       document.body.style.overflow = oldOverflow;
       document.body.style.touchAction = oldTouchAction;
     };
@@ -141,8 +170,17 @@ export default function WatchClient({
   }, [servers, safeEpisodeIndex, movie.slug]);
 
   return (
-    <div>
-      <Link href={`/phim/${movie.slug}`} className="text-sm text-red-300">
+    <div
+      data-tv-scope="watch-page"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+    >
+      <Link
+        href={`/phim/${movie.slug}`}
+        data-tv-skip
+        tabIndex={-1}
+        className="text-sm text-red-300"
+      >
         ← Quay lại chi tiết phim
       </Link>
 
@@ -179,8 +217,9 @@ export default function WatchClient({
 
         <button
           type="button"
+          data-tv-default
           onClick={() => setEpisodePanelOpen(true)}
-          className="rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500"
+          className="rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
         >
           Chọn tập
         </button>
@@ -195,7 +234,7 @@ export default function WatchClient({
             toàn. Nếu nguồn có m3u8 trực tiếp thì app có thể tự resume.
           </p>
 
-          <div className="flex flex-wrap gap-2">
+          <div data-tv-row className="flex flex-wrap gap-2">
             {sameEpisodeServerLinks.map((item) => (
               <Link
                 key={`${item.serverIndex}-${item.episode.name}`}
@@ -239,7 +278,10 @@ export default function WatchClient({
       </div>
 
       <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.04] p-3 md:p-4">
-        <div className="grid grid-cols-3 gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-3">
+        <div
+          data-tv-row
+          className="grid grid-cols-3 gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-3"
+        >
           {previousHref ? (
             <Link
               href={previousHref}
@@ -287,7 +329,12 @@ export default function WatchClient({
       </section>
 
       {episodePanelOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6">
+        <div
+          data-tv-scope="episode-panel"
+          data-tv-lock="true"
+          data-tv-modal="episode-panel"
+          className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6"
+        >
           <section className="flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b0f19] shadow-2xl md:max-h-[86dvh] md:rounded-3xl">
             <div className="shrink-0 border-b border-white/10 p-5">
               <div className="flex items-start justify-between gap-4">
@@ -302,6 +349,7 @@ export default function WatchClient({
 
                 <button
                   type="button"
+                  data-tv-close
                   onClick={() => setEpisodePanelOpen(false)}
                   className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
                 >
@@ -319,7 +367,7 @@ export default function WatchClient({
               <div className="mb-6">
                 <h3 className="mb-3 text-lg font-black">Phiên bản</h3>
 
-                <div className="flex flex-wrap gap-2">
+                <div data-tv-row className="flex flex-wrap gap-2">
                   {servers.map((server, serverIndex) => {
                     const hasCurrentEpisode = Boolean(
                       server.server_data?.[safeEpisodeIndex]
@@ -376,6 +424,8 @@ export default function WatchClient({
                         {serverEpisodes.length > 0 && (
                           <Link
                             href={getEpisodeUrl(movie.slug, serverIndex, 0)}
+                            data-tv-skip
+                            tabIndex={-1}
                             onClick={() => setEpisodePanelOpen(false)}
                             className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
                           >
@@ -389,7 +439,10 @@ export default function WatchClient({
                           Server này chưa có tập.
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                        <div
+                          data-tv-row
+                          className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
+                        >
                           {serverEpisodes.map((episodeItem, episodeIndex) => {
                             const active =
                               serverIndex === safeServerIndex &&
@@ -412,6 +465,7 @@ export default function WatchClient({
                                   serverIndex,
                                   episodeIndex
                                 )}
+                                data-tv-default={active ? true : undefined}
                                 onClick={() => setEpisodePanelOpen(false)}
                                 className={[
                                   "flex min-h-[54px] items-center justify-center rounded-xl border px-3 py-3 text-center text-sm font-bold",
@@ -436,7 +490,7 @@ export default function WatchClient({
                 })}
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div data-tv-row className="mt-6 flex flex-wrap gap-3">
                 <Link
                   href={`/phim/${movie.slug}`}
                   onClick={() => setEpisodePanelOpen(false)}
