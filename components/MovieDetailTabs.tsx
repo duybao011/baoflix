@@ -1,21 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 
-type TabKey = "info" | "episodes" | "cast" | "related";
+type TabKey = "episodes" | "cast" | "related" | "info";
 
 type Props = {
-  info: React.ReactNode;
-  episodes: React.ReactNode;
-  cast: React.ReactNode;
-  related: React.ReactNode;
+  info: ReactNode;
+  episodes: ReactNode;
+  cast: ReactNode;
+  related: ReactNode;
+  defaultTab?: TabKey;
 };
 
-const tabs: { key: TabKey; label: string }[] = [
-  { key: "info", label: "Thông tin" },
-  { key: "episodes", label: "Tập phim" },
-  { key: "cast", label: "Diễn viên" },
-  { key: "related", label: "Liên quan" },
+const tabs: {
+  key: TabKey;
+  label: string;
+}[] = [
+  {
+    key: "episodes",
+    label: "Tập phim",
+  },
+  {
+    key: "cast",
+    label: "Diễn viên",
+  },
+  {
+    key: "related",
+    label: "Liên quan",
+  },
+  {
+    key: "info",
+    label: "Thông tin",
+  },
 ];
 
 export default function MovieDetailTabs({
@@ -23,29 +39,30 @@ export default function MovieDetailTabs({
   episodes,
   cast,
   related,
+  defaultTab = "episodes",
 }: Props) {
-  const [active, setActive] = useState<TabKey>("episodes");
+  const [activeTab, setActiveTab] = useState<TabKey>(defaultTab);
 
   const content = {
-    info,
     episodes,
     cast,
     related,
+    info,
   };
 
   return (
-    <section className="mt-8">
-      <div className="sticky top-[138px] z-30 -mx-1 mb-5 flex gap-2 overflow-x-auto rounded-3xl border border-white/10 bg-[#070a12]/90 p-2 backdrop-blur">
+    <section className="mt-6">
+      <div className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-black/20 p-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             type="button"
-            onClick={() => setActive(tab.key)}
+            onClick={() => setActiveTab(tab.key)}
             className={[
-              "whitespace-nowrap rounded-2xl px-5 py-3 text-sm font-bold transition",
-              active === tab.key
+              "rounded-2xl px-5 py-3 text-sm font-black transition",
+              activeTab === tab.key
                 ? "bg-red-600 text-white"
-                : "bg-white/5 text-slate-300 hover:bg-white/10",
+                : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white",
             ].join(" ")}
           >
             {tab.label}
@@ -53,7 +70,7 @@ export default function MovieDetailTabs({
         ))}
       </div>
 
-      <div>{content[active]}</div>
+      <div>{content[activeTab]}</div>
     </section>
   );
 }

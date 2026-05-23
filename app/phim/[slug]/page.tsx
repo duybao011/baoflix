@@ -1,27 +1,76 @@
-import FavoriteButton from "@/components/FavoriteButton";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 import EpisodeServerList from "@/components/EpisodeServerList";
+import MovieDetailActions from "@/components/MovieDetailActions";
 import MovieDetailTabs from "@/components/MovieDetailTabs";
 import RelatedMovies from "@/components/RelatedMovies";
 import {
   getImageUrl,
   getMovieDetail,
-  stripHtml,
   getPeopleList,
+  stripHtml,
 } from "@/lib/kkphim";
 
 type PageProps = {
-  params: Promise<{ slug: string }>;
+  params: Promise<{
+    slug: string;
+  }>;
 };
+
+function InfoPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-200">
+      {children}
+    </span>
+  );
+}
+
+function SidebarSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mt-5">
+      <h3 className="mb-2 text-sm font-black text-white">{title}</h3>
+      {children}
+    </div>
+  );
+}
 
 export default async function MovieDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const data = await getMovieDetail(slug);
+
+  let data;
+
+  try {
+    data = await getMovieDetail(slug);
+  } catch {
+    notFound();
+  }
+
+  if (!data?.movie) {
+    notFound();
+  }
 
   const movie = data.movie;
   const servers = data.episodes ?? [];
 
   const actors = getPeopleList(movie.actor);
   const directors = getPeopleList(movie.director);
+
+  const content = stripHtml(movie.content);
+
+  const firstServerIndex = servers.findIndex(
+    (server) => (server.server_data ?? []).length > 0
+  );
+
+  const firstWatchHref =
+    firstServerIndex >= 0
+      ? `/xem/${movie.slug}?server=${firstServerIndex}&tap=0`
+      : "";
 
   const infoTab = (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
@@ -71,8 +120,7 @@ export default async function MovieDetailPage({ params }: PageProps) {
 
         {movie.lang && (
           <p>
-            <span className="font-bold text-white">Ngôn ngữ:</span>{" "}
-            {movie.lang}
+            <span className="font-bold text-white">Ngôn ngữ:</span> {movie.lang}
           </p>
         )}
 
@@ -90,12 +138,7 @@ export default async function MovieDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-2">
             {movie.country.map((item) => (
-              <span
-                key={item.slug}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300"
-              >
-                {item.name}
-              </span>
+              <InfoPill key={item.slug}>{item.name}</InfoPill>
             ))}
           </div>
         </div>
@@ -107,12 +150,7 @@ export default async function MovieDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-2">
             {movie.category.map((item) => (
-              <span
-                key={item.slug}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300"
-              >
-                {item.name}
-              </span>
+              <InfoPill key={item.slug}>{item.name}</InfoPill>
             ))}
           </div>
         </div>
@@ -121,10 +159,35 @@ export default async function MovieDetailPage({ params }: PageProps) {
       <div className="mt-6">
         <h3 className="mb-2 font-black">Nội dung</h3>
 
-        <p className="max-w-4xl whitespace-pre-line leading-7 text-slate-300">
-          {stripHtml(movie.content) || "Chưa có mô tả."}
+        <p className="whitespace-pre-line leading-7 text-slate-300">
+          {content || "Chưa có mô tả."}
         </p>
       </div>
+    </section>
+  );
+
+  const episodesTab = (
+    <section>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-black">Tập phim</h2>
+
+          <p className="mt-1 text-sm text-slate-400">
+            Chọn bản chiếu hoặc tập phim để xem ngay.
+          </p>
+        </div>
+
+        {firstWatchHref && (
+          <Link
+            href={firstWatchHref}
+            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black hover:bg-red-500"
+          >
+            Xem ngay
+          </Link>
+        )}
+      </div>
+
+      <EpisodeServerList movieSlug={movie.slug} servers={servers} />
     </section>
   );
 
@@ -148,9 +211,7 @@ export default async function MovieDetailPage({ params }: PageProps) {
           </div>
         </div>
       ) : (
-        <p className="text-slate-400">
-          API chưa có dữ liệu diễn viên cho phim này.
-        </p>
+        <p className="text-slate-400">Chưa có dữ liệu diễn viên.</p>
       )}
 
       {directors.length > 0 && (
@@ -172,64 +233,103 @@ export default async function MovieDetailPage({ params }: PageProps) {
     </section>
   );
 
+  const relatedTab = <RelatedMovies movie={movie} />;
+
   return (
-    <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
-      <aside>
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
-          <img
-            src={getImageUrl(movie.poster_url || movie.thumb_url)}
-            alt={movie.name}
-            className="aspect-[2/3] w-full object-cover"
+    <div>
+      <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#111521] shadow-2xl">
+            <div className="p-5">
+              <div className="overflow-hidden rounded-2xl bg-white/5">
+                <img
+                  src={getImageUrl(movie.poster_url || movie.thumb_url)}
+                  alt={movie.name}
+                  className="aspect-[2/3] w-full object-cover"
+                />
+              </div>
+
+              <h1 className="mt-5 text-2xl font-black leading-tight">
+                {movie.name}
+              </h1>
+
+              {movie.origin_name && (
+                <p className="mt-1 text-sm font-bold text-yellow-300">
+                  {movie.origin_name}
+                </p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {movie.year && <InfoPill>{movie.year}</InfoPill>}
+                {movie.quality && <InfoPill>{movie.quality}</InfoPill>}
+                {movie.time && <InfoPill>{movie.time}</InfoPill>}
+                {movie.lang && <InfoPill>{movie.lang}</InfoPill>}
+              </div>
+
+              <SidebarSection title="Giới thiệu">
+                <p className="line-clamp-[10] text-sm leading-6 text-slate-300">
+                  {content || "Chưa có mô tả."}
+                </p>
+              </SidebarSection>
+
+              {movie.country && movie.country.length > 0 && (
+                <SidebarSection title="Quốc gia">
+                  <div className="flex flex-wrap gap-2">
+                    {movie.country.map((item) => (
+                      <InfoPill key={item.slug}>{item.name}</InfoPill>
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+
+              {movie.category && movie.category.length > 0 && (
+                <SidebarSection title="Thể loại">
+                  <div className="flex flex-wrap gap-2">
+                    {movie.category.slice(0, 6).map((item) => (
+                      <InfoPill key={item.slug}>{item.name}</InfoPill>
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+
+              {directors.length > 0 && (
+                <SidebarSection title="Đạo diễn">
+                  <p className="text-sm text-slate-300">
+                    {directors.join(", ")}
+                  </p>
+                </SidebarSection>
+              )}
+
+              {actors.length > 0 && (
+                <SidebarSection title="Diễn viên">
+                  <div className="flex flex-wrap gap-2">
+                    {actors.slice(0, 8).map((actor) => (
+                      <span
+                        key={actor}
+                        className="rounded-full border border-yellow-300/20 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-200"
+                      >
+                        {actor}
+                      </span>
+                    ))}
+                  </div>
+                </SidebarSection>
+              )}
+            </div>
+          </section>
+        </aside>
+
+        <main>
+          <MovieDetailActions movie={movie} servers={servers} />
+
+          <MovieDetailTabs
+            defaultTab="episodes"
+            episodes={episodesTab}
+            cast={castTab}
+            related={relatedTab}
+            info={infoTab}
           />
-        </div>
-
-        <div className="mt-4">
-          <FavoriteButton movie={movie} />
-        </div>
-      </aside>
-
-      <section>
-        <p className="mb-3 text-sm font-bold uppercase tracking-[0.3em] text-red-400">
-          {movie.episode_current || "Đang cập nhật"}
-        </p>
-
-        <h1 className="text-4xl font-black md:text-5xl">{movie.name}</h1>
-
-        <p className="mt-2 text-lg text-slate-400">{movie.origin_name}</p>
-
-        <div className="mt-5 flex flex-wrap gap-2 text-sm">
-          {movie.year && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.year}
-            </span>
-          )}
-
-          {movie.quality && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.quality}
-            </span>
-          )}
-
-          {movie.lang && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.lang}
-            </span>
-          )}
-
-          {movie.time && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.time}
-            </span>
-          )}
-        </div>
-
-        <MovieDetailTabs
-          info={infoTab}
-          episodes={<EpisodeServerList movieSlug={movie.slug} servers={servers} />}
-          cast={castTab}
-          related={<RelatedMovies movie={movie} />}
-        />
-      </section>
+        </main>
+      </div>
     </div>
   );
 }
