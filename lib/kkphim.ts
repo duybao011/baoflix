@@ -325,6 +325,216 @@ async function getAggregatedAnimationBySubtype(
   };
 }
 
+/* =========================
+   Multi-tag filter merge
+========================= */
+
+const MULTI_FILTER_SOURCE_PAGES = 6;
+const MULTI_FILTER_SOURCE_LIMIT = 48;
+
+function parseMultiFilterValue(value?: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => item !== "tat-ca");
+}
+
+function shouldUseMultiTagMerge(filters: FilterValues) {
+  const categorySlugs = parseMultiFilterValue(filters.category);
+  const countrySlugs = parseMultiFilterValue(filters.country);
+
+  return categorySlugs.length > 1 || countrySlugs.length > 1;
+}
+
+function matchAnyTaxonomy(
+  movie: MovieItem,
+  key: "category" | "country",
+  selectedSlugs: string[]
+) {
+  if (!selectedSlugs.length) return true;
+
+  const list = movie[key] || [];
+
+  if (!list.length) return true;
+
+  return list.some((item) => selectedSlugs.includes(item.slug));
+}
+
+function applyLocalMultiTagFilter(
+  items: MovieItem[],
+  categorySlugs: string[],
+  countrySlugs: string[]
+) {
+  return items.filter((movie) => {
+    return (
+      matchAnyTaxonomy(movie, "category", categorySlugs) &&
+      matchAnyTaxonomy(movie, "country", countrySlugs)
+    );
+  });
+}
+
+function sortLocalMoviesByFilter(items: MovieItem[], filters: FilterValues) {
+  const sortField = filters.sort_field || "modified.time";
+  const sortType = filters.sort_type || "desc";
+  const direction = sortType === "asc" ? 1 : -1;
+
+  if (sortField === "year") {
+    return [...items].sort((a, b) => {
+      return (Number(a.year || 0) - Number(b.year || 0)) * direction;
+    });
+  }
+
+  if (sortField === "_id") {
+    return [...items].sort((a, b) => {
+      return String(a._id || "").localeCompare(String(b._id || "")) * direction;
+    });
+  }
+
+  return items;
+}
+
+function getMultiFilterTitle(
+  categorySlugs: string[],
+  countrySlugs: string[],
+  type?: string
+) {
+  const parts: string[] = [];
+
+  if (type && type !== "tat-ca") {
+    parts.push(`Loại: ${type}`);
+  }
+
+  if (countrySlugs.length) {
+    parts.push(`${countrySlugs.length} quốc gia`);
+  }
+
+  if (categorySlugs.length) {
+    parts.push(`${categorySlugs.length} thể loại`);
+  }
+
+  return parts.length ? `Kết quả lọc: ${parts.join(" • ")}` : "Kết quả lọc";
+}
+
+async function getAggregatedMultiFilterMovies(
+  filters: FilterValues = {}
+): Promise<MovieListResult> {
+  const page = Number(filters.page || 1);
+  const limit = Number(filters.limit || 36);
+
+  const type = filters.type || "tat-ca";
+  const subtype = filters.subtype || "tat-ca";
+  const year = filters.year || "tat-ca";
+
+  const categorySlugs = parseMultiFilterValue(filters.category);
+  const countrySlugs = parseMultiFilterValue(filters.country);
+
+  const categoryQueries = categorySlugs.length ? categorySlugs : [undefined];
+  const countryQueries = countrySlugs.length ? countrySlugs : [undefined];
+
+  const sourcePages = Array.from(
+    {
+      length: Math.max(3, Math.min(MULTI_FILTER_SOURCE_PAGES, page + 2)),
+    },
+    (_, index) => index + 1
+  );
+
+  const sourceLimit = Math.max(limit, MULTI_FILTER_SOURCE_LIMIT);
+
+  const baseFilters: Partial<FilterValues> = {
+    sort_field: filters.sort_field || "modified.time",
+    sort_type: filters.sort_type || "desc",
+    sort_lang: filters.sort_lang,
+    year: year !== "tat-ca" ? year : undefined,
+  };
+
+  const tasks: Promise<MovieListResult>[] = [];
+
+  categoryQueries.forEach((categorySlug) => {
+    countryQueries.forEach((countrySlug) => {
+      sourcePages.forEach((sourcePage) => {
+        const comboFilters: Partial<FilterValues> = {
+          ...baseFilters,
+          category: categorySlug,
+          country: countrySlug,
+        };
+
+        if (type === "hoat-hinh") {
+          tasks.push(
+            getMoviesByList("hoat-hinh", sourcePage, sourceLimit, comboFilters)
+          );
+          return;
+        }
+
+        if (type && type !== "tat-ca") {
+          tasks.push(
+            getMoviesByList(type, sourcePage, sourceLimit, comboFilters)
+          );
+          return;
+        }
+
+        if (categorySlug) {
+          tasks.push(
+            getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
+              ...baseFilters,
+              country: countrySlug,
+            })
+          );
+          return;
+        }
+
+        if (countrySlug) {
+          tasks.push(
+            getMoviesByCountry(countrySlug, sourcePage, sourceLimit, {
+              ...baseFilters,
+            })
+          );
+        }
+      });
+    });
+  });
+
+  if (!tasks.length) {
+    return getLatestMovieListResult(page, limit);
+  }
+
+  const results = await Promise.allSettled(tasks);
+
+  const mergedItems = uniqueMovies(
+    results.flatMap((result) => {
+      if (result.status !== "fulfilled") return [];
+      return result.value.items || [];
+    })
+  );
+
+  const locallyFilteredItems = applyLocalMultiTagFilter(
+    mergedItems,
+    categorySlugs,
+    countrySlugs
+  );
+
+  const subtypeFilteredItems =
+    type === "hoat-hinh" && subtype !== "tat-ca"
+      ? filterAnimationSubtype(
+          {
+            title: "Hoạt hình",
+            items: locallyFilteredItems,
+            pagination: {},
+          },
+          subtype
+        ).items
+      : locallyFilteredItems;
+
+  const sortedItems = sortLocalMoviesByFilter(subtypeFilteredItems, filters);
+  const paginated = paginateLocalMovies(sortedItems, page, limit);
+
+  return {
+    title: getMultiFilterTitle(categorySlugs, countrySlugs, type),
+    items: paginated.items,
+    pagination: paginated.pagination,
+  };
+}
+
 export async function getGenres() {
   try {
     const data = await fetchJson<Taxonomy[]>("/the-loai");
@@ -476,6 +686,15 @@ export async function getFilteredMovies(
   const category = filters.category || "tat-ca";
   const country = filters.country || "tat-ca";
   const year = filters.year || "tat-ca";
+
+  if (shouldUseMultiTagMerge(filters)) {
+    try {
+      return await getAggregatedMultiFilterMovies(filters);
+    } catch (error) {
+      console.warn("Lỗi lọc nhiều tag:", error);
+      return emptyMovieResult("Kết quả lọc nhiều tag", page);
+    }
+  }
 
   const commonFilters: Partial<FilterValues> = {
     sort_field: filters.sort_field || "modified.time",

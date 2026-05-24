@@ -3,11 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getImageUrl, Taxonomy } from "@/lib/kkphim";
-import {
-  readWatchHistory,
-  removeWatchHistoryItem,
-  clearWatchHistory,
-} from "@/lib/watchStore";
 
 const KEY = "baoflix_history";
 
@@ -68,6 +63,20 @@ function matchLang(movieLang: string | undefined, selected: string) {
   return true;
 }
 
+function formatWatchedTime(value?: string) {
+  if (!value) return "";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  return date.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
 function SelectBox({
   value,
   onChange,
@@ -85,6 +94,78 @@ function SelectBox({
     >
       {children}
     </select>
+  );
+}
+
+function HistoryCard({
+  item,
+  onRemove,
+}: {
+  item: HistoryItem;
+  onRemove: () => void;
+}) {
+  const watchHref = `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${
+    item.episodeIndex
+  }`;
+
+  return (
+    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] transition hover:-translate-y-1 hover:bg-white/[0.075]">
+      <Link href={watchHref} className="block">
+        <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
+          <img
+            src={getImageUrl(item.poster_url || item.thumb_url)}
+            alt={item.name}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-2 pt-12">
+            <p className="line-clamp-1 text-[11px] font-black text-red-300">
+              Xem tiếp: {item.episodeName}
+            </p>
+
+            {item.serverName && (
+              <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-yellow-300">
+                {item.serverName}
+              </p>
+            )}
+          </div>
+
+          {item.quality && (
+            <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">
+              {item.quality}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-1 p-3">
+          <h2 className="line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-white">
+            {item.name}
+          </h2>
+
+          {item.origin_name && (
+            <p className="line-clamp-1 text-xs text-slate-400">
+              {item.origin_name}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
+            {item.year && <span>{item.year}</span>}
+            {item.lang && <span>• {item.lang}</span>}
+            {item.watchedAt && <span>• {formatWatchedTime(item.watchedAt)}</span>}
+          </div>
+        </div>
+      </Link>
+
+      <button
+        type="button"
+        onClick={onRemove}
+        className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/75 px-2.5 py-1 text-[11px] font-black text-white opacity-90 backdrop-blur hover:bg-red-600"
+        aria-label={`Xóa ${item.name} khỏi lịch sử`}
+      >
+        Xóa
+      </button>
+    </article>
   );
 }
 
@@ -119,20 +200,20 @@ export default function HistoryPage() {
     ) as string[];
   }, [items]);
 
-const countries = useMemo(() => {
-  const map = new Map<string, string>();
+  const countries = useMemo(() => {
+    const map = new Map<string, string>();
 
-  items.forEach((item) => {
-    item.country?.forEach((country) => {
-      map.set(country.slug, country.name);
+    items.forEach((item) => {
+      item.country?.forEach((countryItem) => {
+        map.set(countryItem.slug, countryItem.name);
+      });
     });
-  });
 
-  return Array.from(map.entries()).map(([slug, name]) => ({
-    slug,
-    name,
-  }));
-}, [items]);
+    return Array.from(map.entries()).map(([slug, name]) => ({
+      slug,
+      name,
+    }));
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     const q = normalize(keyword);
@@ -145,27 +226,28 @@ const countries = useMemo(() => {
       const matchKeyword = !q || text.includes(q);
       const matchType = type === "tat-ca" || item.type === type;
       const matchYear = year === "tat-ca" || String(item.year) === year;
-const matchServer = server === "tat-ca" || item.serverName === server;
+      const matchServer = server === "tat-ca" || item.serverName === server;
 
-const matchCountry =
-  country === "tat-ca" ||
-  item.country?.some((countryItem) => countryItem.slug === country);
+      const matchCountry =
+        country === "tat-ca" ||
+        item.country?.some((countryItem) => countryItem.slug === country);
 
-const matchLanguage = matchLang(item.lang, lang);
+      const matchLanguage = matchLang(item.lang, lang);
 
       return (
-  matchKeyword &&
-  matchType &&
-  matchYear &&
-  matchServer &&
-  matchCountry &&
-  matchLanguage
-);
+        matchKeyword &&
+        matchType &&
+        matchYear &&
+        matchServer &&
+        matchCountry &&
+        matchLanguage
+      );
     });
 
     if (sort === "oldest") {
       result = [...result].sort(
-        (a, b) => new Date(a.watchedAt).getTime() - new Date(b.watchedAt).getTime()
+        (a, b) =>
+          new Date(a.watchedAt).getTime() - new Date(b.watchedAt).getTime()
       );
     }
 
@@ -175,7 +257,8 @@ const matchLanguage = matchLang(item.lang, lang);
 
     if (sort === "latest") {
       result = [...result].sort(
-        (a, b) => new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+        (a, b) =>
+          new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
       );
     }
 
@@ -188,27 +271,28 @@ const matchLanguage = matchLang(item.lang, lang);
   }
 
   function clearFilters() {
-  setKeyword("");
-  setType("tat-ca");
-  setLang("tat-ca");
-  setServer("tat-ca");
-  setCountry("tat-ca");
-  setYear("tat-ca");
-  setSort("latest");
-}
+    setKeyword("");
+    setType("tat-ca");
+    setLang("tat-ca");
+    setServer("tat-ca");
+    setCountry("tat-ca");
+    setYear("tat-ca");
+    setSort("latest");
+  }
 
-function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
-  const next = items.filter((item) => {
-    const sameMovie = item.slug === slug;
-    const sameServer = (item.serverIndex ?? 0) === serverIndex;
-    const sameEpisode = item.episodeIndex === episodeIndex;
+  function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
+    const next = items.filter((item) => {
+      const sameMovie = item.slug === slug;
+      const sameServer = (item.serverIndex ?? 0) === serverIndex;
+      const sameEpisode = item.episodeIndex === episodeIndex;
 
-    return !(sameMovie && sameServer && sameEpisode);
-  });
+      return !(sameMovie && sameServer && sameEpisode);
+    });
 
-  setItems(next);
-  localStorage.setItem(KEY, JSON.stringify(next));
-}
+    setItems(next);
+    localStorage.setItem(KEY, JSON.stringify(next));
+  }
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between gap-4">
@@ -222,6 +306,7 @@ function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
 
         {items.length > 0 && (
           <button
+            type="button"
             onClick={clearHistory}
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
           >
@@ -231,7 +316,7 @@ function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
       </div>
 
       <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
@@ -264,14 +349,14 @@ function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
             ))}
           </SelectBox>
 
-<SelectBox value={country} onChange={setCountry}>
-  <option value="tat-ca">Tất cả quốc gia</option>
-  {countries.map((item) => (
-    <option key={item.slug} value={item.slug}>
-      {item.name}
-    </option>
-  ))}
-</SelectBox>
+          <SelectBox value={country} onChange={setCountry}>
+            <option value="tat-ca">Tất cả quốc gia</option>
+            {countries.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.name}
+              </option>
+            ))}
+          </SelectBox>
 
           <SelectBox value={year} onChange={setYear}>
             <option value="tat-ca">Tất cả năm</option>
@@ -289,6 +374,7 @@ function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
           </SelectBox>
 
           <button
+            type="button"
             onClick={clearFilters}
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold hover:bg-white/10"
           >
@@ -306,62 +392,23 @@ function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
           Chưa có lịch sử phù hợp.
         </div>
       ) : (
-        <div className="grid gap-4">
-{filteredItems.map((item) => (
-  <div
-    key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
-    className="flex gap-4 rounded-3xl border border-white/10 bg-white/5 p-3 hover:bg-white/10"
-  >
-    <Link
-      href={`/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex}`}
-      className="flex min-w-0 flex-1 gap-4"
-    >
-      <img
-        src={getImageUrl(item.poster_url || item.thumb_url)}
-        alt={item.name}
-        className="h-28 w-20 shrink-0 rounded-2xl object-cover"
-      />
-
-      <div className="flex min-w-0 flex-col justify-center">
-        <h2 className="line-clamp-2 font-bold">{item.name}</h2>
-
-        <p className="line-clamp-1 text-sm text-slate-400">
-          {item.origin_name}
-        </p>
-
-        <p className="mt-2 text-sm text-red-300">
-          Xem tiếp: {item.episodeName}
-        </p>
-
-        {item.serverName && (
-          <p className="mt-1 text-sm text-yellow-300">
-            Nguồn: {item.serverName}
-          </p>
-        )}
-
-        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
-          {item.year && <span>{item.year}</span>}
-          {item.lang && <span>{item.lang}</span>}
-          {item.quality && <span>{item.quality}</span>}
-        </div>
-      </div>
-    </Link>
-
-    <button
-      type="button"
-      onClick={() =>
-        removeHistoryItem(
-          item.slug,
-          item.serverIndex ?? 0,
-          item.episodeIndex
-        )
-      }
-      className="h-fit rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold text-slate-200 hover:bg-red-600 hover:text-white"
-    >
-      Xóa
-    </button>
-  </div>
-))}
+        <div
+          data-tv-row
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
+        >
+          {filteredItems.map((item) => (
+            <HistoryCard
+              key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
+              item={item}
+              onRemove={() =>
+                removeHistoryItem(
+                  item.slug,
+                  item.serverIndex ?? 0,
+                  item.episodeIndex
+                )
+              }
+            />
+          ))}
         </div>
       )}
     </div>
