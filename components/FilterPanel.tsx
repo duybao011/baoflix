@@ -131,6 +131,34 @@ const sortOptions = [
   },
 ];
 
+function parseMultiValue(value?: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item) => item !== "tat-ca");
+}
+
+function toggleValue(list: string[], value: string) {
+  if (!value || value === "tat-ca") return [];
+
+  if (list.includes(value)) {
+    return list.filter((item) => item !== value);
+  }
+
+  return [...list, value];
+}
+
+function addValue(list: string[], value: string) {
+  if (!value || value === "tat-ca") return list;
+  if (list.includes(value)) return list;
+  return [...list, value];
+}
+
+function multiToParam(list: string[]) {
+  return list.filter(Boolean).join(",");
+}
+
 function normalizeText(text?: string) {
   return String(text || "")
     .toLowerCase()
@@ -260,6 +288,49 @@ function SelectBox({
   );
 }
 
+function SelectedSummary({
+  label,
+  items,
+  selected,
+  onClear,
+}: {
+  label: string;
+  items: Taxonomy[];
+  selected: string[];
+  onClear: () => void;
+}) {
+  if (!selected.length) return null;
+
+  const selectedItems = selected
+    .map((slug) => items.find((item) => item.slug === slug))
+    .filter(Boolean) as Taxonomy[];
+
+  return (
+    <div className="mt-2 flex w-full flex-wrap items-center gap-2 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-3">
+      <span className="text-xs font-black uppercase tracking-[0.16em] text-yellow-200">
+        {label} đã chọn
+      </span>
+
+      {selectedItems.map((item) => (
+        <span
+          key={item.slug}
+          className="rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-black"
+        >
+          {item.name}
+        </span>
+      ))}
+
+      <button
+        type="button"
+        onClick={onClear}
+        className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-bold text-white hover:bg-white/10"
+      >
+        Xóa nhóm này
+      </button>
+    </div>
+  );
+}
+
 export default function FilterPanel({ genres, countries, current }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(true);
@@ -270,8 +341,12 @@ export default function FilterPanel({ genres, countries, current }: Props) {
 
   const [type, setType] = useState(current.type || "tat-ca");
   const [subtype, setSubtype] = useState(current.subtype || "tat-ca");
-  const [category, setCategory] = useState(current.category || "tat-ca");
-  const [country, setCountry] = useState(current.country || "tat-ca");
+  const [countryTags, setCountryTags] = useState<string[]>(
+    parseMultiValue(current.country)
+  );
+  const [categoryTags, setCategoryTags] = useState<string[]>(
+    parseMultiValue(current.category)
+  );
   const [year, setYear] = useState(current.year || "tat-ca");
   const [sortLang, setSortLang] = useState(current.sort_lang || "tat-ca");
   const [sort, setSort] = useState(currentSort);
@@ -304,13 +379,13 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     );
   }, [genres]);
 
-  const countryIsOther =
-    country !== "tat-ca" &&
-    sortedCountries.otherItems.some((item) => item.slug === country);
+  const selectedOtherCountries = sortedCountries.otherItems.filter((item) =>
+    countryTags.includes(item.slug)
+  );
 
-  const categoryIsOther =
-    category !== "tat-ca" &&
-    sortedGenres.otherItems.some((item) => item.slug === category);
+  const selectedOtherGenres = sortedGenres.otherItems.filter((item) =>
+    categoryTags.includes(item.slug)
+  );
 
   function applyFilter() {
     const params = new URLSearchParams();
@@ -321,8 +396,14 @@ export default function FilterPanel({ genres, countries, current }: Props) {
       params.set("subtype", subtype);
     }
 
-    if (category !== "tat-ca") params.set("category", category);
-    if (country !== "tat-ca") params.set("country", country);
+    if (categoryTags.length > 0) {
+      params.set("category", multiToParam(categoryTags));
+    }
+
+    if (countryTags.length > 0) {
+      params.set("country", multiToParam(countryTags));
+    }
+
     if (year !== "tat-ca") params.set("year", year);
     if (sortLang !== "tat-ca") params.set("sort_lang", sortLang);
 
@@ -340,8 +421,8 @@ export default function FilterPanel({ genres, countries, current }: Props) {
   function clearFilter() {
     setType("tat-ca");
     setSubtype("tat-ca");
-    setCategory("tat-ca");
-    setCountry("tat-ca");
+    setCategoryTags([]);
+    setCountryTags([]);
     setYear("tat-ca");
     setSortLang("tat-ca");
     setSort("modified.time:desc");
@@ -397,8 +478,8 @@ export default function FilterPanel({ genres, countries, current }: Props) {
 
           <FilterRow label="Quốc gia">
             <OptionButton
-              active={country === "tat-ca"}
-              onClick={() => setCountry("tat-ca")}
+              active={countryTags.length === 0}
+              onClick={() => setCountryTags([])}
             >
               Tất cả
             </OptionButton>
@@ -406,19 +487,36 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             {sortedCountries.priorityItems.map((item) => (
               <OptionButton
                 key={item.slug}
-                active={country === item.slug}
-                onClick={() => setCountry(item.slug)}
+                active={countryTags.includes(item.slug)}
+                onClick={() =>
+                  setCountryTags((oldList) => toggleValue(oldList, item.slug))
+                }
               >
+                {countryTags.includes(item.slug) ? "✓ " : ""}
                 {item.name}
+              </OptionButton>
+            ))}
+
+            {selectedOtherCountries.map((item) => (
+              <OptionButton
+                key={item.slug}
+                active
+                onClick={() =>
+                  setCountryTags((oldList) => toggleValue(oldList, item.slug))
+                }
+              >
+                ✓ {item.name}
               </OptionButton>
             ))}
 
             {sortedCountries.otherItems.length > 0 && (
               <SelectBox
-                value={countryIsOther ? country : "tat-ca"}
-                onChange={(value) => setCountry(value)}
+                value="tat-ca"
+                onChange={(value) =>
+                  setCountryTags((oldList) => addValue(oldList, value))
+                }
               >
-                <option value="tat-ca">Quốc gia khác</option>
+                <option value="tat-ca">Thêm quốc gia khác</option>
 
                 {sortedCountries.otherItems.map((item) => (
                   <option key={item.slug} value={item.slug}>
@@ -427,6 +525,13 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 ))}
               </SelectBox>
             )}
+
+            <SelectedSummary
+              label="Quốc gia"
+              items={countries}
+              selected={countryTags}
+              onClear={() => setCountryTags([])}
+            />
           </FilterRow>
 
           <FilterRow label="Loại phim">
@@ -475,8 +580,8 @@ export default function FilterPanel({ genres, countries, current }: Props) {
 
           <FilterRow label="Thể loại">
             <OptionButton
-              active={category === "tat-ca"}
-              onClick={() => setCategory("tat-ca")}
+              active={categoryTags.length === 0}
+              onClick={() => setCategoryTags([])}
             >
               Tất cả
             </OptionButton>
@@ -484,19 +589,36 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             {sortedGenres.priorityItems.map((item) => (
               <OptionButton
                 key={item.slug}
-                active={category === item.slug}
-                onClick={() => setCategory(item.slug)}
+                active={categoryTags.includes(item.slug)}
+                onClick={() =>
+                  setCategoryTags((oldList) => toggleValue(oldList, item.slug))
+                }
               >
+                {categoryTags.includes(item.slug) ? "✓ " : ""}
                 {item.name}
+              </OptionButton>
+            ))}
+
+            {selectedOtherGenres.map((item) => (
+              <OptionButton
+                key={item.slug}
+                active
+                onClick={() =>
+                  setCategoryTags((oldList) => toggleValue(oldList, item.slug))
+                }
+              >
+                ✓ {item.name}
               </OptionButton>
             ))}
 
             {sortedGenres.otherItems.length > 0 && (
               <SelectBox
-                value={categoryIsOther ? category : "tat-ca"}
-                onChange={(value) => setCategory(value)}
+                value="tat-ca"
+                onChange={(value) =>
+                  setCategoryTags((oldList) => addValue(oldList, value))
+                }
               >
-                <option value="tat-ca">Thể loại khác</option>
+                <option value="tat-ca">Thêm thể loại khác</option>
 
                 {sortedGenres.otherItems.map((item) => (
                   <option key={item.slug} value={item.slug}>
@@ -505,6 +627,13 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 ))}
               </SelectBox>
             )}
+
+            <SelectedSummary
+              label="Thể loại"
+              items={genres}
+              selected={categoryTags}
+              onClear={() => setCategoryTags([])}
+            />
           </FilterRow>
 
           <FilterRow label="Năm sản xuất">
