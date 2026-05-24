@@ -122,7 +122,10 @@ export default function TvWatchOverlay({
       <div className="pointer-events-none bg-gradient-to-b from-black/85 via-black/45 to-transparent px-4 pb-16 pt-4 md:px-6">
         <div
           data-tv-row
-          className="pointer-events-auto flex flex-wrap items-center gap-3"
+          className={[
+            "flex flex-wrap items-center gap-3",
+            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+          ].join(" ")}
         >
           <Link
             href={`/phim/${movie.slug}`}
@@ -147,7 +150,12 @@ export default function TvWatchOverlay({
 
       <div className="pointer-events-none bg-gradient-to-t from-black/90 via-black/65 to-transparent px-4 pb-5 pt-20 md:px-6">
         {sameEpisodeServerLinks.length > 1 && (
-          <section className="pointer-events-auto mb-4">
+          <section
+            className={[
+              "mb-4",
+              overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+            ].join(" ")}
+          >
             <h2 className="mb-2 text-base font-black text-white">
               Âm thanh / Server
             </h2>
@@ -180,7 +188,11 @@ export default function TvWatchOverlay({
         )}
 
         {currentEpisodes.length > 0 && (
-          <section className="pointer-events-auto">
+          <section
+            className={[
+              overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+            ].join(" ")}
+          >
             <h2 className="mb-2 text-base font-black text-white">
               Danh sách tập
             </h2>
@@ -218,7 +230,10 @@ export default function TvWatchOverlay({
 
         <div
           data-tv-row
-          className="pointer-events-auto mt-4 grid grid-cols-3 gap-3"
+          className={[
+            "mt-4 grid grid-cols-3 gap-3",
+            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+          ].join(" ")}
         >
           {previousHref ? (
             <Link

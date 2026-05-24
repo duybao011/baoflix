@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const FOCUSABLE_SELECTOR = [
@@ -11,6 +11,23 @@ const FOCUSABLE_SELECTOR = [
   "textarea:not([disabled])",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
+
+const TV_SESSION_KEY = "baoflix_tv_mode";
+
+function isTvAutoFocusEnabled() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get("tv") === "0") return false;
+    if (searchParams.get("tv") === "1") return true;
+
+    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function isVisibleElement(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
@@ -46,8 +63,33 @@ function findFirstFocusable(scope: HTMLElement) {
 
 export default function TvAutoFocus() {
   const pathname = usePathname();
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    function refreshEnabled() {
+      setEnabled(isTvAutoFocusEnabled());
+    }
+
+    refreshEnabled();
+
+    window.addEventListener("baoflix-tv-mode-change", refreshEnabled);
+    window.addEventListener("storage", refreshEnabled);
+    window.addEventListener("focus", refreshEnabled);
+    window.addEventListener("resize", refreshEnabled);
+    window.addEventListener("orientationchange", refreshEnabled);
+
+    return () => {
+      window.removeEventListener("baoflix-tv-mode-change", refreshEnabled);
+      window.removeEventListener("storage", refreshEnabled);
+      window.removeEventListener("focus", refreshEnabled);
+      window.removeEventListener("resize", refreshEnabled);
+      window.removeEventListener("orientationchange", refreshEnabled);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
     const timer = window.setTimeout(() => {
       const modal = document.querySelector<HTMLElement>(
         "[data-tv-modal][data-tv-scope]"
@@ -79,7 +121,7 @@ export default function TvAutoFocus() {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [pathname]);
+  }, [enabled, pathname]);
 
   return null;
 }

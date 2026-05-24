@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const FOCUSABLE_SELECTOR = [
@@ -20,6 +20,22 @@ type FocusEntry = {
 };
 
 const ROW_THRESHOLD = 22;
+const TV_SESSION_KEY = "baoflix_tv_mode";
+
+function isTvRemoteEnabled() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+
+    if (searchParams.get("tv") === "0") return false;
+    if (searchParams.get("tv") === "1") return true;
+
+    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 function getDirectionFromKey(key: string): Direction | null {
   if (key === "ArrowUp") return "up";
@@ -296,8 +312,33 @@ function handleBack(event: KeyboardEvent) {
 
 export default function TvRemoteNavigator() {
   const pathname = usePathname();
+  const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    function refreshEnabled() {
+      setEnabled(isTvRemoteEnabled());
+    }
+
+    refreshEnabled();
+
+    window.addEventListener("baoflix-tv-mode-change", refreshEnabled);
+    window.addEventListener("storage", refreshEnabled);
+    window.addEventListener("focus", refreshEnabled);
+    window.addEventListener("resize", refreshEnabled);
+    window.addEventListener("orientationchange", refreshEnabled);
+
+    return () => {
+      window.removeEventListener("baoflix-tv-mode-change", refreshEnabled);
+      window.removeEventListener("storage", refreshEnabled);
+      window.removeEventListener("focus", refreshEnabled);
+      window.removeEventListener("resize", refreshEnabled);
+      window.removeEventListener("orientationchange", refreshEnabled);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!enabled) return;
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
 
@@ -338,7 +379,6 @@ export default function TvRemoteNavigator() {
       const activeScope = getActiveScope(activeElement);
 
       const root = modalScope || activeScope || getMainScope() || document;
-
       const focusableElements = getFocusableElements(root);
 
       if (!focusableElements.length) return;
@@ -388,7 +428,7 @@ export default function TvRemoteNavigator() {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [pathname]);
+  }, [enabled, pathname]);
 
   return null;
 }
