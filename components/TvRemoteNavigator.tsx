@@ -60,7 +60,8 @@ function isActivationKey(key: string) {
 function shouldWakeHiddenWatchOverlay(key: string) {
   return (
     getDirectionFromKey(key) !== null ||
-    isActivationKey(key)
+    isActivationKey(key) ||
+    isBackKey(key)
   );
 }
 
@@ -356,11 +357,14 @@ export default function TvRemoteNavigator() {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
 
 const activeElement = document.activeElement;
+const openModalScope = getModalScope();
 
 // Giống TV app:
 // overlay đang ẩn thì phím đầu tiên chỉ đánh thức overlay,
 // chưa điều hướng / chưa bấm nút.
+// Riêng khi đang mở modal chọn tập thì Back vẫn ưu tiên đóng modal.
 if (
+  !openModalScope &&
   !isTextInput(activeElement) &&
   shouldWakeHiddenWatchOverlay(event.key)
 ) {
