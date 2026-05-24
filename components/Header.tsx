@@ -303,7 +303,7 @@ function SearchForm({
       </form>
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[70] overflow-hidden rounded-3xl border border-white/10 bg-[#0b0f19] shadow-2xl">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[70] max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0f19] shadow-2xl">
           {keyword.trim().length > 0 && (
             <button
               type="button"
@@ -436,8 +436,9 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const isSearchPage = pathname === "/tim-kiem";
-  const isTvMode = pathname === "/tv";
+const isSearchPage = pathname === "/tim-kiem";
+const isTvMode = pathname === "/tv";
+const isWatchPage = pathname.startsWith("/xem");
   const currentKeyword =
     searchParams.get("q") || searchParams.get("keyword") || "";
 
@@ -472,7 +473,12 @@ export default function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#070b14]/95 backdrop-blur-xl">
+      <header
+  className={[
+    "sticky top-0 z-40 border-b border-white/10 bg-[#070b14]/95 backdrop-blur-xl",
+    isWatchPage ? "hidden lg:block" : "",
+  ].join(" ")}
+>
         <div className="mx-auto max-w-7xl px-4 py-3">
           <div className="flex items-center justify-between gap-3 lg:hidden">
             <Link

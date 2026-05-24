@@ -11,11 +11,19 @@ const items = [
   { label: "Lịch sử", href: "/lich-su", icon: "↺" },
 ];
 
+function shouldHideBottomNav(pathname: string) {
+  return pathname.startsWith("/xem");
+}
+
 export default function MobileBottomNav() {
   const pathname = usePathname();
 
+  if (shouldHideBottomNav(pathname)) {
+    return null;
+  }
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#070a12]/95 px-2 py-2 backdrop-blur md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#070a12]/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
       <div className="grid grid-cols-5 gap-1">
         {items.map((item) => {
           const active =
@@ -28,7 +36,7 @@ export default function MobileBottomNav() {
               key={item.href}
               href={item.href}
               className={[
-                "flex flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs",
+                "flex min-h-[54px] flex-col items-center justify-center rounded-2xl px-2 py-2 text-xs",
                 active
                   ? "bg-red-600 text-white"
                   : "text-slate-300 hover:bg-white/10",
