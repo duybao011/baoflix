@@ -133,13 +133,13 @@ export default function FullscreenPlayerBox({
           type="button"
           onClick={toggleFullscreen}
           className={[
-            "rounded-xl px-4 py-2 text-sm font-black text-white backdrop-blur",
+            "rounded-xl px-3 py-2 text-xs font-black text-white backdrop-blur sm:px-4 sm:text-sm",
             expanded
               ? "bg-red-600 hover:bg-red-500"
               : "bg-black/75 hover:bg-yellow-300 hover:text-black",
           ].join(" ")}
         >
-          {expanded ? "Thu nhỏ" : "Toàn màn hình TV"}
+          {expanded ? "Thu nhỏ" : "Toàn màn hình"}
         </button>
       </div>
     </div>

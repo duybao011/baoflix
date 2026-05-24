@@ -269,3 +269,9 @@ video {
     0 0 0 4px rgba(250, 204, 21, 0.22),
     0 18px 42px rgba(0, 0, 0, 0.55);
 }
+
+@media (max-width: 767px) {
+  main:has([data-tv-scope="watch-page"]) {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  }
+}
