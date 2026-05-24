@@ -69,6 +69,20 @@ function detectTvOverlayEnabled() {
     const forceNormal = searchParams.get("tv") === "0";
 
     if (forceNormal) return false;
+
+    const userAgent = navigator.userAgent.toLowerCase();
+
+    const isMobile =
+      /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
+
+    // Điện thoại không dùng TV overlay.
+    // Chỉ cho ?tv=1 override nếu fen cố tình muốn test.
+    if (isMobile && !forceTv) {
+      sessionStorage.removeItem("baoflix_tv_mode");
+      localStorage.removeItem("baoflix_tv_mode");
+      return false;
+    }
+
     if (forceTv) return true;
 
     const isFromTvMode = sessionStorage.getItem("baoflix_tv_mode") === "1";
@@ -99,11 +113,15 @@ useEffect(() => {
   window.addEventListener("baoflix-tv-mode-change", refreshTvOverlay);
   window.addEventListener("storage", refreshTvOverlay);
   window.addEventListener("focus", refreshTvOverlay);
+  window.addEventListener("resize", refreshTvOverlay);
+  window.addEventListener("orientationchange", refreshTvOverlay);
 
   return () => {
     window.removeEventListener("baoflix-tv-mode-change", refreshTvOverlay);
     window.removeEventListener("storage", refreshTvOverlay);
     window.removeEventListener("focus", refreshTvOverlay);
+    window.removeEventListener("resize", refreshTvOverlay);
+    window.removeEventListener("orientationchange", refreshTvOverlay);
   };
 }, []);
 
