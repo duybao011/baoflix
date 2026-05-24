@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
+import { getNormalWatchedKey } from "@/lib/watchStore";
 
 type SameEpisodeServerLink = {
   server: EpisodeServer;
@@ -18,11 +19,13 @@ type TvWatchOverlayProps = {
   episodeName?: string;
   previousHref: string;
   nextHref: string;
+  watchedEpisodes: string[];
   sameEpisodeServerLinks: SameEpisodeServerLink[];
   onOpenEpisodePanel: () => void;
 };
 
 const AUTO_HIDE_MS = 3500;
+const EPISODE_WINDOW_SIZE = 12;
 
 function normalizeServerName(name?: string) {
   const text = String(name || "").toLowerCase();
@@ -42,6 +45,36 @@ function getEpisodeUrl(
   return `/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function focusOverlayDefault() {
+  window.setTimeout(() => {
+    const overlay = document.querySelector<HTMLElement>(
+      "[data-tv-overlay='watch']"
+    );
+
+    if (!overlay) return;
+
+    const target =
+      overlay.querySelector<HTMLElement>("[data-tv-overlay-default]") ||
+      overlay.querySelector<HTMLElement>("a[href], button:not([disabled])");
+
+    if (!target) return;
+
+    target.focus({
+      preventScroll: true,
+    });
+
+    target.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "center",
+    });
+  }, 60);
+}
+
 export default function TvWatchOverlay({
   movie,
   currentServer,
@@ -50,6 +83,7 @@ export default function TvWatchOverlay({
   episodeName,
   previousHref,
   nextHref,
+  watchedEpisodes,
   sameEpisodeServerLinks,
   onOpenEpisodePanel,
 }: TvWatchOverlayProps) {
@@ -57,6 +91,37 @@ export default function TvWatchOverlay({
   const hideTimerRef = useRef<number | null>(null);
 
   const currentEpisodes = currentServer?.server_data ?? [];
+
+  const episodeWindow = useMemo(() => {
+    if (currentEpisodes.length <= EPISODE_WINDOW_SIZE) {
+      return {
+        start: 0,
+        end: currentEpisodes.length,
+        items: currentEpisodes.map((episode, index) => ({
+          episode,
+          episodeIndex: index,
+        })),
+      };
+    }
+
+    const half = Math.floor(EPISODE_WINDOW_SIZE / 2);
+    const start = clamp(
+      safeEpisodeIndex - half,
+      0,
+      Math.max(0, currentEpisodes.length - EPISODE_WINDOW_SIZE)
+    );
+
+    const end = Math.min(currentEpisodes.length, start + EPISODE_WINDOW_SIZE);
+
+    return {
+      start,
+      end,
+      items: currentEpisodes.slice(start, end).map((episode, offset) => ({
+        episode,
+        episodeIndex: start + offset,
+      })),
+    };
+  }, [currentEpisodes, safeEpisodeIndex]);
 
   const hiddenFocusProps = useMemo(() => {
     return overlayVisible
@@ -87,6 +152,11 @@ export default function TvWatchOverlay({
     scheduleHide();
   }
 
+  function showOverlayAndFocus() {
+    showOverlay();
+    focusOverlayDefault();
+  }
+
   useEffect(() => {
     showOverlay();
 
@@ -94,10 +164,15 @@ export default function TvWatchOverlay({
       showOverlay();
     }
 
+    function handleWakeOverlay() {
+      showOverlayAndFocus();
+    }
+
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("mousedown", handleActivity);
     window.addEventListener("touchstart", handleActivity);
     window.addEventListener("keydown", handleActivity);
+    window.addEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
 
     return () => {
       clearHideTimer();
@@ -105,6 +180,7 @@ export default function TvWatchOverlay({
       window.removeEventListener("mousedown", handleActivity);
       window.removeEventListener("touchstart", handleActivity);
       window.removeEventListener("keydown", handleActivity);
+      window.removeEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
     };
   }, []);
 
@@ -114,6 +190,8 @@ export default function TvWatchOverlay({
 
   return (
     <div
+      data-tv-overlay="watch"
+      data-tv-overlay-visible={overlayVisible ? "true" : "false"}
       className={[
         "pointer-events-none absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-300",
         overlayVisible ? "opacity-100" : "opacity-0",
@@ -187,22 +265,39 @@ export default function TvWatchOverlay({
           </section>
         )}
 
-        {currentEpisodes.length > 0 && (
+        {episodeWindow.items.length > 0 && (
           <section
             className={[
               overlayVisible ? "pointer-events-auto" : "pointer-events-none",
             ].join(" ")}
           >
-            <h2 className="mb-2 text-base font-black text-white">
-              Danh sách tập
-            </h2>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <h2 className="text-base font-black text-white">
+                Danh sách tập
+              </h2>
+
+              {currentEpisodes.length > EPISODE_WINDOW_SIZE && (
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
+                  {episodeWindow.start + 1}-{episodeWindow.end}/
+                  {currentEpisodes.length}
+                </span>
+              )}
+            </div>
 
             <div
               data-tv-row
               className="baoflix-tv-overlay-scroll flex gap-2 overflow-x-auto pb-1"
             >
-              {currentEpisodes.map((episode, episodeIndex) => {
+              {episodeWindow.items.map(({ episode, episodeIndex }) => {
                 const active = episodeIndex === safeEpisodeIndex;
+
+                const watchedKey = getNormalWatchedKey(
+                  movie.slug,
+                  safeServerIndex,
+                  episodeIndex
+                );
+
+                const watched = watchedEpisodes.includes(watchedKey);
 
                 return (
                   <Link
@@ -212,6 +307,7 @@ export default function TvWatchOverlay({
                       safeServerIndex,
                       episodeIndex
                     )}
+                    data-tv-overlay-default={active ? true : undefined}
                     {...hiddenFocusProps}
                     className={[
                       "flex min-w-[110px] shrink-0 items-center justify-center rounded-2xl border px-5 py-3 text-center text-sm font-black backdrop-blur",
@@ -220,7 +316,13 @@ export default function TvWatchOverlay({
                         : "border-white/15 bg-black/45 text-white hover:bg-white/15",
                     ].join(" ")}
                   >
-                    {episode.name}
+                    <span className="inline-flex items-center justify-center gap-1">
+                      {watched && !active && (
+                        <span className="text-yellow-300">✓</span>
+                      )}
+                      {watched && active && <span>✓</span>}
+                      <span>{episode.name}</span>
+                    </span>
                   </Link>
                 );
               })}

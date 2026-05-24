@@ -57,6 +57,19 @@ function isActivationKey(key: string) {
   );
 }
 
+function shouldWakeHiddenWatchOverlay(key: string) {
+  return (
+    getDirectionFromKey(key) !== null ||
+    isActivationKey(key)
+  );
+}
+
+function getHiddenWatchOverlay() {
+  return document.querySelector<HTMLElement>(
+    "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
+  );
+}
+
 function isBackKey(key: string) {
   return key === "Escape" || key === "Backspace" || key === "BrowserBack";
 }
@@ -342,12 +355,28 @@ export default function TvRemoteNavigator() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
 
-      const activeElement = document.activeElement;
+const activeElement = document.activeElement;
 
-      if (isBackKey(event.key) && !isTextInput(activeElement)) {
-        handleBack(event);
-        return;
-      }
+// Giống TV app:
+// overlay đang ẩn thì phím đầu tiên chỉ đánh thức overlay,
+// chưa điều hướng / chưa bấm nút.
+if (
+  !isTextInput(activeElement) &&
+  shouldWakeHiddenWatchOverlay(event.key)
+) {
+  const hiddenOverlay = getHiddenWatchOverlay();
+
+  if (hiddenOverlay) {
+    event.preventDefault();
+    window.dispatchEvent(new Event("baoflix-show-tv-overlay"));
+    return;
+  }
+}
+
+if (isBackKey(event.key) && !isTextInput(activeElement)) {
+  handleBack(event);
+  return;
+}
 
       if (isActivationKey(event.key) && !isTextInput(activeElement)) {
         clickActiveElement(event);

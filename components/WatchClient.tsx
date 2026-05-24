@@ -332,21 +332,22 @@ useEffect(() => {
             )}
 
             {tvOverlayEnabled && (
-              <TvWatchOverlay
-                movie={movie}
-                currentServer={currentServer}
-                safeServerIndex={safeServerIndex}
-                safeEpisodeIndex={safeEpisodeIndex}
-                episodeName={episode?.name}
-                previousHref={previousHref}
-                nextHref={nextHref}
-                sameEpisodeServerLinks={sameEpisodeServerLinks.map((item) => ({
-                  server: item.server,
-                  serverIndex: item.serverIndex,
-                  href: item.href,
-                }))}
-                onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
-              />
+	<TvWatchOverlay
+  movie={movie}
+  currentServer={currentServer}
+  safeServerIndex={safeServerIndex}
+  safeEpisodeIndex={safeEpisodeIndex}
+  episodeName={episode?.name}
+  previousHref={previousHref}
+  nextHref={nextHref}
+  watchedEpisodes={watchedEpisodes}
+  sameEpisodeServerLinks={sameEpisodeServerLinks.map((item) => ({
+    server: item.server,
+    serverIndex: item.serverIndex,
+    href: item.href,
+  }))}
+  onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
+/>
             )}
           </div>
         </FullscreenPlayerBox>
