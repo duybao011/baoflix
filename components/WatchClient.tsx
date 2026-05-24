@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import HlsPlayer from "@/components/HlsPlayer";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
+import TvWatchOverlay from "@/components/TvWatchOverlay";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
 import {
   getNormalWatchedKey,
@@ -61,6 +62,23 @@ function focusTvDefaultInModal() {
   });
 }
 
+function detectTvOverlayEnabled() {
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    const forceTv = searchParams.get("tv") === "1";
+    const forceNormal = searchParams.get("tv") === "0";
+
+    if (forceNormal) return false;
+    if (forceTv) return true;
+
+    const isFromTvMode = sessionStorage.getItem("baoflix_tv_mode") === "1";
+
+    return isFromTvMode;
+  } catch {
+    return false;
+  }
+}
+
 export default function WatchClient({
   movie,
   servers,
@@ -69,6 +87,25 @@ export default function WatchClient({
 }: WatchClientProps) {
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
+  const [tvOverlayEnabled, setTvOverlayEnabled] = useState(false);
+
+useEffect(() => {
+  function refreshTvOverlay() {
+    setTvOverlayEnabled(detectTvOverlayEnabled());
+  }
+
+  refreshTvOverlay();
+
+  window.addEventListener("baoflix-tv-mode-change", refreshTvOverlay);
+  window.addEventListener("storage", refreshTvOverlay);
+  window.addEventListener("focus", refreshTvOverlay);
+
+  return () => {
+    window.removeEventListener("baoflix-tv-mode-change", refreshTvOverlay);
+    window.removeEventListener("storage", refreshTvOverlay);
+    window.removeEventListener("focus", refreshTvOverlay);
+  };
+}, []);
 
   const safeServerIndex =
     Number.isNaN(currentServerIndex) ||
@@ -255,29 +292,54 @@ export default function WatchClient({
 
       <div className="baoflix-player-fill mt-5">
         <FullscreenPlayerBox>
-          {episode?.link_embed ? (
-            <iframe
-              src={episode.link_embed}
-              allowFullScreen
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              className="h-full w-full"
-              title={`${movie.name} - ${episode.name}`}
-            />
-          ) : episode?.link_m3u8 ? (
-            <HlsPlayer
-              src={episode.link_m3u8}
-              storageKey={watchTimeKey}
-              autoResume
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-slate-400">
-              Tập này chưa có link phát.
-            </div>
-          )}
+          <div className="relative h-full w-full overflow-hidden bg-black">
+            {episode?.link_embed ? (
+              <iframe
+                src={episode.link_embed}
+                allowFullScreen
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                className="h-full w-full"
+                title={`${movie.name} - ${episode.name}`}
+              />
+            ) : episode?.link_m3u8 ? (
+              <HlsPlayer
+                src={episode.link_m3u8}
+                storageKey={watchTimeKey}
+                autoResume
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-slate-400">
+                Tập này chưa có link phát.
+              </div>
+            )}
+
+            {tvOverlayEnabled && (
+              <TvWatchOverlay
+                movie={movie}
+                currentServer={currentServer}
+                safeServerIndex={safeServerIndex}
+                safeEpisodeIndex={safeEpisodeIndex}
+                episodeName={episode?.name}
+                previousHref={previousHref}
+                nextHref={nextHref}
+                sameEpisodeServerLinks={sameEpisodeServerLinks.map((item) => ({
+                  server: item.server,
+                  serverIndex: item.serverIndex,
+                  href: item.href,
+                }))}
+                onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
+              />
+            )}
+          </div>
         </FullscreenPlayerBox>
       </div>
 
-      <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.04] p-3 md:p-4">
+      <section
+        className={[
+          "mt-5 rounded-3xl border border-white/10 bg-white/[0.04] p-3 md:p-4",
+          tvOverlayEnabled ? "lg:hidden" : "",
+        ].join(" ")}
+      >
         <div
           data-tv-row
           className="grid grid-cols-3 gap-2 md:flex md:flex-wrap md:items-center md:justify-between md:gap-3"

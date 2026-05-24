@@ -246,3 +246,26 @@ video {
   box-shadow: none;
   transform: none;
 }
+
+/* =========================
+   TV Watch Overlay
+========================= */
+
+.baoflix-tv-overlay-scroll {
+  scrollbar-width: none;
+}
+
+.baoflix-tv-overlay-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Làm focus trên overlay giống TV app hơn */
+.baoflix-player-fill [data-tv-row] a:focus-visible,
+.baoflix-player-fill [data-tv-row] button:focus-visible {
+  outline: 3px solid #facc15;
+  outline-offset: 3px;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow:
+    0 0 0 4px rgba(250, 204, 21, 0.22),
+    0 18px 42px rgba(0, 0, 0, 0.55);
+}

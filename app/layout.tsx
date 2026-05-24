@@ -8,6 +8,7 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import TvModeFloatingButton from "@/components/TvModeFloatingButton";
 import TvRemoteNavigator from "@/components/TvRemoteNavigator";
 import TvAutoFocus from "@/components/TvAutoFocus";
+import TvModeToggleButton from "@/components/TvModeToggleButton";
 
 export const metadata: Metadata = {
   title: "BảoFlix",
@@ -46,6 +47,7 @@ export default function RootLayout({
         <MobileBackButton />
         <MobileBottomNav />
         <TvModeFloatingButton />
+	<TvModeToggleButton />
 
         <main className="mx-auto min-h-screen max-w-[1600px] px-4 pb-28 pt-6 sm:px-6 lg:px-8">
           {children}

@@ -1,4 +1,5 @@
 import TvDashboard from "@/components/TvDashboard";
+import TvModeSession from "@/components/TvModeSession";
 import { getFilteredMovies } from "@/lib/kkphim";
 
 export default async function TvPage() {
@@ -9,5 +10,10 @@ export default async function TvPage() {
     limit: 12,
   });
 
-  return <TvDashboard chineseSeries={chineseSeriesResult.items} />;
+  return (
+    <>
+      <TvModeSession />
+      <TvDashboard chineseSeries={chineseSeriesResult.items} />
+    </>
+  );
 }
