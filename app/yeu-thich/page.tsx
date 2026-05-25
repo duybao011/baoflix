@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getImageUrl, MovieItem, Taxonomy } from "@/lib/kkphim";
 
 const KEY = "baoflix_favorites";
@@ -84,6 +84,41 @@ function FavoriteCard({
   movie: SavedMovie;
   onRemove: () => void;
 }) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const resetTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleRemoveClick() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+
+      if (resetTimerRef.current) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+
+      resetTimerRef.current = window.setTimeout(() => {
+        setConfirmingDelete(false);
+        resetTimerRef.current = null;
+      }, 2200);
+
+      return;
+    }
+
+    if (resetTimerRef.current) {
+      window.clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+
+    onRemove();
+  }
+
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] transition hover:-translate-y-1 hover:bg-white/[0.075]">
       <Link href={`/phim/${movie.slug}`} className="block">
@@ -137,11 +172,20 @@ function FavoriteCard({
 
       <button
         type="button"
-        onClick={onRemove}
-        className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/75 px-2.5 py-1 text-[11px] font-black text-white opacity-90 backdrop-blur hover:bg-red-600"
-        aria-label={`Xóa ${movie.name} khỏi yêu thích`}
+        onClick={handleRemoveClick}
+        className={[
+          "absolute right-2 top-2 rounded-full border px-2.5 py-1 text-[11px] font-black text-white backdrop-blur",
+          confirmingDelete
+            ? "border-red-400 bg-red-600"
+            : "border-white/10 bg-black/75 hover:bg-red-600",
+        ].join(" ")}
+        aria-label={
+          confirmingDelete
+            ? `Xác nhận xóa ${movie.name} khỏi yêu thích`
+            : `Xóa ${movie.name} khỏi yêu thích`
+        }
       >
-        Xóa
+        {confirmingDelete ? "Chắc chắn?" : "Xóa"}
       </button>
     </article>
   );
@@ -156,6 +200,7 @@ export default function FavoritesPage() {
   const [country, setCountry] = useState("tat-ca");
   const [category, setCategory] = useState("tat-ca");
   const [sort, setSort] = useState("latest");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -195,6 +240,15 @@ export default function FavoritesPage() {
 
     return Array.from(map.entries()).map(([slug, name]) => ({ slug, name }));
   }, [movies]);
+
+  const hasActiveFilters =
+    keyword.trim() ||
+    type !== "tat-ca" ||
+    lang !== "tat-ca" ||
+    year !== "tat-ca" ||
+    country !== "tat-ca" ||
+    category !== "tat-ca" ||
+    sort !== "latest";
 
   const filteredMovies = useMemo(() => {
     const q = normalize(keyword);
@@ -268,7 +322,35 @@ export default function FavoritesPage() {
       </p>
 
       <section className="mb-8 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <div className="flex items-center justify-between gap-3 md:hidden">
+          <div>
+            <h2 className="text-lg font-black">Bộ lọc yêu thích</h2>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Đang hiện {filteredMovies.length}/{movies.length} phim.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen((value) => !value)}
+            className={[
+              "rounded-2xl border px-4 py-2 text-sm font-black",
+              hasActiveFilters
+                ? "border-yellow-300 bg-yellow-300 text-black"
+                : "border-white/10 bg-white/5 text-white",
+            ].join(" ")}
+          >
+            {mobileFiltersOpen ? "Ẩn lọc" : "Hiện lọc"}
+          </button>
+        </div>
+
+        <div
+          className={[
+            "mt-4 grid gap-3 md:mt-0 md:grid md:grid-cols-2 lg:grid-cols-4",
+            mobileFiltersOpen ? "grid" : "hidden md:grid",
+          ].join(" ")}
+        >
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
@@ -330,15 +412,37 @@ export default function FavoritesPage() {
           <button
             type="button"
             onClick={clearFilters}
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold hover:bg-white/10"
+            disabled={!hasActiveFilters}
+            className={[
+              "rounded-2xl border px-4 py-3 text-sm font-bold",
+              hasActiveFilters
+                ? "border-white/10 bg-white/5 hover:bg-white/10"
+                : "cursor-not-allowed border-white/5 bg-white/[0.03] text-slate-500",
+            ].join(" ")}
           >
             Xóa lọc
           </button>
         </div>
 
-        <p className="mt-4 text-sm text-slate-400">
+        <p className="mt-4 hidden text-sm text-slate-400 md:block">
           Đang hiện {filteredMovies.length}/{movies.length} phim.
         </p>
+
+        {!mobileFiltersOpen && hasActiveFilters && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 md:hidden">
+            <span className="rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-black">
+              Đang lọc
+            </span>
+
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-white"
+            >
+              Xóa lọc nhanh
+            </button>
+          </div>
+        )}
       </section>
 
       {filteredMovies.length === 0 ? (
