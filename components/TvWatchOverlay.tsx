@@ -24,7 +24,7 @@ type TvWatchOverlayProps = {
   onOpenEpisodePanel: () => void;
 };
 
-const AUTO_HIDE_MS = 3500;
+const AUTO_HIDE_MS = 2000;
 const EPISODE_WINDOW_SIZE = 12;
 
 function normalizeServerName(name?: string) {
