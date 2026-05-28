@@ -2,13 +2,39 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { EpisodeServer } from "@/lib/kkphim";
+import type { Episode, EpisodeServer } from "@/lib/kkphim";
 import { getNormalWatchedKey, readWatchedEpisodes } from "@/lib/watchStore";
 
 type ValidServer = {
   server: EpisodeServer;
   originalIndex: number;
 };
+
+type EpisodeGroup = {
+  label: string;
+  start: number;
+  end: number;
+  episodes: Episode[];
+};
+
+const EPISODE_GROUP_SIZE = 24;
+
+function buildEpisodeGroups(episodes: Episode[]) {
+  const groups: EpisodeGroup[] = [];
+
+  for (let start = 0; start < episodes.length; start += EPISODE_GROUP_SIZE) {
+    const end = Math.min(start + EPISODE_GROUP_SIZE, episodes.length);
+
+    groups.push({
+      label: `${start + 1}-${end}`,
+      start,
+      end,
+      episodes: episodes.slice(start, end),
+    });
+  }
+
+  return groups;
+}
 
 export default function EpisodeServerList({
   movieSlug,
@@ -18,6 +44,9 @@ export default function EpisodeServerList({
   servers: EpisodeServer[];
 }) {
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
+  const [activeGroupByServer, setActiveGroupByServer] = useState<
+    Record<number, number>
+  >({});
 
   useEffect(() => {
     setWatchedEpisodes(readWatchedEpisodes());
@@ -130,6 +159,14 @@ export default function EpisodeServerList({
     <section className="space-y-6">
       {servers.map((server, serverIndex) => {
         const episodes = server.server_data ?? [];
+        const groups = buildEpisodeGroups(episodes);
+        const rawActiveGroupIndex = activeGroupByServer[serverIndex] ?? 0;
+        const activeGroupIndex = Math.min(
+          Math.max(rawActiveGroupIndex, 0),
+          Math.max(groups.length - 1, 0)
+        );
+
+        const activeGroup = groups[activeGroupIndex];
 
         const hasPreviousPlayableEpisode = servers
           .slice(0, serverIndex)
@@ -150,18 +187,32 @@ export default function EpisodeServerList({
 
                 <p className="mt-1 text-sm text-slate-400">
                   {episodes.length} tập
+                  {activeGroup && groups.length > 1
+                    ? ` • đang hiện ${activeGroup.start + 1}-${activeGroup.end}`
+                    : ""}
                 </p>
               </div>
 
               {episodes.length > 0 && (
-                <Link
-                  href={`/xem/${movieSlug}?server=${serverIndex}&tap=0`}
-                  data-tv-skip
-                  tabIndex={-1}
-                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
-                >
-                  Xem server này
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/xem/${movieSlug}?server=${serverIndex}&tap=0`}
+                    data-tv-skip
+                    tabIndex={-1}
+                    className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
+                  >
+                    Tập đầu
+                  </Link>
+
+                  <Link
+                    href={`/xem/${movieSlug}?server=${serverIndex}&tap=${
+                      episodes.length - 1
+                    }`}
+                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
+                  >
+                    Tập mới nhất
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -170,39 +221,76 @@ export default function EpisodeServerList({
                 Server này chưa có tập.
               </div>
             ) : (
-              <div
-                data-tv-row
-                className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
-              >
-                {episodes.map((episode, episodeIndex) => {
-                  const watchedKey = getNormalWatchedKey(
-                    movieSlug,
-                    serverIndex,
-                    episodeIndex
-                  );
+              <>
+                {groups.length > 1 && (
+                  <div data-tv-row className="mb-4 flex flex-wrap gap-2">
+                    {groups.map((group, groupIndex) => {
+                      const active = groupIndex === activeGroupIndex;
 
-                  const watched = watchedEpisodes.includes(watchedKey);
+                      return (
+                        <button
+                          key={`${serverIndex}-${group.label}`}
+                          type="button"
+                          onClick={() =>
+                            setActiveGroupByServer((old) => ({
+                              ...old,
+                              [serverIndex]: groupIndex,
+                            }))
+                          }
+                          className={[
+                            "rounded-xl border px-4 py-2 text-sm font-black",
+                            active
+                              ? "border-yellow-300 bg-yellow-300 text-black"
+                              : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                          ].join(" ")}
+                        >
+                          {group.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                  const shouldBeDefault =
-                    !hasPreviousPlayableEpisode && episodeIndex === 0;
+                <div
+                  data-tv-row
+                  className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
+                >
+                  {(activeGroup?.episodes ?? episodes).map(
+                    (episode, localEpisodeIndex) => {
+                      const episodeIndex = activeGroup
+                        ? activeGroup.start + localEpisodeIndex
+                        : localEpisodeIndex;
 
-                  return (
-                    <Link
-                      key={`${serverIndex}-${episode.name}-${episodeIndex}`}
-                      href={`/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`}
-                      data-tv-default={shouldBeDefault ? true : undefined}
-                      className="flex min-h-[54px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
-                    >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        {watched && (
-                          <span className="text-yellow-300">✓</span>
-                        )}
-                        <span>{episode.name}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
+                      const watchedKey = getNormalWatchedKey(
+                        movieSlug,
+                        serverIndex,
+                        episodeIndex
+                      );
+
+                      const watched = watchedEpisodes.includes(watchedKey);
+
+                      const shouldBeDefault =
+                        !hasPreviousPlayableEpisode && episodeIndex === 0;
+
+                      return (
+                        <Link
+                          key={`${serverIndex}-${episode.name}-${episodeIndex}`}
+                          href={`/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`}
+                          data-tv-default={shouldBeDefault ? true : undefined}
+                          className="flex min-h-[54px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
+                        >
+                          <span className="inline-flex items-center justify-center gap-1">
+                            {watched && (
+                              <span className="text-yellow-300">✓</span>
+                            )}
+                            <span>{episode.name}</span>
+                          </span>
+                        </Link>
+                      );
+                    }
+                  )}
+                </div>
+              </>
             )}
           </div>
         );

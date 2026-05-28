@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import CompactMovieCard from "@/components/CompactMovieCard";
 import { getImageUrl } from "@/lib/kkphim";
 import {
   readWatchHistory,
@@ -45,82 +46,6 @@ function formatWatchedTime(value?: string) {
     month: "2-digit",
     year: "2-digit",
   });
-}
-
-function ContinueCard({
-  item,
-  onDelete,
-}: {
-  item: WatchHistoryItem;
-  onDelete: () => void;
-}) {
-  const href = getHistoryHref(item);
-  const image = getImageUrl(item.poster_url || item.thumb_url);
-  const sourceLabel = getSourceLabel(item);
-
-  return (
-    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] transition hover:-translate-y-1 hover:bg-white/[0.075]">
-      <Link href={href} className="block">
-        <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
-          <img
-            src={image}
-            alt={item.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent p-2 pt-14">
-            <p className="line-clamp-1 text-[11px] font-black text-red-300">
-              Xem tiếp: {item.episodeName || "Tập đang xem"}
-            </p>
-
-            <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-yellow-300">
-              {sourceLabel}
-            </p>
-          </div>
-
-          {item.quality && (
-            <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">
-              {item.quality}
-            </span>
-          )}
-
-          {item.isCustom && (
-            <span className="absolute right-2 top-2 rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-black">
-              Riêng
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-1 p-3">
-          <h3 className="line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-white">
-            {item.name}
-          </h3>
-
-          {item.origin_name && (
-            <p className="line-clamp-1 text-xs text-slate-400">
-              {item.origin_name}
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
-            {item.year && <span>{item.year}</span>}
-            {item.lang && <span>• {item.lang}</span>}
-            {item.watchedAt && <span>• {formatWatchedTime(item.watchedAt)}</span>}
-          </div>
-        </div>
-      </Link>
-
-      <button
-        type="button"
-        onClick={onDelete}
-        className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/75 px-2.5 py-1 text-[11px] font-black text-white opacity-100 backdrop-blur hover:bg-red-600 md:opacity-0 md:group-hover:opacity-100"
-        aria-label={`Xóa ${item.name} khỏi xem tiếp`}
-      >
-        Xóa
-      </button>
-    </article>
-  );
 }
 
 export default function ContinueWatching() {
@@ -230,10 +155,28 @@ export default function ContinueWatching() {
             className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4"
           >
             {compactItems.map((item) => (
-              <ContinueCard
+              <CompactMovieCard
                 key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
-                item={item}
-                onDelete={() => deleteItem(item)}
+                href={getHistoryHref(item)}
+                title={item.name}
+                originName={item.origin_name}
+                image={item.poster_url || item.thumb_url}
+                topBadge={item.quality}
+                topBadgeTone="dark"
+                rightBadge={item.isCustom ? "Riêng" : undefined}
+                bottomPrimary={`Xem tiếp: ${
+                  item.episodeName || "Tập đang xem"
+                }`}
+                bottomSecondary={getSourceLabel(item)}
+                meta={[
+                  item.year,
+                  item.lang,
+                  item.watchedAt && formatWatchedTime(item.watchedAt),
+                ]}
+                onRemove={() => deleteItem(item)}
+                removeLabel="Xóa"
+                removeAriaLabel={`Xóa ${item.name} khỏi xem tiếp`}
+                hideRemoveUntilHover
               />
             ))}
           </div>

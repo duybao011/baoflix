@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { restoreLastTvFocus } from "@/lib/tvFocusMemory";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -103,6 +104,14 @@ export default function TvAutoFocus() {
 
       if (!scope) return;
 
+      const restored = restoreLastTvFocus(scope, undefined, {
+        // Modal chọn tập nên ưu tiên data-tv-default/current episode,
+        // tránh fallback theo index của focus ngoài trang.
+        allowIndexFallback: !modal,
+      });
+
+      if (restored) return;
+
       const defaultElement =
         scope.querySelector<HTMLElement>("[data-tv-default]");
 
@@ -116,7 +125,7 @@ export default function TvAutoFocus() {
       if (firstFocusable) {
         focusElement(firstFocusable);
       }
-    }, 140);
+    }, 160);
 
     return () => {
       window.clearTimeout(timer);

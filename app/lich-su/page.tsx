@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { getImageUrl, Taxonomy } from "@/lib/kkphim";
+import CompactMovieCard from "@/components/CompactMovieCard";
 
 const KEY = "baoflix_history";
 
@@ -94,78 +95,6 @@ function SelectBox({
     >
       {children}
     </select>
-  );
-}
-
-function HistoryCard({
-  item,
-  onRemove,
-}: {
-  item: HistoryItem;
-  onRemove: () => void;
-}) {
-  const watchHref = `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${
-    item.episodeIndex
-  }`;
-
-  return (
-    <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] transition hover:-translate-y-1 hover:bg-white/[0.075]">
-      <Link href={watchHref} className="block">
-        <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
-          <img
-            src={getImageUrl(item.poster_url || item.thumb_url)}
-            alt={item.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
-
-          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-2 pt-12">
-            <p className="line-clamp-1 text-[11px] font-black text-red-300">
-              Xem tiếp: {item.episodeName}
-            </p>
-
-            {item.serverName && (
-              <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-yellow-300">
-                {item.serverName}
-              </p>
-            )}
-          </div>
-
-          {item.quality && (
-            <span className="absolute left-2 top-2 rounded-full bg-black/75 px-2 py-1 text-[10px] font-black text-white">
-              {item.quality}
-            </span>
-          )}
-        </div>
-
-        <div className="space-y-1 p-3">
-          <h2 className="line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-white">
-            {item.name}
-          </h2>
-
-          {item.origin_name && (
-            <p className="line-clamp-1 text-xs text-slate-400">
-              {item.origin_name}
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
-            {item.year && <span>{item.year}</span>}
-            {item.lang && <span>• {item.lang}</span>}
-            {item.watchedAt && <span>• {formatWatchedTime(item.watchedAt)}</span>}
-          </div>
-        </div>
-      </Link>
-
-      <button
-        type="button"
-        onClick={onRemove}
-        className="absolute right-2 top-2 rounded-full border border-white/10 bg-black/75 px-2.5 py-1 text-[11px] font-black text-white opacity-90 backdrop-blur hover:bg-red-600"
-        aria-label={`Xóa ${item.name} khỏi lịch sử`}
-      >
-        Xóa
-      </button>
-    </article>
   );
 }
 
@@ -397,17 +326,27 @@ export default function HistoryPage() {
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
         >
           {filteredItems.map((item) => (
-            <HistoryCard
-              key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
-              item={item}
-              onRemove={() =>
-                removeHistoryItem(
-                  item.slug,
-                  item.serverIndex ?? 0,
-                  item.episodeIndex
-                )
-              }
-            />
+<CompactMovieCard
+  key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
+  href={`/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex}`}
+  title={item.name}
+  originName={item.origin_name}
+  image={item.poster_url || item.thumb_url}
+  topBadge={item.quality}
+  topBadgeTone="dark"
+  bottomPrimary={`Xem tiếp: ${item.episodeName}`}
+  bottomSecondary={item.serverName}
+  meta={[item.year, item.lang, item.watchedAt && formatWatchedTime(item.watchedAt)]}
+  onRemove={() =>
+    removeHistoryItem(
+      item.slug,
+      item.serverIndex ?? 0,
+      item.episodeIndex
+    )
+  }
+  removeLabel="Xóa"
+  removeAriaLabel={`Xóa ${item.name} khỏi lịch sử`}
+/>
           ))}
         </div>
       )}

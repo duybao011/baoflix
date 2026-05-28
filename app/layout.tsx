@@ -9,6 +9,8 @@ import TvModeFloatingButton from "@/components/TvModeFloatingButton";
 import TvRemoteNavigator from "@/components/TvRemoteNavigator";
 import TvAutoFocus from "@/components/TvAutoFocus";
 import TvModeToggleButton from "@/components/TvModeToggleButton";
+import ReloadAppButton from "@/components/ReloadAppButton";
+import TvFocusMemory from "@/components/TvFocusMemory";
 
 export const metadata: Metadata = {
   title: "BảoFlix",
@@ -36,6 +38,7 @@ export default function RootLayout({
         <PwaRegister />
         <TvRemoteNavigator />
 	<TvAutoFocus />
+	<TvFocusMemory />
         <Suspense
           fallback={
             <div className="h-[73px] border-b border-white/10 bg-[#070b14]" />
@@ -48,6 +51,7 @@ export default function RootLayout({
         <MobileBottomNav />
         <TvModeFloatingButton />
 	<TvModeToggleButton />
+	<ReloadAppButton />
 
         <main className="mx-auto min-h-screen max-w-[1600px] px-4 pb-28 pt-6 sm:px-6 lg:px-8">
           {children}

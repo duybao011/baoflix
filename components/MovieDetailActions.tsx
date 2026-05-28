@@ -16,11 +16,45 @@ function getFirstWatchHref(movieSlug: string, servers: EpisodeServer[]) {
     (server) => (server.server_data ?? []).length > 0
   );
 
-  if (firstServerIndex < 0) {
-    return "";
-  }
+  if (firstServerIndex < 0) return "";
 
   return `/xem/${movieSlug}?server=${firstServerIndex}&tap=0`;
+}
+
+function getLatestWatchHref(movieSlug: string, servers: EpisodeServer[]) {
+  let bestServerIndex = -1;
+  let bestEpisodeIndex = -1;
+  let bestEpisodeCount = 0;
+
+  servers.forEach((server, serverIndex) => {
+    const episodes = server.server_data ?? [];
+
+    if (episodes.length > bestEpisodeCount) {
+      bestServerIndex = serverIndex;
+      bestEpisodeIndex = episodes.length - 1;
+      bestEpisodeCount = episodes.length;
+    }
+  });
+
+  if (bestServerIndex < 0 || bestEpisodeIndex < 0) return "";
+
+  return `/xem/${movieSlug}?server=${bestServerIndex}&tap=${bestEpisodeIndex}`;
+}
+
+function getLatestEpisodeLabel(servers: EpisodeServer[]) {
+  let bestName = "";
+  let bestEpisodeCount = 0;
+
+  servers.forEach((server) => {
+    const episodes = server.server_data ?? [];
+
+    if (episodes.length > bestEpisodeCount) {
+      bestEpisodeCount = episodes.length;
+      bestName = episodes[episodes.length - 1]?.name || "";
+    }
+  });
+
+  return bestName;
 }
 
 export default function MovieDetailActions({ movie, servers }: Props) {
@@ -54,14 +88,26 @@ export default function MovieDetailActions({ movie, servers }: Props) {
     [movie.slug, servers]
   );
 
+  const latestHref = useMemo(
+    () => getLatestWatchHref(movie.slug, servers),
+    [movie.slug, servers]
+  );
+
+  const latestEpisodeLabel = useMemo(
+    () => getLatestEpisodeLabel(servers),
+    [servers]
+  );
+
   const continueHref = historyItem?.href || "";
+  const hasLatestDifferentFromFirst = latestHref && latestHref !== firstHref;
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-      <div className="flex flex-wrap items-center gap-3">
+      <div data-tv-row className="flex flex-wrap items-center gap-3">
         {continueHref ? (
           <Link
             href={continueHref}
+            data-tv-default
             className="rounded-2xl bg-yellow-300 px-6 py-3 font-black text-black hover:bg-yellow-200"
           >
             ▶ Xem tiếp
@@ -69,6 +115,7 @@ export default function MovieDetailActions({ movie, servers }: Props) {
         ) : firstHref ? (
           <Link
             href={firstHref}
+            data-tv-default
             className="rounded-2xl bg-yellow-300 px-6 py-3 font-black text-black hover:bg-yellow-200"
           >
             ▶ Xem ngay
@@ -80,6 +127,24 @@ export default function MovieDetailActions({ movie, servers }: Props) {
           >
             Chưa có tập
           </button>
+        )}
+
+        {firstHref && (
+          <Link
+            href={firstHref}
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:bg-white/10"
+          >
+            Tập đầu
+          </Link>
+        )}
+
+        {hasLatestDifferentFromFirst && (
+          <Link
+            href={latestHref}
+            className="rounded-2xl bg-red-600 px-5 py-3 font-black text-white hover:bg-red-500"
+          >
+            Tập mới nhất
+          </Link>
         )}
 
         <FavoriteButton movie={movie} />
@@ -97,6 +162,12 @@ export default function MovieDetailActions({ movie, servers }: Props) {
             </p>
           )}
         </div>
+      )}
+
+      {hasLatestDifferentFromFirst && latestEpisodeLabel && (
+        <p className="mt-3 text-xs text-slate-500">
+          Tập mới nhất hiện có: {latestEpisodeLabel}
+        </p>
       )}
     </section>
   );
