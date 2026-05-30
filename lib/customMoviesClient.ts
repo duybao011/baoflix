@@ -31,6 +31,78 @@ export function driveToPreviewUrl(url: string) {
   return raw;
 }
 
+export type EpisodeLinkCheck = {
+  ok: boolean;
+  level: "ok" | "warning" | "error";
+  message: string;
+};
+
+export function checkEpisodeLink(link?: string): EpisodeLinkCheck {
+  const raw = String(link || "").trim();
+
+  if (!raw) {
+    return {
+      ok: false,
+      level: "error",
+      message: "Link trống.",
+    };
+  }
+
+  if (!/^https?:\/\//i.test(raw)) {
+    return {
+      ok: false,
+      level: "error",
+      message: "Link nên bắt đầu bằng http:// hoặc https://.",
+    };
+  }
+
+  if (/drive\.google\.com\/file\/d\/[^/]+/i.test(raw)) {
+    return {
+      ok: true,
+      level: "ok",
+      message: "Google Drive file link hợp lệ, app sẽ tự đổi sang /preview.",
+    };
+  }
+
+  if (/drive\.google\.com\/open\?id=/i.test(raw) || /drive\.google\.com\/uc\?/.test(raw)) {
+    return {
+      ok: true,
+      level: "ok",
+      message: "Google Drive id link hợp lệ, app sẽ tự đổi sang /preview.",
+    };
+  }
+
+  if (/\/preview(\?|$)/i.test(raw)) {
+    return {
+      ok: true,
+      level: "ok",
+      message: "Embed/preview link có vẻ ổn.",
+    };
+  }
+
+  if (/\.m3u8(\?|$)/i.test(raw)) {
+    return {
+      ok: true,
+      level: "ok",
+      message: "HLS .m3u8 public. Nếu server cho phép CORS thì HlsPlayer sẽ phát.",
+    };
+  }
+
+  if (/\.(mp4|webm|mov)(\?|$)/i.test(raw)) {
+    return {
+      ok: true,
+      level: "warning",
+      message: "Direct video link. Nếu trình duyệt phát được thì dùng ổn.",
+    };
+  }
+
+  return {
+    ok: true,
+    level: "warning",
+    message: "Link hợp lệ dạng URL, nhưng chưa nhận diện được loại nguồn. Hãy bấm xem thử.",
+  };
+}
+
 export function readCustomMovies(): StoredCustomMovie[] {
   try {
     const raw = localStorage.getItem(CUSTOM_MOVIES_KEY);
@@ -251,14 +323,15 @@ function parseSeasonsFromText(name: string, episodesText: string) {
       linkRaw = parts.slice(1).join("|").trim();
     }
 
-    const link = driveToPreviewUrl(linkRaw || "");
+    const isHls = /\.m3u8(\?|$)/i.test(linkRaw);
+    const link = isHls ? "" : driveToPreviewUrl(linkRaw || "");
 
     currentSeason.server_data.push({
       name: episodeName,
       slug: slugify(episodeName),
       filename: `${name} - ${currentSeason.server_name} - ${episodeName}`,
       link_embed: link,
-      link_m3u8: "",
+      link_m3u8: isHls ? linkRaw : "",
     });
   });
 

@@ -55,6 +55,13 @@ function CustomMovieMiniCard({
         >
           Quản lý mùa / tập
         </Link>
+
+        <Link
+          href={`${href}/sua`}
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10"
+        >
+          Sửa thông tin
+        </Link>
       </div>
 
       {onDelete && (
@@ -140,9 +147,7 @@ export default function CustomMoviesPage() {
         <div>
           <h1 className="text-3xl font-black">Phim riêng</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
-            Từ giờ mục này chỉ dùng một nguồn duy nhất: phim được thêm và quản lý
-            bằng giao diện trên thiết bị này. Phim cũ trong code không còn hiện
-            song song nữa để tránh trùng lịch sử và trùng card.
+            Thư viện phim được thêm và quản lý bằng giao diện trên thiết bị này.
           </p>
         </div>
 

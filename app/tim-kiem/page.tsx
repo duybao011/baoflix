@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LocalCustomSearchResults from "@/components/LocalCustomSearchResults";
 import MovieGrid from "@/components/MovieGrid";
 import Pagination from "@/components/Pagination";
 import SearchEmptyState from "@/components/SearchEmptyState";
@@ -99,7 +100,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
           <p className="mt-2 text-slate-400">
             Kết quả được lọc lại để giảm tình trạng tìm “Hoa” ra cả “Hoàng”,
-            “Hoại”...
+            “Hoại”... Phim riêng trên thiết bị này cũng sẽ hiện ở khối riêng.
           </p>
         </div>
 
@@ -206,6 +207,8 @@ export default async function SearchPage({ searchParams }: PageProps) {
           </div>
         </div>
       </section>
+
+      <LocalCustomSearchResults q={q} country={country} year={year} />
 
       {result.items.length > 0 ? (
         <>

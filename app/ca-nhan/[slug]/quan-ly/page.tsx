@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { use, useEffect, useMemo, useState } from "react";
 import {
+  checkEpisodeLink,
   countEpisodes,
   driveToPreviewUrl,
   getCustomMovieBySlugClient,
   readCustomMovies,
   saveCustomMovies,
   StoredCustomMovie,
+  type EpisodeLinkCheck,
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
 
@@ -44,6 +46,10 @@ function parseBulkEpisodes(raw: string): EpisodeDraft[] {
     .filter((item) => item.link);
 }
 
+function getEpisodeLinkValue(episode: { link_embed?: string; link_m3u8?: string }) {
+  return episode.link_m3u8 || episode.link_embed || "";
+}
+
 export default function ManageCustomMoviePage({ params }: PageProps) {
   const { slug } = use(params);
 
@@ -53,6 +59,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
   const [episodeLink, setEpisodeLink] = useState("");
   const [bulkEpisodesText, setBulkEpisodesText] = useState("");
   const [status, setStatus] = useState("");
+  const [linkChecks, setLinkChecks] = useState<Record<string, EpisodeLinkCheck>>({});
 
   useEffect(() => {
     const found = getCustomMovieBySlugClient(slug) || null;
@@ -135,6 +142,16 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
     return seasonIndex;
   }
 
+  function normalizeEpisodeLink(rawLink: string) {
+    const cleanLink = rawLink.trim();
+    const isHls = /\.m3u8(\?|$)/i.test(cleanLink);
+
+    return {
+      link_embed: isHls ? "" : driveToPreviewUrl(cleanLink),
+      link_m3u8: isHls ? cleanLink : "",
+    };
+  }
+
   function addEpisode() {
     const cleanSeasonName = seasonName.trim() || "Mùa 1";
     const cleanEpisodeName = episodeName.trim();
@@ -157,8 +174,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
       name: finalEpisodeName,
       slug: slugify(finalEpisodeName),
       filename: `${movie.name} - ${cleanSeasonName} - ${finalEpisodeName}`,
-      link_embed: driveToPreviewUrl(cleanLink),
-      link_m3u8: cleanLink.endsWith(".m3u8") ? cleanLink : "",
+      ...normalizeEpisodeLink(cleanLink),
     });
 
     saveUpdatedMovie(
@@ -192,8 +208,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
         name: finalEpisodeName,
         slug: slugify(finalEpisodeName),
         filename: `${movie.name} - ${cleanSeasonName} - ${finalEpisodeName}`,
-        link_embed: draft.link.endsWith(".m3u8") ? "" : driveToPreviewUrl(draft.link),
-        link_m3u8: draft.link.endsWith(".m3u8") ? draft.link : "",
+        ...normalizeEpisodeLink(draft.link),
       });
     });
 
@@ -281,6 +296,52 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
     saveUpdatedMovie(cloned, "Đã xóa mùa.");
   }
 
+  function moveEpisode(seasonIndex: number, episodeIndex: number, direction: -1 | 1) {
+    const targetIndex = episodeIndex + direction;
+
+    if (targetIndex < 0) return;
+
+    const season = seasons[seasonIndex];
+
+    if (!season || targetIndex >= season.server_data.length) return;
+
+    const cloned: StoredCustomMovie = JSON.parse(JSON.stringify(movieData));
+    const list = cloned.episodes[seasonIndex].server_data;
+
+    const [item] = list.splice(episodeIndex, 1);
+    list.splice(targetIndex, 0, item);
+
+    saveUpdatedMovie(cloned, "Đã đổi thứ tự tập.");
+  }
+
+  function checkOneEpisodeLink(seasonIndex: number, episodeIndex: number) {
+    const episode = seasons[seasonIndex]?.server_data?.[episodeIndex];
+    if (!episode) return;
+
+    const key = `${seasonIndex}-${episodeIndex}`;
+    const result = checkEpisodeLink(getEpisodeLinkValue(episode));
+
+    setLinkChecks((prev) => ({
+      ...prev,
+      [key]: result,
+    }));
+  }
+
+  function checkAllEpisodeLinks() {
+    const next: Record<string, EpisodeLinkCheck> = {};
+
+    seasons.forEach((season, seasonIndex) => {
+      season.server_data.forEach((episode, episodeIndex) => {
+        next[`${seasonIndex}-${episodeIndex}`] = checkEpisodeLink(
+          getEpisodeLinkValue(episode)
+        );
+      });
+    });
+
+    setLinkChecks(next);
+    setStatus("Đã kiểm tra nhanh tất cả link tập.");
+  }
+
   return (
     <div>
       <Link href={`/ca-nhan/${movie.slug}`} className="text-sm text-red-300">
@@ -297,12 +358,29 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
           </p>
         </div>
 
-        <Link
-          href={`/ca-nhan/${movie.slug}/xem?season=0&tap=0`}
-          className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black hover:bg-red-500"
-        >
-          Xem từ đầu
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/ca-nhan/${movie.slug}/sua`}
+            className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black hover:bg-white/10"
+          >
+            Sửa thông tin
+          </Link>
+
+          <button
+            type="button"
+            onClick={checkAllEpisodeLinks}
+            className="rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-5 py-3 text-sm font-black text-yellow-100 hover:bg-yellow-300 hover:text-black"
+          >
+            Check tất cả link
+          </button>
+
+          <Link
+            href={`/ca-nhan/${movie.slug}/xem?season=0&tap=0`}
+            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black hover:bg-red-500"
+          >
+            Xem từ đầu
+          </Link>
+        </div>
       </div>
 
       {status && (
@@ -447,94 +525,140 @@ Tập 06 | https://drive.google.com/file/d/zzz/view`}
                     Mùa này chưa có tập.
                   </div>
                 ) : (
-                  season.server_data.map((episode, episodeIndex) => (
-                    <details
-                      key={`${episode.name}-${episodeIndex}`}
-                      className="rounded-2xl border border-white/10 bg-black/20 p-3"
-                    >
-                      <summary className="cursor-pointer list-none">
-                        <div className="flex items-center justify-between gap-3">
-                          <Link
-                            href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
-                            className="font-bold hover:text-red-300"
-                          >
-                            {episode.name}
-                          </Link>
+                  season.server_data.map((episode, episodeIndex) => {
+                    const checkKey = `${seasonIndex}-${episodeIndex}`;
+                    const checkResult = linkChecks[checkKey];
 
-                          <span className="text-xs text-slate-500">
-                            Bấm để sửa
-                          </span>
+                    return (
+                      <details
+                        key={`${episode.name}-${episodeIndex}`}
+                        className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                      >
+                        <summary className="cursor-pointer list-none">
+                          <div className="flex items-center justify-between gap-3">
+                            <Link
+                              href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
+                              className="font-bold hover:text-red-300"
+                            >
+                              {episodeIndex + 1}. {episode.name}
+                            </Link>
+
+                            <span className="text-xs text-slate-500">
+                              Bấm để sửa
+                            </span>
+                          </div>
+                        </summary>
+
+                        {checkResult && (
+                          <div
+                            className={[
+                              "mt-3 rounded-xl border p-3 text-xs font-semibold",
+                              checkResult.level === "ok"
+                                ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+                                : checkResult.level === "warning"
+                                  ? "border-yellow-300/20 bg-yellow-300/10 text-yellow-100"
+                                  : "border-red-400/20 bg-red-500/10 text-red-100",
+                            ].join(" ")}
+                          >
+                            {checkResult.message}
+                          </div>
+                        )}
+
+                        <div className="mt-4 grid gap-3">
+                          <label className="grid gap-2">
+                            <span className="text-xs font-bold text-slate-400">
+                              Tên tập
+                            </span>
+
+                            <input
+                              defaultValue={episode.name}
+                              onBlur={(event) =>
+                                updateEpisode(seasonIndex, episodeIndex, {
+                                  name: event.currentTarget.value,
+                                })
+                              }
+                              className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
+                            />
+                          </label>
+
+                          <label className="grid gap-2">
+                            <span className="text-xs font-bold text-slate-400">
+                              Link embed
+                            </span>
+
+                            <input
+                              defaultValue={episode.link_embed || ""}
+                              onBlur={(event) =>
+                                updateEpisode(seasonIndex, episodeIndex, {
+                                  link_embed: event.currentTarget.value,
+                                })
+                              }
+                              className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
+                            />
+                          </label>
+
+                          <label className="grid gap-2">
+                            <span className="text-xs font-bold text-slate-400">
+                              Link m3u8 nếu có
+                            </span>
+
+                            <input
+                              defaultValue={episode.link_m3u8 || ""}
+                              onBlur={(event) =>
+                                updateEpisode(seasonIndex, episodeIndex, {
+                                  link_m3u8: event.currentTarget.value,
+                                })
+                              }
+                              className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
+                            />
+                          </label>
+
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
+                              className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black hover:bg-red-500"
+                            >
+                              Xem tập này
+                            </Link>
+
+                            <button
+                              type="button"
+                              onClick={() => checkOneEpisodeLink(seasonIndex, episodeIndex)}
+                              className="rounded-xl border border-yellow-300/30 bg-yellow-300/10 px-3 py-2 text-xs font-bold text-yellow-100 hover:bg-yellow-300 hover:text-black"
+                            >
+                              Check link
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => moveEpisode(seasonIndex, episodeIndex, -1)}
+                              disabled={episodeIndex === 0}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              ↑ Lên
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => moveEpisode(seasonIndex, episodeIndex, 1)}
+                              disabled={episodeIndex === season.server_data.length - 1}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              ↓ Xuống
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => deleteEpisode(seasonIndex, episodeIndex)}
+                              className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:bg-red-600"
+                            >
+                              Xóa tập
+                            </button>
+                          </div>
                         </div>
-                      </summary>
-
-                      <div className="mt-4 grid gap-3">
-                        <label className="grid gap-2">
-                          <span className="text-xs font-bold text-slate-400">
-                            Tên tập
-                          </span>
-
-                          <input
-                            defaultValue={episode.name}
-                            onBlur={(event) =>
-                              updateEpisode(seasonIndex, episodeIndex, {
-                                name: event.currentTarget.value,
-                              })
-                            }
-                            className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
-                          />
-                        </label>
-
-                        <label className="grid gap-2">
-                          <span className="text-xs font-bold text-slate-400">
-                            Link embed
-                          </span>
-
-                          <input
-                            defaultValue={episode.link_embed || ""}
-                            onBlur={(event) =>
-                              updateEpisode(seasonIndex, episodeIndex, {
-                                link_embed: event.currentTarget.value,
-                              })
-                            }
-                            className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
-                          />
-                        </label>
-
-                        <label className="grid gap-2">
-                          <span className="text-xs font-bold text-slate-400">
-                            Link m3u8 nếu có
-                          </span>
-
-                          <input
-                            defaultValue={episode.link_m3u8 || ""}
-                            onBlur={(event) =>
-                              updateEpisode(seasonIndex, episodeIndex, {
-                                link_m3u8: event.currentTarget.value,
-                              })
-                            }
-                            className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
-                          />
-                        </label>
-
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
-                            className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black hover:bg-red-500"
-                          >
-                            Xem tập này
-                          </Link>
-
-                          <button
-                            type="button"
-                            onClick={() => deleteEpisode(seasonIndex, episodeIndex)}
-                            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-bold hover:bg-red-600"
-                          >
-                            Xóa tập
-                          </button>
-                        </div>
-                      </div>
-                    </details>
-                  ))
+                      </details>
+                    );
+                  })
                 )}
               </div>
             </div>
