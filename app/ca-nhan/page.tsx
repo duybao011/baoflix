@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode, ChangeEvent } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { customMovieResponses } from "@/data/custom-movies";
+import type { ChangeEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  cloneCustomMovieResponseToLocal,
   deleteCustomMovie,
   exportCustomMoviesJson,
   importCustomMoviesJson,
@@ -20,7 +18,6 @@ function CustomMovieMiniCard({
   poster,
   href,
   badge,
-  action,
   onDelete,
 }: {
   name: string;
@@ -28,7 +25,6 @@ function CustomMovieMiniCard({
   poster?: string;
   href: string;
   badge?: string;
-  action?: ReactNode;
   onDelete?: () => void;
 }) {
   return (
@@ -42,7 +38,7 @@ function CustomMovieMiniCard({
 
         <div className="p-3">
           {badge && (
-            <span className="mb-2 inline-block rounded-full bg-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-yellow-200">
+            <span className="mb-2 inline-block rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-black">
               {badge}
             </span>
           )}
@@ -52,7 +48,14 @@ function CustomMovieMiniCard({
         </div>
       </Link>
 
-      {action && <div className="border-t border-white/10 p-2">{action}</div>}
+      <div className="grid gap-2 border-t border-white/10 p-2">
+        <Link
+          href={`${href}/quan-ly`}
+          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10"
+        >
+          Quản lý mùa / tập
+        </Link>
+      </div>
 
       {onDelete && (
         <button
@@ -76,30 +79,16 @@ export default function CustomMoviesPage() {
     setLocalMovies(readCustomMovies());
   }, []);
 
-  const localMovieSlugs = useMemo(() => {
-    return new Set(localMovies.map((item) => item.movie.slug));
-  }, [localMovies]);
-
   function removeMovie(slug: string) {
     const confirmed = window.confirm(
-      "Xóa phim thêm bằng giao diện trên thiết bị này hả fen?"
+      "Xóa phim riêng này khỏi thiết bị hiện tại hả fen?"
     );
 
     if (!confirmed) return;
 
     const next = deleteCustomMovie(slug);
     setLocalMovies(next);
-    setStatus("Đã xóa phim khỏi thư viện giao diện.");
-  }
-
-  function cloneBuiltInMovie(
-    movieResponse: (typeof customMovieResponses)[number]
-  ) {
-    const next = cloneCustomMovieResponseToLocal(movieResponse);
-    setLocalMovies(next);
-    setStatus(
-      `Đã đưa “${movieResponse.movie.name}” vào thư viện giao diện. Giờ fen có thể quản lý mùa/tập ngay trên web.`
-    );
+    setStatus("Đã xóa phim khỏi thư viện phim riêng.");
   }
 
   function downloadBackup() {
@@ -150,9 +139,10 @@ export default function CustomMoviesPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Phim riêng</h1>
-          <p className="mt-2 text-slate-400">
-            Thư viện phim do fen tự thêm vào BảoFlix. Phim trong code có thể
-            được copy sang đây để quản lý mùa/tập ngay trên web.
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+            Từ giờ mục này chỉ dùng một nguồn duy nhất: phim được thêm và quản lý
+            bằng giao diện trên thiết bị này. Phim cũ trong code không còn hiện
+            song song nữa để tránh trùng lịch sử và trùng card.
           </p>
         </div>
 
@@ -197,70 +187,51 @@ export default function CustomMoviesPage() {
         </div>
       )}
 
-      <section className="mb-10">
-        <h2 className="mb-2 text-2xl font-black">Phim trong code</h2>
-
-        <p className="mb-5 text-sm leading-6 text-slate-400">
-          Mấy phim này vẫn giữ nguyên như cũ. Muốn thêm tập ngay trên web thì
-          bấm <b>Đưa vào giao diện</b>, app sẽ tạo một bản local để quản lý.
-        </p>
-
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {customMovieResponses.map((item) => {
-            const hasLocalVersion = localMovieSlugs.has(item.movie.slug);
-
-            return (
-              <CustomMovieMiniCard
-                key={item.movie.slug}
-                name={item.movie.name}
-                originName={item.movie.origin_name}
-                poster={item.movie.poster_url || item.movie.thumb_url}
-                href={`/phim/${item.movie.slug}`}
-                badge="Trong code"
-                action={
-                  hasLocalVersion ? (
-                    <div className="grid gap-2">
-                      <Link
-                        href={`/ca-nhan/${item.movie.slug}`}
-                        className="rounded-xl bg-yellow-300 px-3 py-2 text-center text-xs font-black text-black hover:bg-yellow-200"
-                      >
-                        Mở bản giao diện
-                      </Link>
-
-                      <Link
-                        href={`/ca-nhan/${item.movie.slug}/quan-ly`}
-                        className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10"
-                      >
-                        Quản lý tập
-                      </Link>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => cloneBuiltInMovie(item)}
-                      className="w-full rounded-xl bg-red-600 px-3 py-2 text-xs font-black hover:bg-red-500"
-                    >
-                      Đưa vào giao diện
-                    </button>
-                  )
-                }
-              />
-            );
-          })}
-        </div>
-      </section>
-
       <section>
-        <h2 className="mb-2 text-2xl font-black">Phim thêm bằng giao diện</h2>
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-black">Thư viện phim riêng</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {localMovies.length} phim đang lưu trên trình duyệt hiện tại.
+            </p>
+          </div>
 
-        <p className="mb-5 text-sm leading-6 text-slate-400">
-          Các phim trong mục này lưu trên trình duyệt hiện tại bằng localStorage.
-          Có thể thêm tập, thêm mùa, xóa tập và backup/import bằng JSON.
-        </p>
+          {localMovies.length > 0 && (
+            <Link
+              href="/ca-nhan/them"
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10"
+            >
+              Thêm phim khác
+            </Link>
+          )}
+        </div>
 
         {localMovies.length === 0 ? (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-slate-400">
-            Chưa có phim nào được thêm bằng giao diện.
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+            <h3 className="text-xl font-black">Chưa có phim riêng nào</h3>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+              Bấm <b>+ Thêm phim</b> để tạo phim mới bằng giao diện. Nếu đã có
+              backup JSON từ máy khác hoặc từ bản cũ, dùng <b>Import JSON</b> để
+              khôi phục thư viện.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                href="/ca-nhan/them"
+                className="rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500"
+              >
+                + Thêm phim đầu tiên
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
+              >
+                Import JSON
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
@@ -272,14 +243,6 @@ export default function CustomMoviesPage() {
                 poster={item.movie.poster_url || item.movie.thumb_url}
                 href={`/ca-nhan/${item.movie.slug}`}
                 badge="Giao diện"
-                action={
-                  <Link
-                    href={`/ca-nhan/${item.movie.slug}/quan-ly`}
-                    className="block rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10"
-                  >
-                    Quản lý mùa / tập
-                  </Link>
-                }
                 onDelete={() => removeMovie(item.movie.slug)}
               />
             ))}

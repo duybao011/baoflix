@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import EpisodeServerList from "@/components/EpisodeServerList";
+import LocalCustomMovieRouteSync from "@/components/LocalCustomMovieRouteSync";
 import MovieDetailActions from "@/components/MovieDetailActions";
 import MovieDetailTabs from "@/components/MovieDetailTabs";
 import RelatedMovies from "@/components/RelatedMovies";
@@ -235,12 +236,14 @@ export default async function MovieDetailPage({ params }: PageProps) {
 
   const relatedTab = <RelatedMovies movie={movie} />;
 
-return (
-  <div
-    data-tv-scope="movie-detail"
-    data-tv-lock="true"
-    data-tv-autofocus="true"
-  >
+  return (
+    <div
+      data-tv-scope="movie-detail"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+    >
+      <LocalCustomMovieRouteSync slug={movie.slug} mode="detail" />
+
       <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
         <aside className="lg:sticky lg:top-24 lg:self-start">
           <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#111521] shadow-2xl">

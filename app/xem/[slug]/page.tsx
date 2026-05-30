@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LocalCustomMovieRouteSync from "@/components/LocalCustomMovieRouteSync";
 import WatchClient from "@/components/WatchClient";
 import { getMovieDetail } from "@/lib/kkphim";
 
@@ -16,25 +17,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
   const data = await getMovieDetail(slug);
   const servers = data.episodes ?? [];
-
-  if (!servers.length) {
-    return (
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
-        <h1 className="text-2xl font-black">Chưa có tập để xem</h1>
-
-        <p className="mt-2 text-slate-400">
-          Phim này chưa có danh sách tập hoặc nguồn phát đang lỗi.
-        </p>
-
-        <Link
-          href={`/phim/${slug}`}
-          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
-        >
-          Quay lại chi tiết phim
-        </Link>
-      </div>
-    );
-  }
 
   const rawServerIndex = Number(query.server || 0);
   const rawEpisodeIndex = Number(query.tap || 0);
@@ -56,12 +38,47 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       ? 0
       : rawEpisodeIndex;
 
+  if (!servers.length) {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+        <LocalCustomMovieRouteSync
+          slug={slug}
+          mode="watch"
+          serverIndex={safeServerIndex}
+          episodeIndex={safeEpisodeIndex}
+        />
+
+        <h1 className="text-2xl font-black">Chưa có tập để xem</h1>
+
+        <p className="mt-2 text-slate-400">
+          Phim này chưa có danh sách tập hoặc nguồn phát đang lỗi.
+        </p>
+
+        <Link
+          href={`/phim/${slug}`}
+          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
+        >
+          Quay lại chi tiết phim
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <WatchClient
-      movie={data.movie}
-      servers={servers}
-      currentServerIndex={safeServerIndex}
-      currentEpisodeIndex={safeEpisodeIndex}
-    />
+    <>
+      <LocalCustomMovieRouteSync
+        slug={slug}
+        mode="watch"
+        serverIndex={safeServerIndex}
+        episodeIndex={safeEpisodeIndex}
+      />
+
+      <WatchClient
+        movie={data.movie}
+        servers={servers}
+        currentServerIndex={safeServerIndex}
+        currentEpisodeIndex={safeEpisodeIndex}
+      />
+    </>
   );
 }
