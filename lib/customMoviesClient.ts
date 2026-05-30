@@ -75,6 +75,124 @@ export function upsertCustomMovie(movie: StoredCustomMovie) {
   return next;
 }
 
+function cloneJson<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value));
+}
+
+export function countEpisodes(
+  seasons: {
+    server_name: string;
+    server_data: unknown[];
+  }[] = []
+) {
+  return seasons.reduce((total, season) => total + season.server_data.length, 0);
+}
+
+export function createStoredCustomMovieFromResponse(
+  response: MovieDetailResponse
+): StoredCustomMovie {
+  const now = new Date().toISOString();
+  const cloned = cloneJson(response);
+  const totalEpisodes = countEpisodes(cloned.episodes || []);
+
+  return {
+    ...cloned,
+    source: "local",
+    createdAt: now,
+    updatedAt: now,
+    movie: {
+      ...cloned.movie,
+      _id: cloned.movie._id || `custom-${cloned.movie.slug}`,
+      slug: cloned.movie.slug || slugify(cloned.movie.name),
+      poster_url: cloned.movie.poster_url || "/placeholder.png",
+      thumb_url:
+        cloned.movie.thumb_url || cloned.movie.poster_url || "/placeholder.png",
+      episode_current: cloned.movie.episode_current || `${totalEpisodes} tập`,
+      episode_total: cloned.movie.episode_total || String(totalEpisodes),
+      quality: cloned.movie.quality || "HD",
+      lang: cloned.movie.lang || "Phim riêng",
+      type: cloned.movie.type || "series",
+      status: cloned.movie.status || "ongoing",
+      content:
+        cloned.movie.content || "Phim riêng do bạn tự thêm vào BảoFlix.",
+      category:
+        cloned.movie.category && cloned.movie.category.length > 0
+          ? cloned.movie.category
+          : [
+              {
+                name: "Phim riêng",
+                slug: "phim-rieng",
+              },
+            ],
+      country:
+        cloned.movie.country && cloned.movie.country.length > 0
+          ? cloned.movie.country
+          : [
+              {
+                name: "Nhật Bản",
+                slug: "nhat-ban",
+              },
+            ],
+      actor: cloned.movie.actor || [],
+      director: cloned.movie.director || [],
+    },
+    episodes: cloned.episodes || [],
+  };
+}
+
+export function cloneCustomMovieResponseToLocal(response: MovieDetailResponse) {
+  const stored = createStoredCustomMovieFromResponse(response);
+  return upsertCustomMovie(stored);
+}
+
+export function exportCustomMoviesJson() {
+  return JSON.stringify(
+    {
+      exportedAt: new Date().toISOString(),
+      version: 1,
+      movies: readCustomMovies(),
+    },
+    null,
+    2
+  );
+}
+
+export function importCustomMoviesJson(raw: string) {
+  const data = JSON.parse(raw);
+
+  const importedMovies: StoredCustomMovie[] = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.movies)
+      ? data.movies
+      : [];
+
+  const validMovies = importedMovies.filter((item) => {
+    return item?.movie?.slug && item?.movie?.name && Array.isArray(item?.episodes);
+  });
+
+  if (validMovies.length === 0) {
+    throw new Error("File JSON không có phim riêng hợp lệ.");
+  }
+
+  const current = readCustomMovies();
+  const map = new Map<string, StoredCustomMovie>();
+
+  current.forEach((item) => map.set(item.movie.slug, item));
+  validMovies.forEach((item) => {
+    map.set(item.movie.slug, {
+      ...item,
+      source: "local",
+      createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  });
+
+  const next = Array.from(map.values());
+  saveCustomMovies(next);
+
+  return next;
+}
+
 function parseSeasonsFromText(name: string, episodesText: string) {
   const lines = episodesText
     .split("\n")
@@ -154,15 +272,6 @@ function parseSeasonsFromText(name: string, episodesText: string) {
           server_data: [],
         },
       ];
-}
-
-function countEpisodes(
-  seasons: {
-    server_name: string;
-    server_data: unknown[];
-  }[]
-) {
-  return seasons.reduce((total, season) => total + season.server_data.length, 0);
 }
 
 export function createCustomMovieFromForm(input: {

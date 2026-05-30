@@ -1,29 +1,18 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { getImageUrl, Taxonomy } from "@/lib/kkphim";
+import { Taxonomy } from "@/lib/kkphim";
 import CompactMovieCard from "@/components/CompactMovieCard";
+import {
+  clearWatchHistory,
+  readWatchHistory,
+  removeWatchHistoryItem,
+  type WatchHistoryItem,
+} from "@/lib/watchStore";
 
-const KEY = "baoflix_history";
-
-type HistoryItem = {
-  slug: string;
-  name: string;
-  origin_name?: string;
-  poster_url?: string;
-  thumb_url?: string;
-  year?: number;
-  lang?: string;
-  quality?: string;
-  type?: string;
+type HistoryItem = WatchHistoryItem & {
   category?: Taxonomy[];
   country?: Taxonomy[];
-  episodeName: string;
-  episodeIndex: number;
-  serverIndex?: number;
-  serverName?: string;
-  watchedAt: string;
 };
 
 const langOptions = [
@@ -78,6 +67,30 @@ function formatWatchedTime(value?: string) {
   });
 }
 
+function getHistoryHref(item: HistoryItem) {
+  if (item.href) {
+    return item.href;
+  }
+
+  if (item.isCustom) {
+    return `/ca-nhan/${item.slug}/xem?season=${item.seasonIndex ?? 0}&tap=${
+      item.episodeIndex ?? 0
+    }`;
+  }
+
+  return `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${
+    item.episodeIndex ?? 0
+  }`;
+}
+
+function getSourceLabel(item: HistoryItem) {
+  if (item.isCustom) {
+    return item.seasonName || "Phim riêng";
+  }
+
+  return item.serverName || "Server";
+}
+
 function SelectBox({
   value,
   onChange,
@@ -109,12 +122,19 @@ export default function HistoryPage() {
   const [sort, setSort] = useState("latest");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      setItems(raw ? JSON.parse(raw) : []);
-    } catch {
-      setItems([]);
+    setItems(readWatchHistory());
+
+    function refreshHistory() {
+      setItems(readWatchHistory());
     }
+
+    window.addEventListener("storage", refreshHistory);
+    window.addEventListener("focus", refreshHistory);
+
+    return () => {
+      window.removeEventListener("storage", refreshHistory);
+      window.removeEventListener("focus", refreshHistory);
+    };
   }, []);
 
   const years = useMemo(() => {
@@ -125,7 +145,7 @@ export default function HistoryPage() {
 
   const servers = useMemo(() => {
     return Array.from(
-      new Set(items.map((item) => item.serverName).filter(Boolean))
+      new Set(items.map((item) => getSourceLabel(item)).filter(Boolean))
     ) as string[];
   }, [items]);
 
@@ -148,14 +168,15 @@ export default function HistoryPage() {
     const q = normalize(keyword);
 
     let result = items.filter((item) => {
+      const sourceLabel = getSourceLabel(item);
       const text = normalize(
-        `${item.name} ${item.origin_name} ${item.episodeName} ${item.serverName}`
+        `${item.name} ${item.origin_name} ${item.episodeName} ${sourceLabel}`
       );
 
       const matchKeyword = !q || text.includes(q);
       const matchType = type === "tat-ca" || item.type === type;
       const matchYear = year === "tat-ca" || String(item.year) === year;
-      const matchServer = server === "tat-ca" || item.serverName === server;
+      const matchServer = server === "tat-ca" || sourceLabel === server;
 
       const matchCountry =
         country === "tat-ca" ||
@@ -176,7 +197,8 @@ export default function HistoryPage() {
     if (sort === "oldest") {
       result = [...result].sort(
         (a, b) =>
-          new Date(a.watchedAt).getTime() - new Date(b.watchedAt).getTime()
+          new Date(a.watchedAt || 0).getTime() -
+          new Date(b.watchedAt || 0).getTime()
       );
     }
 
@@ -187,7 +209,8 @@ export default function HistoryPage() {
     if (sort === "latest") {
       result = [...result].sort(
         (a, b) =>
-          new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+          new Date(b.watchedAt || 0).getTime() -
+          new Date(a.watchedAt || 0).getTime()
       );
     }
 
@@ -195,7 +218,7 @@ export default function HistoryPage() {
   }, [items, keyword, type, lang, server, country, year, sort]);
 
   function clearHistory() {
-    localStorage.removeItem(KEY);
+    clearWatchHistory();
     setItems([]);
   }
 
@@ -209,17 +232,13 @@ export default function HistoryPage() {
     setSort("latest");
   }
 
-  function removeHistoryItem(slug: string, serverIndex = 0, episodeIndex = 0) {
-    const next = items.filter((item) => {
-      const sameMovie = item.slug === slug;
-      const sameServer = (item.serverIndex ?? 0) === serverIndex;
-      const sameEpisode = item.episodeIndex === episodeIndex;
-
-      return !(sameMovie && sameServer && sameEpisode);
+  function removeHistoryMovie(item: HistoryItem) {
+    const next = removeWatchHistoryItem({
+      slug: item.slug,
+      isCustom: item.isCustom,
     });
 
     setItems(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
   }
 
   return (
@@ -229,7 +248,7 @@ export default function HistoryPage() {
           <h1 className="text-3xl font-black">Lịch sử xem</h1>
 
           <p className="mt-1 text-slate-400">
-            Lọc nhanh các phim fen đã xem gần đây.
+            Lọc nhanh các phim fen đã xem gần đây. Cùng slug sẽ được gộp thành một lịch sử.
           </p>
         </div>
 
@@ -270,7 +289,7 @@ export default function HistoryPage() {
           </SelectBox>
 
           <SelectBox value={server} onChange={setServer}>
-            <option value="tat-ca">Tất cả server</option>
+            <option value="tat-ca">Tất cả nguồn</option>
             {servers.map((item) => (
               <option key={item} value={item}>
                 {item}
@@ -326,27 +345,26 @@ export default function HistoryPage() {
           className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
         >
           {filteredItems.map((item) => (
-<CompactMovieCard
-  key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex}`}
-  href={`/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex}`}
-  title={item.name}
-  originName={item.origin_name}
-  image={item.poster_url || item.thumb_url}
-  topBadge={item.quality}
-  topBadgeTone="dark"
-  bottomPrimary={`Xem tiếp: ${item.episodeName}`}
-  bottomSecondary={item.serverName}
-  meta={[item.year, item.lang, item.watchedAt && formatWatchedTime(item.watchedAt)]}
-  onRemove={() =>
-    removeHistoryItem(
-      item.slug,
-      item.serverIndex ?? 0,
-      item.episodeIndex
-    )
-  }
-  removeLabel="Xóa"
-  removeAriaLabel={`Xóa ${item.name} khỏi lịch sử`}
-/>
+            <CompactMovieCard
+              key={item.slug}
+              href={getHistoryHref(item)}
+              title={item.name}
+              originName={item.origin_name}
+              image={item.poster_url || item.thumb_url}
+              topBadge={item.quality}
+              topBadgeTone="dark"
+              rightBadge={item.isCustom ? "Riêng" : undefined}
+              bottomPrimary={`Xem tiếp: ${item.episodeName || "Tập đang xem"}`}
+              bottomSecondary={getSourceLabel(item)}
+              meta={[
+                item.year,
+                item.lang,
+                item.watchedAt && formatWatchedTime(item.watchedAt),
+              ]}
+              onRemove={() => removeHistoryMovie(item)}
+              removeLabel="Xóa"
+              removeAriaLabel={`Xóa ${item.name} khỏi lịch sử`}
+            />
           ))}
         </div>
       )}

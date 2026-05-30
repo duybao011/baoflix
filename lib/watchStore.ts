@@ -14,6 +14,7 @@ export type WatchHistoryItem = {
   year?: number;
   lang?: string;
   quality?: string;
+  type?: string;
 
   episodeName?: string;
   episodeIndex?: number;
@@ -86,7 +87,11 @@ export function saveWatchedEpisode(key: string) {
 }
 
 function getHistoryGroupKey(item: WatchHistoryItem) {
-  return `${item.isCustom ? "custom" : "normal"}:${item.slug}`;
+  // Cùng slug thì gộp chung 1 lịch sử, dù là phim trong code hay phim thêm bằng giao diện.
+  // Ví dụ:
+  // /phim/sabakan-uchuu-e-iku và /ca-nhan/sabakan-uchuu-e-iku
+  // chỉ còn 1 card "Xem tiếp", giữ bản có watchedAt mới nhất.
+  return item.slug;
 }
 
 function getTimeValue(item: WatchHistoryItem) {
@@ -94,11 +99,33 @@ function getTimeValue(item: WatchHistoryItem) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function normalizeHistoryItem(item: WatchHistoryItem): WatchHistoryItem {
+  if (!item.href) {
+    if (item.isCustom) {
+      return {
+        ...item,
+        href: `/ca-nhan/${item.slug}/xem?season=${item.seasonIndex ?? 0}&tap=${
+          item.episodeIndex ?? 0
+        }`,
+      };
+    }
+
+    return {
+      ...item,
+      href: `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${
+        item.episodeIndex ?? 0
+      }`,
+    };
+  }
+
+  return item;
+}
+
 /**
  * Gom lịch sử về đúng logic:
- * 1 phim thường = 1 dòng
- * 1 phim riêng = 1 dòng
- * Giữ lại dòng có watchedAt mới nhất.
+ * 1 slug phim = 1 dòng duy nhất.
+ * Nếu phim trong code và phim thêm bằng giao diện có cùng slug,
+ * giữ lại dòng có watchedAt mới nhất.
  */
 export function normalizeWatchHistory(items: WatchHistoryItem[]) {
   const map = new Map<string, WatchHistoryItem>();
@@ -106,11 +133,12 @@ export function normalizeWatchHistory(items: WatchHistoryItem[]) {
   items.forEach((item) => {
     if (!item?.slug) return;
 
-    const key = getHistoryGroupKey(item);
+    const normalizedItem = normalizeHistoryItem(item);
+    const key = getHistoryGroupKey(normalizedItem);
     const old = map.get(key);
 
-    if (!old || getTimeValue(item) >= getTimeValue(old)) {
-      map.set(key, item);
+    if (!old || getTimeValue(normalizedItem) >= getTimeValue(old)) {
+      map.set(key, normalizedItem);
     }
   });
 
@@ -123,7 +151,7 @@ export function readWatchHistory() {
   const raw = readJson<WatchHistoryItem[]>(HISTORY_KEY, []);
   const normalized = normalizeWatchHistory(raw);
 
-  if (normalized.length !== raw.length) {
+  if (JSON.stringify(normalized) !== JSON.stringify(raw)) {
     writeJson(HISTORY_KEY, normalized);
   }
 
@@ -140,13 +168,8 @@ export function removeWatchHistoryItem(input: {
 }) {
   const history = readWatchHistory();
 
-  const next = history.filter(
-    (item) =>
-      !(
-        item.slug === input.slug &&
-        Boolean(item.isCustom) === Boolean(input.isCustom)
-      )
-  );
+  // Vì lịch sử đã gộp theo slug, xóa 1 phim là xóa luôn mọi biến thể normal/custom cùng slug.
+  const next = history.filter((item) => item.slug !== input.slug);
 
   writeJson(HISTORY_KEY, next);
 
@@ -171,6 +194,7 @@ export function saveNormalWatchHistory(input: {
     year: input.movie.year,
     lang: input.movie.lang,
     quality: input.movie.quality,
+    type: input.movie.type,
     country: input.movie.country,
     category: input.movie.category,
 
@@ -187,9 +211,7 @@ export function saveNormalWatchHistory(input: {
 
   const next = normalizeWatchHistory([
     item,
-    ...history.filter(
-      (old) => !(old.slug === item.slug && !Boolean(old.isCustom))
-    ),
+    ...history.filter((old) => old.slug !== item.slug),
   ]).slice(0, 200);
 
   writeJson(HISTORY_KEY, next);
@@ -215,6 +237,7 @@ export function saveCustomWatchHistory(input: {
     year: input.movie.year,
     lang: input.movie.lang,
     quality: input.movie.quality,
+    type: input.movie.type,
     country: input.movie.country,
     category: input.movie.category,
 
@@ -231,9 +254,7 @@ export function saveCustomWatchHistory(input: {
 
   const next = normalizeWatchHistory([
     item,
-    ...history.filter(
-      (old) => !(old.slug === item.slug && Boolean(old.isCustom))
-    ),
+    ...history.filter((old) => old.slug !== item.slug),
   ]).slice(0, 200);
 
   writeJson(HISTORY_KEY, next);

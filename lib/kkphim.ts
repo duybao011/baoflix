@@ -845,17 +845,28 @@ export async function getMoviesFromSlugs(slugs: string[]) {
 }
 
 export function getImageUrl(url?: string) {
-  if (!url) return PLACEHOLDER_IMAGE;
+  const rawUrl = String(url || "").trim();
 
-  if (url.startsWith("/")) {
-    return url;
+  if (!rawUrl) return PLACEHOLDER_IMAGE;
+
+  // Chặn dữ liệu cũ còn lưu /placeholder.png trong localStorage/history/favorite.
+  if (
+    rawUrl === "/placeholder.png" ||
+    rawUrl === "placeholder.png" ||
+    rawUrl.endsWith("/placeholder.png")
+  ) {
+    return PLACEHOLDER_IMAGE;
   }
 
-  if (url.startsWith("http")) {
-    return url;
+  if (rawUrl.startsWith("/")) {
+    return rawUrl;
   }
 
-  return `${IMAGE_BASE}/${url.replace(/^\/+/, "")}`;
+  if (rawUrl.startsWith("http")) {
+    return rawUrl;
+  }
+
+  return `${IMAGE_BASE}/${rawUrl.replace(/^\/+/, "")}`;
 }
 
 export function getWebpImageUrl(url?: string) {
