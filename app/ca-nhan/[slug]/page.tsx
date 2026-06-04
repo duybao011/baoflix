@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import MovieDetailTabs from "@/components/MovieDetailTabs";
 import {
   getCustomMovieBySlugClient,
@@ -10,38 +10,126 @@ import {
 import { getImageUrl, getPeopleList, stripHtml } from "@/lib/kkphim";
 import {
   getCustomWatchedKey,
+  readWatchHistory,
   readWatchedEpisodes,
+  type WatchHistoryItem,
 } from "@/lib/watchStore";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+function InfoPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-200">
+      {children}
+    </span>
+  );
+}
+
+function countTotalEpisodes(seasons: StoredCustomMovie["episodes"]) {
+  return (seasons || []).reduce((total, season) => {
+    return total + (season.server_data ?? []).length;
+  }, 0);
+}
+
+function countWatchedCustomEpisodes(
+  movieSlug: string,
+  seasons: StoredCustomMovie["episodes"],
+  watchedEpisodes: string[]
+) {
+  let count = 0;
+
+  (seasons || []).forEach((season, seasonIndex) => {
+    (season.server_data ?? []).forEach((_, episodeIndex) => {
+      const watchedKey = getCustomWatchedKey(
+        movieSlug,
+        seasonIndex,
+        episodeIndex
+      );
+
+      if (watchedEpisodes.includes(watchedKey)) count += 1;
+    });
+  });
+
+  return count;
+}
+
+function getFirstCustomHref(movieSlug: string, seasons: StoredCustomMovie["episodes"]) {
+  const seasonIndex = seasons.findIndex(
+    (season) => (season.server_data ?? []).length > 0
+  );
+
+  if (seasonIndex < 0) return "";
+
+  return `/ca-nhan/${movieSlug}/xem?season=${seasonIndex}&tap=0`;
+}
+
+function getLatestCustomTarget(seasons: StoredCustomMovie["episodes"]) {
+  for (let seasonIndex = seasons.length - 1; seasonIndex >= 0; seasonIndex -= 1) {
+    const episodes = seasons[seasonIndex]?.server_data ?? [];
+
+    if (episodes.length > 0) {
+      return {
+        seasonIndex,
+        episodeIndex: episodes.length - 1,
+        episode: episodes[episodes.length - 1],
+        seasonName: seasons[seasonIndex]?.server_name || `Mùa ${seasonIndex + 1}`,
+      };
+    }
+  }
+
+  return null;
+}
+
+function getLatestCustomHref(movieSlug: string, seasons: StoredCustomMovie["episodes"]) {
+  const target = getLatestCustomTarget(seasons);
+  if (!target) return "";
+  return `/ca-nhan/${movieSlug}/xem?season=${target.seasonIndex}&tap=${target.episodeIndex}`;
+}
+
+function getWatchStateLabel(watchedCount: number, totalEpisodes: number) {
+  if (totalEpisodes <= 0) return "Chưa có tập";
+  if (watchedCount <= 0) return "Chưa xem";
+  if (watchedCount >= totalEpisodes) return "Đã xem hết";
+  return "Đang xem dở";
+}
+
+function getContinueHref(item: WatchHistoryItem | null, fallbackHref: string) {
+  if (!item) return fallbackHref;
+  return item.href || fallbackHref;
+}
+
 export default function CustomMovieDetailPage({ params }: PageProps) {
   const { slug } = use(params);
 
   const [movieData, setMovieData] = useState<StoredCustomMovie | null>(null);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
+  const [historyItem, setHistoryItem] = useState<WatchHistoryItem | null>(null);
 
   useEffect(() => {
     setMovieData(getCustomMovieBySlugClient(slug) || null);
   }, [slug]);
 
   useEffect(() => {
-    setWatchedEpisodes(readWatchedEpisodes());
-
-    function refreshWatchedEpisodes() {
+    function refresh() {
       setWatchedEpisodes(readWatchedEpisodes());
+      setHistoryItem(
+        readWatchHistory().find((item) => item.slug === slug && item.isCustom) ||
+          null
+      );
     }
 
-    window.addEventListener("storage", refreshWatchedEpisodes);
-    window.addEventListener("focus", refreshWatchedEpisodes);
+    refresh();
+
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
 
     return () => {
-      window.removeEventListener("storage", refreshWatchedEpisodes);
-      window.removeEventListener("focus", refreshWatchedEpisodes);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
     };
-  }, []);
+  }, [slug]);
 
   if (!movieData) {
     return (
@@ -49,26 +137,60 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
         <h1 className="text-2xl font-black">Không tìm thấy phim riêng</h1>
 
         <p className="mt-2 text-slate-400">
-          Phim này có thể nằm trên thiết bị khác hoặc đã bị xóa.
+          Phim này có thể nằm trên thiết bị khác, chưa được import vào trình
+          duyệt này, hoặc đã bị xóa.
         </p>
 
-        <Link
-          href="/ca-nhan"
-          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
-        >
-          Quay lại phim riêng
-        </Link>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <Link
+            href="/ca-nhan"
+            className="inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
+          >
+            Quay lại phim riêng
+          </Link>
+
+          <Link
+            href="/ca-nhan/them"
+            className="inline-block rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
+          >
+            Import / thêm phim
+          </Link>
+        </div>
       </div>
     );
   }
 
   const movie = movieData.movie;
   const seasons = movieData.episodes ?? [];
-  const firstSeason = seasons[0];
-  const firstEpisodes = firstSeason?.server_data ?? [];
 
   const actors = getPeopleList(movie.actor);
   const directors = getPeopleList(movie.director);
+
+  const firstHref = getFirstCustomHref(movie.slug, seasons);
+  const latestHref = getLatestCustomHref(movie.slug, seasons);
+  const latestTarget = getLatestCustomTarget(seasons);
+  const continueHref = getContinueHref(historyItem, firstHref);
+
+  const totalEpisodes = countTotalEpisodes(seasons);
+  const watchedCount = countWatchedCustomEpisodes(
+    movie.slug,
+    seasons,
+    watchedEpisodes
+  );
+  const progressPercent =
+    totalEpisodes > 0
+      ? Math.min(100, Math.round((watchedCount / totalEpisodes) * 100))
+      : 0;
+
+  const latestWatched = latestTarget
+    ? watchedEpisodes.includes(
+        getCustomWatchedKey(
+          movie.slug,
+          latestTarget.seasonIndex,
+          latestTarget.episodeIndex
+        )
+      )
+    : false;
 
   const infoTab = (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
@@ -114,13 +236,6 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
             <span className="font-bold text-white">Nguồn:</span> {movie.lang}
           </p>
         )}
-
-        {movie.status && (
-          <p>
-            <span className="font-bold text-white">Trạng thái:</span>{" "}
-            {movie.status}
-          </p>
-        )}
       </div>
 
       {movie.country && movie.country.length > 0 && (
@@ -129,12 +244,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-2">
             {movie.country.map((item) => (
-              <span
-                key={item.slug}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300"
-              >
-                {item.name}
-              </span>
+              <InfoPill key={item.slug}>{item.name}</InfoPill>
             ))}
           </div>
         </div>
@@ -146,12 +256,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
           <div className="flex flex-wrap gap-2">
             {movie.category.map((item) => (
-              <span
-                key={item.slug}
-                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300"
-              >
-                {item.name}
-              </span>
+              <InfoPill key={item.slug}>{item.name}</InfoPill>
             ))}
           </div>
         </div>
@@ -169,7 +274,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
   const episodesTab = (
     <section className="rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-      <div className="mb-5 flex items-center justify-between gap-4">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-black">Danh sách tập</h2>
 
@@ -178,14 +283,25 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        {firstEpisodes.length > 0 && (
-          <Link
-            href={`/ca-nhan/${movie.slug}/xem?season=0&tap=0`}
-            className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold hover:bg-red-500"
-          >
-            Xem ngay
-          </Link>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {firstHref && (
+            <Link
+              href={firstHref}
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
+            >
+              Tập đầu
+            </Link>
+          )}
+
+          {latestHref && latestHref !== firstHref && (
+            <Link
+              href={latestHref}
+              className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-bold hover:bg-red-500"
+            >
+              Tập mới nhất
+            </Link>
+          )}
+        </div>
       </div>
 
       {seasons.length === 0 ? (
@@ -202,7 +318,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
                 key={`${season.server_name}-${seasonIndex}`}
                 className="rounded-3xl border border-white/10 bg-black/20 p-4"
               >
-                <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-xl font-black">
                       {season.server_name || `Mùa ${seasonIndex + 1}`}
@@ -215,10 +331,10 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
                   {episodes.length > 0 && (
                     <Link
-                      href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=0`}
+                      href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodes.length - 1}`}
                       className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
                     >
-                      Xem mùa này
+                      Tập mới nhất
                     </Link>
                   )}
                 </div>
@@ -228,14 +344,10 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
                     Mùa này chưa có tập.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  <div data-tv-row className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
                     {episodes.map((episode, episodeIndex) => {
                       const watched = watchedEpisodes.includes(
-                        getCustomWatchedKey(
-                          movie.slug,
-                          seasonIndex,
-                          episodeIndex
-                        )
+                        getCustomWatchedKey(movie.slug, seasonIndex, episodeIndex)
                       );
 
                       return (
@@ -245,9 +357,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
                           className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-center text-sm font-bold hover:bg-red-600"
                         >
                           <span className="inline-flex items-center justify-center gap-1">
-                            {watched && (
-                              <span className="text-yellow-300">✓</span>
-                            )}
+                            {watched && <span className="text-yellow-300">✓</span>}
                             <span>{episode.name}</span>
                           </span>
                         </Link>
@@ -333,7 +443,12 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
   );
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
+    <div
+      data-tv-scope="custom-movie-detail"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+      className="grid gap-8 lg:grid-cols-[320px_1fr]"
+    >
       <aside>
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
           <img
@@ -345,10 +460,7 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
       </aside>
 
       <section>
-        <Link
-          href="/ca-nhan"
-          className="text-sm text-red-300 hover:text-red-200"
-        >
+        <Link href="/ca-nhan" className="text-sm text-red-300 hover:text-red-200">
           ← Quay lại phim riêng
         </Link>
 
@@ -358,40 +470,110 @@ export default function CustomMovieDetailPage({ params }: PageProps) {
 
         <h1 className="text-4xl font-black md:text-5xl">{movie.name}</h1>
 
-        <p className="mt-2 text-lg text-slate-400">{movie.origin_name}</p>
+        {movie.origin_name && (
+          <p className="mt-2 text-lg font-bold text-yellow-300">
+            {movie.origin_name}
+          </p>
+        )}
 
-        <div className="mt-5 flex flex-wrap gap-2 text-sm">
-          {movie.year && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.year}
-            </span>
+        <div data-tv-row className="mt-5 flex flex-wrap gap-3">
+          {continueHref ? (
+            <Link
+              href={continueHref}
+              data-tv-default
+              className="rounded-2xl bg-yellow-300 px-6 py-3 font-black text-black hover:bg-yellow-200"
+            >
+              ▶ Xem tiếp
+            </Link>
+          ) : firstHref ? (
+            <Link
+              href={firstHref}
+              data-tv-default
+              className="rounded-2xl bg-yellow-300 px-6 py-3 font-black text-black hover:bg-yellow-200"
+            >
+              ▶ Xem ngay
+            </Link>
+          ) : (
+            <button
+              disabled
+              className="rounded-2xl bg-white/10 px-6 py-3 font-black text-white opacity-50"
+            >
+              Chưa có tập
+            </button>
           )}
 
-          {movie.quality && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.quality}
-            </span>
+          {firstHref && (
+            <Link
+              href={firstHref}
+              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white hover:bg-white/10"
+            >
+              Tập đầu
+            </Link>
           )}
 
-          {movie.lang && (
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {movie.lang}
-            </span>
-          )}
-
-          {movie.episode_current && (
-            <span className="rounded-full bg-red-600 px-3 py-1">
-              {movie.episode_current}
-            </span>
+          {latestHref && latestHref !== firstHref && (
+            <Link
+              href={latestHref}
+              className="rounded-2xl bg-red-600 px-5 py-3 font-black text-white hover:bg-red-500"
+            >
+              Tập mới nhất
+            </Link>
           )}
         </div>
 
-        <MovieDetailTabs
-          info={infoTab}
-          episodes={episodesTab}
-          cast={castTab}
-          related={relatedTab}
-        />
+        <section className="mt-5 rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-300">
+                Trạng thái xem
+              </p>
+
+              <h2 className="mt-2 text-xl font-black text-white">
+                {getWatchStateLabel(watchedCount, totalEpisodes)}
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-300">
+                Đã xem {watchedCount}/{totalEpisodes} tập
+                {historyItem?.episodeName ? ` • xem tiếp: ${historyItem.episodeName}` : ""}
+              </p>
+            </div>
+
+            {latestTarget && (
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold text-slate-300">
+                {latestWatched ? "✓ Đã xem tập mới nhất" : "Tập mới nhất chưa xem"}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-black/30">
+            <div
+              className="h-full rounded-full bg-yellow-300 transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+
+          {latestTarget && (
+            <p className="mt-3 text-xs text-slate-400">
+              Tập mới nhất: {latestTarget.seasonName} • {latestTarget.episode.name}
+            </p>
+          )}
+        </section>
+
+        <div className="mt-6 flex flex-wrap gap-2">
+          {movie.year && <InfoPill>{movie.year}</InfoPill>}
+          {movie.quality && <InfoPill>{movie.quality}</InfoPill>}
+          {movie.lang && <InfoPill>{movie.lang}</InfoPill>}
+        </div>
+
+        <div className="mt-8">
+          <MovieDetailTabs
+            defaultTab="episodes"
+            episodes={episodesTab}
+            cast={castTab}
+            related={relatedTab}
+            info={infoTab}
+          />
+        </div>
       </section>
     </div>
   );

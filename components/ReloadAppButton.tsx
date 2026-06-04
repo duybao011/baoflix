@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
+const HIDE_SESSION_KEY = "baoflix_hide_reload_button";
 
 function isStandalonePwa() {
   if (typeof window === "undefined") return false;
@@ -44,15 +45,33 @@ function isWebViewLike() {
   );
 }
 
+function shouldShowReloadButton() {
+  try {
+    if (sessionStorage.getItem(HIDE_SESSION_KEY) === "1") return false;
+  } catch {
+    // bỏ qua nếu browser chặn storage
+  }
+
+  return isStandalonePwa() || isTvMode() || isWebViewLike();
+}
+
+function getReloadHref() {
+  const url = new URL(window.location.href);
+  url.searchParams.set("_reload", String(Date.now()));
+  return url.toString();
+}
+
 export default function ReloadAppButton() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const isWatchPage = pathname.startsWith("/xem") || pathname.includes("/xem");
+
   useEffect(() => {
     function refreshVisible() {
-      setVisible(isStandalonePwa() || isTvMode() || isWebViewLike());
+      setVisible(shouldShowReloadButton());
     }
 
     setMounted(true);
@@ -86,20 +105,52 @@ export default function ReloadAppButton() {
       // Nếu browser/WebView không cho update SW thì reload thường vẫn được.
     }
 
-    window.location.reload();
+    window.location.href = getReloadHref();
+  }
+
+  function hideTemporarily() {
+    try {
+      sessionStorage.setItem(HIDE_SESSION_KEY, "1");
+    } catch {
+      // bỏ qua
+    }
+
+    setVisible(false);
   }
 
   if (!mounted || !visible) return null;
 
   return (
-    <button
-      type="button"
-      onClick={reloadApp}
-      disabled={loading}
-      className="fixed bottom-24 left-4 z-[80] rounded-full border border-white/10 bg-black/80 px-4 py-3 text-xs font-black text-white shadow-2xl backdrop-blur hover:bg-white/10 disabled:opacity-60 md:bottom-5"
-      title="Tải lại Baoflix để nhận bản mới nhất"
+    <div
+      className={[
+        "fixed z-[80] flex items-center gap-1 rounded-full border border-white/10 bg-black/80 p-1 shadow-2xl backdrop-blur",
+        isWatchPage
+          ? "right-4 top-[calc(env(safe-area-inset-top)+1rem)] md:bottom-5 md:right-5 md:top-auto"
+          : "right-4 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] md:bottom-5 md:right-5",
+      ].join(" ")}
     >
-      {loading ? "Đang tải..." : "↻ Tải lại app"}
-    </button>
+      <button
+        type="button"
+        onClick={reloadApp}
+        disabled={loading}
+        className="rounded-full px-3 py-2 text-xs font-black text-white hover:bg-white/10 disabled:opacity-60 md:px-4"
+        title="Tải lại BảoFlix để nhận bản mới nhất"
+      >
+        <span className="md:hidden">{loading ? "..." : "↻"}</span>
+        <span className="hidden md:inline">
+          {loading ? "Đang tải..." : "↻ Tải lại app"}
+        </span>
+      </button>
+
+      <button
+        type="button"
+        onClick={hideTemporarily}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black text-slate-300 hover:bg-white/10 hover:text-white"
+        aria-label="Ẩn nút tải lại app"
+        title="Ẩn tạm nút tải lại app"
+      >
+        ×
+      </button>
+    </div>
   );
 }
