@@ -34,6 +34,7 @@ const mainNavItems: NavItem[] = [
   { label: "Bộ lọc", href: "/loc", highlight: true },
   { label: "Gu của tôi", href: "/gu-cua-toi" },
   { label: "Thêm phim", href: "/ca-nhan/them" },
+  { label: "Cài đặt", href: "/cai-dat" },
 ];
 
 const quickNavItems: NavItem[] = [
@@ -47,6 +48,7 @@ const quickNavItems: NavItem[] = [
   { label: "Yêu thích", href: "/yeu-thich" },
   { label: "Lịch sử", href: "/lich-su" },
   { label: "Phim riêng", href: "/ca-nhan" },
+  { label: "Cài đặt", href: "/cai-dat" },
   { label: "TV Mode", href: "/tv" },
 ];
 
@@ -61,8 +63,23 @@ const tvModeNavItems: NavItem[] = [
   { label: "Yêu thích", href: "/yeu-thich" },
   { label: "Lịch sử", href: "/lich-su" },
   { label: "Phim riêng", href: "/ca-nhan" },
+  { label: "Cài đặt", href: "/cai-dat" },
 ];
 
+function uniqueNavItems(items: NavItem[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    const key = `${item.href}-${item.label}`;
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
 function readSearchHistory() {
   try {
     const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
@@ -442,12 +459,10 @@ const isWatchPage = pathname.startsWith("/xem");
   const currentKeyword =
     searchParams.get("q") || searchParams.get("keyword") || "";
 
-  const desktopNavItems = isTvMode
-    ? tvModeNavItems
-    : [...mainNavItems, ...quickNavItems];
+  const desktopNavItems = uniqueNavItems(isTvMode ? tvModeNavItems : [...mainNavItems, ...quickNavItems]);
 
-  const mobileMainItems = isTvMode ? tvModeNavItems : mainNavItems;
-  const mobileQuickItems = isTvMode ? quickNavItems.slice(0, 8) : quickNavItems;
+  const mobileMainItems = uniqueNavItems(isTvMode ? tvModeNavItems : mainNavItems);
+  const mobileQuickItems = uniqueNavItems(isTvMode ? quickNavItems.slice(0, 8) : quickNavItems);
 
   const showMobileSearch = searchOpen || isSearchPage;
 

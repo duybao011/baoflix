@@ -68,8 +68,25 @@ const tvShortcuts = [
     desc: "Phim tự thêm",
     href: "/ca-nhan",
   },
+  {
+    label: "Cài đặt",
+    desc: "Tai lai app va TV mode",
+    href: "/cai-dat",
+  },
 ];
 
+function uniqueShortcutItems<T extends { href: string }>(items: T[]) {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.href)) {
+      return false;
+    }
+
+    seen.add(item.href);
+    return true;
+  });
+}
 function readFavorites(): FavoriteItem[] {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -431,7 +448,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
         />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {tvShortcuts.map((item) => (
+          {uniqueShortcutItems(tvShortcuts).map((item) => (
             <ShortcutCard
               key={item.href}
               label={item.label}
