@@ -8,6 +8,29 @@ import {
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
 
+const CUSTOM_POSTER_DIR = "/custom-posters";
+
+type CopyStatus = {
+  key: string;
+  label: string;
+} | null;
+
+function getPosterFileName(slug: string) {
+  return `${slug || "ten-phim"}.jpg`;
+}
+
+function getThumbFileName(slug: string) {
+  return `${slug || "ten-phim"}-thumb.jpg`;
+}
+
+function getPosterPath(slug: string) {
+  return `${CUSTOM_POSTER_DIR}/${getPosterFileName(slug)}`;
+}
+
+function getThumbPath(slug: string) {
+  return `${CUSTOM_POSTER_DIR}/${getThumbFileName(slug)}`;
+}
+
 export default function CustomMovieForm() {
   const router = useRouter();
 
@@ -23,9 +46,44 @@ export default function CustomMovieForm() {
   const [actors, setActors] = useState("");
   const [content, setContent] = useState("");
   const [episodesText, setEpisodesText] = useState("");
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
 
   const autoSlug = useMemo(() => slugify(name), [name]);
   const finalSlug = slug.trim() || autoSlug;
+  const posterFileName = getPosterFileName(finalSlug);
+  const thumbFileName = getThumbFileName(finalSlug);
+  const posterPath = getPosterPath(finalSlug);
+  const thumbPath = getThumbPath(finalSlug);
+
+  async function copyText(value: string, key: string, label: string) {
+    const text = value.trim();
+
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyStatus({ key, label });
+
+      window.setTimeout(() => {
+        setCopyStatus((old) => (old?.key === key ? null : old));
+      }, 1800);
+    } catch {
+      window.prompt("Copy thủ công đoạn này:", text);
+    }
+  }
+
+  function useSlugPoster() {
+    setPosterUrl(posterPath);
+  }
+
+  function useSlugPosterForBoth() {
+    setPosterUrl(posterPath);
+    setThumbUrl(posterPath);
+  }
+
+  function useSlugThumb() {
+    setThumbUrl(thumbPath);
+  }
 
   function submit() {
     if (!name.trim()) {
@@ -105,6 +163,90 @@ export default function CustomMovieForm() {
           </span>
         </label>
 
+        <section className="rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-yellow-200">
+                Đổi tên poster theo slug
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-slate-300">
+                Đổi tên file poster trong <b>public/custom-posters</b> theo slug
+                bên dưới, rồi bấm dùng đường dẫn. App web không thể tự đổi tên
+                file trên máy, nhưng có thể copy tên file và tự điền URL cho fen.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                Tên file poster
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 break-all rounded-xl bg-black/35 px-3 py-2 text-sm font-bold text-yellow-200">
+                  {posterFileName}
+                </code>
+
+                <button
+                  type="button"
+                  onClick={() => copyText(posterFileName, "poster-file", "Đã copy tên poster")}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black hover:bg-white/10"
+                >
+                  {copyStatus?.key === "poster-file" ? copyStatus.label : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">
+                Đường dẫn poster
+              </p>
+
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="min-w-0 flex-1 break-all rounded-xl bg-black/35 px-3 py-2 text-sm font-bold text-yellow-200">
+                  {posterPath}
+                </code>
+
+                <button
+                  type="button"
+                  onClick={() => copyText(posterPath, "poster-path", "Đã copy URL")}
+                  className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black hover:bg-white/10"
+                >
+                  {copyStatus?.key === "poster-path" ? copyStatus.label : "Copy"}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={useSlugPoster}
+              className="rounded-2xl bg-yellow-300 px-4 py-3 text-sm font-black text-black hover:bg-yellow-200"
+            >
+              Dùng làm Poster URL
+            </button>
+
+            <button
+              type="button"
+              onClick={useSlugPosterForBoth}
+              className="rounded-2xl border border-yellow-300/30 bg-yellow-300/10 px-4 py-3 text-sm font-black text-yellow-100 hover:bg-yellow-300/20"
+            >
+              Dùng poster cho cả ảnh ngang
+            </button>
+
+            <button
+              type="button"
+              onClick={() => copyText(finalSlug, "slug", "Đã copy slug")}
+              className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10"
+            >
+              {copyStatus?.key === "slug" ? copyStatus.label : "Copy slug"}
+            </button>
+          </div>
+        </section>
+
         <div className="grid gap-4 md:grid-cols-2">
           <label className="grid gap-2">
             <span className="text-sm font-bold">Poster URL</span>
@@ -126,6 +268,24 @@ export default function CustomMovieForm() {
               placeholder="Để trống sẽ dùng poster"
               className="rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-white outline-none"
             />
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={useSlugThumb}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black hover:bg-white/10"
+              >
+                Dùng {thumbFileName}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => copyText(thumbFileName, "thumb-file", "Đã copy tên ảnh ngang")}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black hover:bg-white/10"
+              >
+                {copyStatus?.key === "thumb-file" ? copyStatus.label : "Copy tên ảnh ngang"}
+              </button>
+            </div>
           </label>
         </div>
 
