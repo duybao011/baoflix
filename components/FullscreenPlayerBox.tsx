@@ -11,6 +11,13 @@ type FullscreenDivElement = HTMLDivElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
+type PlayerHudDetail = {
+  type: "seek" | "play" | "pause";
+  delta?: number;
+  currentTime?: number;
+  duration?: number;
+};
+
 type FullscreenPlayerBoxProps = {
   children: ReactNode;
   /**
@@ -21,14 +28,31 @@ type FullscreenPlayerBoxProps = {
   tvImmersive?: boolean;
 };
 
+function formatTime(value?: number) {
+  if (!value || !Number.isFinite(value) || value < 0) return "0:00";
+
+  const totalSeconds = Math.floor(value);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 export default function FullscreenPlayerBox({
   children,
   tvImmersive = false,
 }: FullscreenPlayerBoxProps) {
   const boxRef = useRef<FullscreenDivElement | null>(null);
+  const hudTimerRef = useRef<number | null>(null);
 
   const [cinemaMode, setCinemaMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [playerHud, setPlayerHud] = useState<PlayerHudDetail | null>(null);
 
   const expanded = tvImmersive || cinemaMode || isFullscreen;
 
@@ -140,6 +164,35 @@ export default function FullscreenPlayerBox({
     };
   }, [cinemaMode, isFullscreen, tvImmersive]);
 
+  useEffect(() => {
+    function handlePlayerHud(event: Event) {
+      const detail = (event as CustomEvent<PlayerHudDetail>).detail;
+
+      if (!detail) return;
+
+      if (hudTimerRef.current) {
+        window.clearTimeout(hudTimerRef.current);
+      }
+
+      setPlayerHud(detail);
+
+      hudTimerRef.current = window.setTimeout(() => {
+        setPlayerHud(null);
+        hudTimerRef.current = null;
+      }, 850);
+    }
+
+    window.addEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
+
+    return () => {
+      if (hudTimerRef.current) {
+        window.clearTimeout(hudTimerRef.current);
+      }
+
+      window.removeEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
+    };
+  }, []);
+
   return (
     <div
       ref={boxRef}
@@ -164,6 +217,27 @@ export default function FullscreenPlayerBox({
       >
         {children}
       </div>
+
+      {tvImmersive && playerHud && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-black/75 px-7 py-5 text-center text-white shadow-2xl backdrop-blur">
+          <div className="text-3xl font-black">
+            {playerHud.type === "seek"
+              ? playerHud.delta && playerHud.delta > 0
+                ? `⏩ +${playerHud.delta}s`
+                : `⏪ ${playerHud.delta}s`
+              : playerHud.type === "play"
+                ? "▶ Phát"
+                : "⏸ Tạm dừng"}
+          </div>
+
+          {playerHud.type === "seek" && (
+            <div className="mt-2 text-sm font-bold text-slate-300">
+              {formatTime(playerHud.currentTime)}
+              {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
+            </div>
+          )}
+        </div>
+      )}
 
       {!tvImmersive && (
         <div className="absolute right-4 top-4 z-50 flex gap-2">

@@ -21,6 +21,7 @@ type FocusEntry = {
 
 const ROW_THRESHOLD = 22;
 const TV_SESSION_KEY = "baoflix_tv_mode";
+const SEEK_SECONDS = 10;
 
 function isTvRemoteEnabled() {
   if (typeof window === "undefined") return false;
@@ -57,9 +58,32 @@ function isActivationKey(key: string) {
   );
 }
 
+function isBackKey(key: string) {
+  return key === "Escape" || key === "Backspace" || key === "BrowserBack";
+}
+
+function isSeekBackwardKey(key: string) {
+  return key === "ArrowLeft" || key === "MediaRewind";
+}
+
+function isSeekForwardKey(key: string) {
+  return key === "ArrowRight" || key === "MediaFastForward";
+}
+
+function isPlayPauseKey(key: string) {
+  return key === "MediaPlayPause" || key === "Play" || key === "Pause";
+}
+
 function shouldWakeHiddenWatchOverlay(key: string) {
+  const direction = getDirectionFromKey(key);
+
+  // TV player logic:
+  // - Up/Down/OK/Back gọi overlay.
+  // - Left/Right ưu tiên tua phim hoặc nhường cho player iframe.
+  // Như vậy bấm trái/phải sẽ không làm overlay bật liên tục khi đang xem.
   return (
-    getDirectionFromKey(key) !== null ||
+    direction === "up" ||
+    direction === "down" ||
     isActivationKey(key) ||
     isBackKey(key)
   );
@@ -69,10 +93,6 @@ function getHiddenWatchOverlay() {
   return document.querySelector<HTMLElement>(
     "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
   );
-}
-
-function isBackKey(key: string) {
-  return key === "Escape" || key === "Backspace" || key === "BrowserBack";
 }
 
 function isTextInput(element: Element | null) {
@@ -324,6 +344,84 @@ function handleBack(event: KeyboardEvent) {
   }
 }
 
+function getVisibleVideo() {
+  const videos = Array.from(document.querySelectorAll<HTMLVideoElement>("video"));
+
+  return videos.find((video) => isVisibleElement(video)) || null;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function showPlayerHud(detail: {
+  type: "seek" | "play" | "pause";
+  delta?: number;
+  currentTime?: number;
+  duration?: number;
+}) {
+  window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail }));
+}
+
+function seekVideo(video: HTMLVideoElement, delta: number) {
+  const duration = Number.isFinite(video.duration) ? video.duration : 0;
+  const maxTime = duration > 0 ? Math.max(duration - 1, 0) : Number.MAX_SAFE_INTEGER;
+  const nextTime = clamp(video.currentTime + delta, 0, maxTime);
+
+  video.currentTime = nextTime;
+
+  showPlayerHud({
+    type: "seek",
+    delta,
+    currentTime: nextTime,
+    duration: duration > 0 ? duration : undefined,
+  });
+}
+
+function toggleVideo(video: HTMLVideoElement) {
+  if (video.paused) {
+    void video.play().catch(() => {
+      // Một số browser/WebView chặn play nếu không xem là user gesture.
+    });
+    showPlayerHud({ type: "play" });
+    return;
+  }
+
+  video.pause();
+  showPlayerHud({ type: "pause" });
+}
+
+function handleHiddenPlayerKey(event: KeyboardEvent) {
+  const isBackward = isSeekBackwardKey(event.key);
+  const isForward = isSeekForwardKey(event.key);
+  const wantsPlayPause = isPlayPauseKey(event.key);
+
+  if (!isBackward && !isForward && !wantsPlayPause) return false;
+
+  const video = getVisibleVideo();
+
+  if (video) {
+    event.preventDefault();
+
+    if (wantsPlayPause) {
+      toggleVideo(video);
+    } else {
+      seekVideo(video, isForward ? SEEK_SECONDS : -SEEK_SECONDS);
+    }
+
+    return true;
+  }
+
+  // Embed iframe thường cross-origin nên app web không tua trực tiếp được.
+  // Không bật overlay với trái/phải; nhường phím cho player/iframe nếu nó hỗ trợ remote.
+  // Đồng thời return true để TV navigator không kéo focus xuống các nút bên dưới.
+  if (isBackward || isForward) {
+    return true;
+  }
+
+  return false;
+}
+
 export default function TvRemoteNavigator() {
   const pathname = usePathname();
   const [enabled, setEnabled] = useState(false);
@@ -356,31 +454,57 @@ export default function TvRemoteNavigator() {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
 
-const activeElement = document.activeElement;
-const openModalScope = getModalScope();
+      const activeElement = document.activeElement;
+      const openModalScope = getModalScope();
+      const hiddenOverlay = getHiddenWatchOverlay();
 
-// Giống TV app:
-// overlay đang ẩn thì phím đầu tiên chỉ đánh thức overlay,
-// chưa điều hướng / chưa bấm nút.
-// Riêng khi đang mở modal chọn tập thì Back vẫn ưu tiên đóng modal.
-if (
-  !openModalScope &&
-  !isTextInput(activeElement) &&
-  shouldWakeHiddenWatchOverlay(event.key)
-) {
-  const hiddenOverlay = getHiddenWatchOverlay();
+      // Khi đang xem TV immersive và overlay đang ẩn:
+      // - Left/Right ưu tiên tua HLS video hoặc nhường cho iframe.
+      // - Up/Down/OK/Back mới gọi overlay.
+      // Điều này tránh cảm giác cứ bấm tua là overlay bật lên che màn hình.
+      if (!openModalScope && !isTextInput(activeElement) && hiddenOverlay) {
+        if (handleHiddenPlayerKey(event)) {
+          return;
+        }
 
-  if (hiddenOverlay) {
-    event.preventDefault();
-    window.dispatchEvent(new Event("baoflix-show-tv-overlay"));
-    return;
-  }
-}
+        if (shouldWakeHiddenWatchOverlay(event.key)) {
+          event.preventDefault();
+          window.dispatchEvent(new Event("baoflix-show-tv-overlay"));
+          return;
+        }
+      }
 
-if (isBackKey(event.key) && !isTextInput(activeElement)) {
-  handleBack(event);
-  return;
-}
+      // Media key riêng của một số remote: xử lý HLS video ngay cả khi overlay đang hiện.
+      // ArrowLeft/Right khi overlay đang hiện vẫn để điều hướng focus giữa các nút.
+      if (
+        !openModalScope &&
+        !isTextInput(activeElement) &&
+        (event.key === "MediaRewind" ||
+          event.key === "MediaFastForward" ||
+          isPlayPauseKey(event.key))
+      ) {
+        const video = getVisibleVideo();
+
+        if (video) {
+          event.preventDefault();
+
+          if (isPlayPauseKey(event.key)) {
+            toggleVideo(video);
+          } else {
+            seekVideo(
+              video,
+              event.key === "MediaFastForward" ? SEEK_SECONDS : -SEEK_SECONDS
+            );
+          }
+
+          return;
+        }
+      }
+
+      if (isBackKey(event.key) && !isTextInput(activeElement)) {
+        handleBack(event);
+        return;
+      }
 
       if (isActivationKey(event.key) && !isTextInput(activeElement)) {
         clickActiveElement(event);

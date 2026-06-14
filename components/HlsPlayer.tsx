@@ -117,8 +117,10 @@ const video = videoElement;
   return (
     <video
       ref={videoRef}
+      data-baoflix-video="true"
       controls
       playsInline
+      preload="metadata"
       className="h-full w-full bg-black object-contain"
     />
   );
