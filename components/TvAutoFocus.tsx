@@ -10,10 +10,39 @@ const FOCUSABLE_SELECTOR = [
   "input:not([disabled])",
   "select:not([disabled])",
   "textarea:not([disabled])",
+  "[role='button']:not([aria-disabled='true'])",
+  "[data-tv-focus]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
+const TV_LOCAL_KEY = "baoflix_tv_mode";
+
+function isLikelyTvDevice() {
+  if (typeof navigator === "undefined" || typeof window === "undefined") {
+    return false;
+  }
+
+  const userAgent = navigator.userAgent.toLowerCase();
+
+  if (/iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent)) {
+    return false;
+  }
+
+  if (
+    /android tv|google tv|googletv|smart-tv|smarttv|hbbtv|tcl|bravia|aft|shield|mitv|hisense|viera|webos|netcast|roku/.test(
+      userAgent
+    )
+  ) {
+    return true;
+  }
+
+  return (
+    userAgent.includes("android") &&
+    !userAgent.includes("mobile") &&
+    Math.min(window.screen.width, window.screen.height) >= 720
+  );
+}
 
 function isTvAutoFocusEnabled() {
   if (typeof window === "undefined") return false;
@@ -24,7 +53,14 @@ function isTvAutoFocusEnabled() {
     if (searchParams.get("tv") === "0") return false;
     if (searchParams.get("tv") === "1") return true;
 
-    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+    const sessionValue = sessionStorage.getItem(TV_SESSION_KEY);
+    const localValue = localStorage.getItem(TV_LOCAL_KEY);
+    const storedMode = sessionValue ?? localValue;
+
+    if (storedMode === "0") return false;
+    if (storedMode === "1") return true;
+
+    return isLikelyTvDevice();
   } catch {
     return false;
   }
@@ -34,7 +70,12 @@ function isVisibleElement(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const style = window.getComputedStyle(element);
 
+  if (element.closest("[inert]")) return false;
   if (element.getAttribute("aria-hidden") === "true") return false;
+  if (element.closest("[aria-hidden='true']")) return false;
+  if (element.closest("[data-tv-overlay='watch'][data-tv-overlay-visible='false']")) return false;
+  if (element.hasAttribute("disabled")) return false;
+  if (element.getAttribute("aria-disabled") === "true") return false;
   if (style.display === "none") return false;
   if (style.visibility === "hidden") return false;
   if (style.opacity === "0") return false;
@@ -43,13 +84,21 @@ function isVisibleElement(element: HTMLElement) {
   return true;
 }
 
+function prepareTvFocusableElement(element: HTMLElement) {
+  if (element.hasAttribute("data-tv-focus") && element.tabIndex < 0) {
+    element.tabIndex = 0;
+  }
+}
+
 function focusElement(element: HTMLElement) {
+  prepareTvFocusableElement(element);
+
   element.focus({
     preventScroll: true,
   });
 
   element.scrollIntoView({
-    behavior: "smooth",
+    behavior: isLikelyTvDevice() ? "auto" : "smooth",
     block: "center",
     inline: "center",
   });
@@ -57,9 +106,14 @@ function focusElement(element: HTMLElement) {
 
 function findFirstFocusable(scope: HTMLElement) {
   return Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter((element) => {
+      prepareTvFocusableElement(element);
+      return true;
+    })
     .filter(isVisibleElement)
     .filter((element) => element.tabIndex !== -1)
-    .filter((element) => !element.hasAttribute("data-tv-skip"))[0];
+    .filter((element) => !element.hasAttribute("data-tv-skip"))
+    .filter((element) => !element.closest("[data-tv-skip]"))[0];
 }
 
 export default function TvAutoFocus() {
@@ -92,15 +146,17 @@ export default function TvAutoFocus() {
     if (!enabled) return;
 
     const timer = window.setTimeout(() => {
-      const modal = document.querySelector<HTMLElement>(
-        "[data-tv-modal][data-tv-scope]"
-      );
+      const modal = document.querySelector<HTMLElement>("[data-tv-modal][data-tv-scope]");
 
       const scope =
         modal ||
         document.querySelector<HTMLElement>(
+          "[data-tv-overlay='watch'][data-tv-overlay-visible='true']"
+        ) ||
+        document.querySelector<HTMLElement>(
           "main [data-tv-scope][data-tv-autofocus='true']"
-        );
+        ) ||
+        document.querySelector<HTMLElement>("main [data-tv-scope]");
 
       if (!scope) return;
 
@@ -112,8 +168,9 @@ export default function TvAutoFocus() {
 
       if (restored) return;
 
-      const defaultElement =
-        scope.querySelector<HTMLElement>("[data-tv-default]");
+      const defaultElement = scope.querySelector<HTMLElement>(
+        "[data-tv-default], [data-tv-overlay-default], [data-tv-action='episode-list']"
+      );
 
       if (defaultElement && isVisibleElement(defaultElement)) {
         focusElement(defaultElement);
