@@ -11,17 +11,26 @@ type FullscreenDivElement = HTMLDivElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
+type FullscreenPlayerBoxProps = {
+  children: ReactNode;
+  /**
+   * TV Mode dùng immersive CSS full viewport thay vì ép Fullscreen API.
+   * Cách này ổn hơn trong Android TV WebView vì requestFullscreen sau navigation
+   * thường bị browser chặn nếu không còn user gesture.
+   */
+  tvImmersive?: boolean;
+};
+
 export default function FullscreenPlayerBox({
   children,
-}: {
-  children: ReactNode;
-}) {
+  tvImmersive = false,
+}: FullscreenPlayerBoxProps) {
   const boxRef = useRef<FullscreenDivElement | null>(null);
 
   const [cinemaMode, setCinemaMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const expanded = cinemaMode || isFullscreen;
+  const expanded = tvImmersive || cinemaMode || isFullscreen;
 
   async function enterFullscreen() {
     const box = boxRef.current;
@@ -55,19 +64,42 @@ export default function FullscreenPlayerBox({
         await doc.webkitExitFullscreen();
       }
     } catch {
-      // bỏ qua lỗi fullscreen trên một số WebView TV
+      // Bỏ qua lỗi fullscreen trên một số WebView TV.
     }
 
     setCinemaMode(false);
   }
 
   function toggleFullscreen() {
+    if (tvImmersive) return;
+
     if (expanded) {
       void exitFullscreen();
     } else {
       void enterFullscreen();
     }
   }
+
+  useEffect(() => {
+    if (!tvImmersive) return;
+
+    const oldBodyOverflow = document.body.style.overflow;
+    const oldBodyTouchAction = document.body.style.touchAction;
+    const oldHtmlOverflow = document.documentElement.style.overflow;
+    const oldHtmlOverscroll = document.documentElement.style.overscrollBehavior;
+
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.overscrollBehavior = "none";
+
+    return () => {
+      document.body.style.overflow = oldBodyOverflow;
+      document.body.style.touchAction = oldBodyTouchAction;
+      document.documentElement.style.overflow = oldHtmlOverflow;
+      document.documentElement.style.overscrollBehavior = oldHtmlOverscroll;
+    };
+  }, [tvImmersive]);
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -91,7 +123,7 @@ export default function FullscreenPlayerBox({
         setCinemaMode(false);
       }
 
-      if (key === "f") {
+      if (key === "f" && !tvImmersive) {
         event.preventDefault();
         toggleFullscreen();
       }
@@ -103,45 +135,52 @@ export default function FullscreenPlayerBox({
 
     return () => {
       document.removeEventListener("fullscreenchange", syncFullscreenState);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        syncFullscreenState
-      );
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [cinemaMode, isFullscreen]);
+  }, [cinemaMode, isFullscreen, tvImmersive]);
 
   return (
     <div
       ref={boxRef}
+      data-tv-player-immersive={tvImmersive ? "true" : "false"}
       className={[
-        "baoflix-fullscreen-player relative overflow-hidden border border-white/10 bg-black transition-all duration-300",
-        expanded ? "rounded-2xl" : "rounded-3xl",
+        "baoflix-fullscreen-player bg-black transition-all duration-300",
+        tvImmersive
+          ? "fixed inset-0 z-[90] overflow-hidden border-0"
+          : "relative overflow-hidden border border-white/10",
+        tvImmersive ? "rounded-none" : expanded ? "rounded-2xl" : "rounded-3xl",
       ].join(" ")}
     >
       <div
         className={[
           "baoflix-fullscreen-inner bg-black transition-all duration-300",
-          expanded ? "h-[78vh] w-full" : "aspect-video w-full",
+          tvImmersive
+            ? "h-[100dvh] w-[100vw]"
+            : expanded
+              ? "h-[78vh] w-full"
+              : "aspect-video w-full",
         ].join(" ")}
       >
         {children}
       </div>
 
-      <div className="absolute right-4 top-4 z-50 flex gap-2">
-        <button
-          type="button"
-          onClick={toggleFullscreen}
-          className={[
-            "rounded-xl px-3 py-2 text-xs font-black text-white backdrop-blur sm:px-4 sm:text-sm",
-            expanded
-              ? "bg-red-600 hover:bg-red-500"
-              : "bg-black/75 hover:bg-yellow-300 hover:text-black",
-          ].join(" ")}
-        >
-          {expanded ? "Thu nhỏ" : "Toàn màn hình"}
-        </button>
-      </div>
+      {!tvImmersive && (
+        <div className="absolute right-4 top-4 z-50 flex gap-2">
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className={[
+              "rounded-xl px-3 py-2 text-xs font-black text-white backdrop-blur sm:px-4 sm:text-sm",
+              expanded
+                ? "bg-red-600 hover:bg-red-500"
+                : "bg-black/75 hover:bg-yellow-300 hover:text-black",
+            ].join(" ")}
+          >
+            {expanded ? "Thu nhỏ" : "Toàn màn hình"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

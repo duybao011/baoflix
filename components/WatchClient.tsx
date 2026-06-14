@@ -173,6 +173,12 @@ export default function WatchClient({
     };
   }, [episodePanelOpen]);
 
+  useEffect(() => {
+    if (!tvOverlayEnabled) return;
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [tvOverlayEnabled, safeServerIndex, safeEpisodeIndex]);
+
   const previousHref =
     safeEpisodeIndex > 0
       ? getEpisodeUrl(movie.slug, safeServerIndex, safeEpisodeIndex - 1)
@@ -212,6 +218,7 @@ export default function WatchClient({
       data-tv-scope="watch-page"
       data-tv-lock="true"
       data-tv-autofocus="true"
+      data-tv-watch-immersive={tvOverlayEnabled ? "true" : "false"}
     >
       <Link
         href={`/phim/${movie.slug}`}
@@ -291,7 +298,7 @@ export default function WatchClient({
       )}
 
       <div className="baoflix-player-fill mt-5">
-        <FullscreenPlayerBox>
+        <FullscreenPlayerBox tvImmersive={tvOverlayEnabled}>
           <div className="relative h-full w-full overflow-hidden bg-black">
             {episode?.link_embed ? (
               <iframe
