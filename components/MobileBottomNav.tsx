@@ -13,7 +13,7 @@ const items = [
 ];
 
 function shouldHideBottomNav(pathname: string) {
-  return pathname.startsWith("/xem") || pathname.includes("/xem?");
+  return pathname.startsWith("/xem") || /^\/ca-nhan\/[^/]+\/xem/.test(pathname);
 }
 
 export default function MobileBottomNav() {

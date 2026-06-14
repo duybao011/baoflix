@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import EpisodePickerModal from "@/components/EpisodePickerModal";
 import HlsPlayer from "@/components/HlsPlayer";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 import TvWatchOverlay from "@/components/TvWatchOverlay";
@@ -38,30 +39,6 @@ function normalizeServerName(name?: string) {
   return name || "Server";
 }
 
-function focusTvDefaultInModal() {
-  const modal = document.querySelector<HTMLElement>(
-    "[data-tv-modal='episode-panel']"
-  );
-
-  if (!modal) return;
-
-  const target =
-    modal.querySelector<HTMLElement>("[data-tv-default]") ||
-    modal.querySelector<HTMLElement>("a[href], button:not([disabled])");
-
-  if (!target) return;
-
-  target.focus({
-    preventScroll: true,
-  });
-
-  target.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
-    inline: "center",
-  });
-}
-
 function detectTvOverlayEnabled() {
   try {
     const searchParams = new URLSearchParams(window.location.search);
@@ -71,12 +48,9 @@ function detectTvOverlayEnabled() {
     if (forceNormal) return false;
 
     const userAgent = navigator.userAgent.toLowerCase();
+    const isMobile = /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
 
-    const isMobile =
-      /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
-
-    // Điện thoại không dùng TV overlay.
-    // Chỉ cho ?tv=1 override nếu fen cố tình muốn test.
+    // Điện thoại không dùng TV overlay, trừ khi cố tình test bằng ?tv=1.
     if (isMobile && !forceTv) {
       sessionStorage.removeItem("baoflix_tv_mode");
       localStorage.removeItem("baoflix_tv_mode");
@@ -85,9 +59,7 @@ function detectTvOverlayEnabled() {
 
     if (forceTv) return true;
 
-    const isFromTvMode = sessionStorage.getItem("baoflix_tv_mode") === "1";
-
-    return isFromTvMode;
+    return sessionStorage.getItem("baoflix_tv_mode") === "1";
   } catch {
     return false;
   }
@@ -103,27 +75,43 @@ export default function WatchClient({
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [tvOverlayEnabled, setTvOverlayEnabled] = useState(false);
 
-useEffect(() => {
-  function refreshTvOverlay() {
-    setTvOverlayEnabled(detectTvOverlayEnabled());
-  }
+  useEffect(() => {
+    function refreshTvOverlay() {
+      setTvOverlayEnabled(detectTvOverlayEnabled());
+    }
 
-  refreshTvOverlay();
+    refreshTvOverlay();
 
-  window.addEventListener("baoflix-tv-mode-change", refreshTvOverlay);
-  window.addEventListener("storage", refreshTvOverlay);
-  window.addEventListener("focus", refreshTvOverlay);
-  window.addEventListener("resize", refreshTvOverlay);
-  window.addEventListener("orientationchange", refreshTvOverlay);
+    window.addEventListener("baoflix-tv-mode-change", refreshTvOverlay);
+    window.addEventListener("storage", refreshTvOverlay);
+    window.addEventListener("focus", refreshTvOverlay);
+    window.addEventListener("resize", refreshTvOverlay);
+    window.addEventListener("orientationchange", refreshTvOverlay);
 
-  return () => {
-    window.removeEventListener("baoflix-tv-mode-change", refreshTvOverlay);
-    window.removeEventListener("storage", refreshTvOverlay);
-    window.removeEventListener("focus", refreshTvOverlay);
-    window.removeEventListener("resize", refreshTvOverlay);
-    window.removeEventListener("orientationchange", refreshTvOverlay);
-  };
-}, []);
+    return () => {
+      window.removeEventListener("baoflix-tv-mode-change", refreshTvOverlay);
+      window.removeEventListener("storage", refreshTvOverlay);
+      window.removeEventListener("focus", refreshTvOverlay);
+      window.removeEventListener("resize", refreshTvOverlay);
+      window.removeEventListener("orientationchange", refreshTvOverlay);
+    };
+  }, []);
+
+  useEffect(() => {
+    function refreshWatchedEpisodes() {
+      setWatchedEpisodes(readWatchedEpisodes());
+    }
+
+    refreshWatchedEpisodes();
+
+    window.addEventListener("storage", refreshWatchedEpisodes);
+    window.addEventListener("focus", refreshWatchedEpisodes);
+
+    return () => {
+      window.removeEventListener("storage", refreshWatchedEpisodes);
+      window.removeEventListener("focus", refreshWatchedEpisodes);
+    };
+  }, []);
 
   const safeServerIndex =
     Number.isNaN(currentServerIndex) ||
@@ -179,12 +167,7 @@ useEffect(() => {
     document.body.style.overflow = "hidden";
     document.body.style.touchAction = "none";
 
-    const timer = window.setTimeout(() => {
-      focusTvDefaultInModal();
-    }, 100);
-
     return () => {
-      window.clearTimeout(timer);
       document.body.style.overflow = oldOverflow;
       document.body.style.touchAction = oldTouchAction;
     };
@@ -276,17 +259,16 @@ useEffect(() => {
           onClick={() => setEpisodePanelOpen(true)}
           className="rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
         >
-          Chọn tập
+          Tập / nguồn
         </button>
       </div>
 
       {sameEpisodeServerLinks.length > 1 && (
         <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-          <h2 className="mb-3 text-lg font-black">Đổi phiên bản</h2>
+          <h2 className="mb-3 text-lg font-black">Phiên bản</h2>
 
           <p className="mb-3 text-sm text-slate-400">
-            Với iframe/player ngoài, thời gian xem có thể không đồng bộ hoàn
-            toàn. Nếu nguồn có m3u8 trực tiếp thì app có thể tự resume.
+            Đổi nhanh phiên bản cùng tập đang xem, hoặc mở “Tập / nguồn” để chọn đầy đủ.
           </p>
 
           <div data-tv-row className="flex flex-wrap gap-2">
@@ -332,22 +314,22 @@ useEffect(() => {
             )}
 
             {tvOverlayEnabled && (
-	<TvWatchOverlay
-  movie={movie}
-  currentServer={currentServer}
-  safeServerIndex={safeServerIndex}
-  safeEpisodeIndex={safeEpisodeIndex}
-  episodeName={episode?.name}
-  previousHref={previousHref}
-  nextHref={nextHref}
-  watchedEpisodes={watchedEpisodes}
-  sameEpisodeServerLinks={sameEpisodeServerLinks.map((item) => ({
-    server: item.server,
-    serverIndex: item.serverIndex,
-    href: item.href,
-  }))}
-  onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
-/>
+              <TvWatchOverlay
+                movie={movie}
+                currentServer={currentServer}
+                safeServerIndex={safeServerIndex}
+                safeEpisodeIndex={safeEpisodeIndex}
+                episodeName={episode?.name}
+                previousHref={previousHref}
+                nextHref={nextHref}
+                watchedEpisodes={watchedEpisodes}
+                sameEpisodeServerLinks={sameEpisodeServerLinks.map((item) => ({
+                  server: item.server,
+                  serverIndex: item.serverIndex,
+                  href: item.href,
+                }))}
+                onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
+              />
             )}
           </div>
         </FullscreenPlayerBox>
@@ -384,7 +366,7 @@ useEffect(() => {
             onClick={() => setEpisodePanelOpen(true)}
             className="flex min-h-[56px] items-center justify-center rounded-2xl bg-yellow-300 px-3 py-3 text-center text-sm font-black text-black hover:bg-yellow-200 md:min-h-[52px] md:px-5"
           >
-            Danh sách tập
+            Tập / nguồn
           </button>
 
           {nextHref ? (
@@ -405,186 +387,19 @@ useEffect(() => {
         </div>
 
         <p className="mt-3 text-center text-xs text-slate-500 md:hidden">
-          Bấm “Danh sách tập” để đổi tập/server ngay trong trang xem.
+          Không xem được? Bấm “Tập / nguồn” để đổi tập hoặc server ngay trong trang xem.
         </p>
       </section>
 
       {episodePanelOpen && (
-        <div
-          data-tv-scope="episode-panel"
-          data-tv-lock="true"
-          data-tv-modal="episode-panel"
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6"
-        >
-          <section className="flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b0f19] shadow-2xl md:max-h-[86dvh] md:rounded-3xl">
-            <div className="shrink-0 border-b border-white/10 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black">Chọn tập</h2>
-
-                  <p className="mt-1 text-sm text-slate-400">
-                    Đổi server hoặc chọn tập khác mà không cần quay lại trang
-                    chi tiết.
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  data-tv-close
-                  onClick={() => setEpisodePanelOpen(false)}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10"
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
-
-            <div
-              className="baoflix-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-5"
-              style={{
-                WebkitOverflowScrolling: "touch",
-              }}
-            >
-              <div className="mb-6">
-                <h3 className="mb-3 text-lg font-black">Phiên bản</h3>
-
-                <div data-tv-row className="flex flex-wrap gap-2">
-                  {servers.map((server, serverIndex) => {
-                    const hasCurrentEpisode = Boolean(
-                      server.server_data?.[safeEpisodeIndex]
-                    );
-
-                    return (
-                      <Link
-                        key={`${server.server_name}-${serverIndex}`}
-                        href={getEpisodeUrl(
-                          movie.slug,
-                          serverIndex,
-                          hasCurrentEpisode ? safeEpisodeIndex : 0
-                        )}
-                        onClick={() => setEpisodePanelOpen(false)}
-                        className={[
-                          "rounded-xl border px-4 py-2 text-sm font-bold",
-                          serverIndex === safeServerIndex
-                            ? "border-yellow-300 bg-yellow-300 text-black"
-                            : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-                        ].join(" ")}
-                      >
-                        {normalizeServerName(server.server_name)}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                {servers.map((server, serverIndex) => {
-                  const serverEpisodes = server.server_data ?? [];
-
-                  return (
-                    <div
-                      key={`${server.server_name}-${serverIndex}`}
-                      className={[
-                        "rounded-3xl border p-4",
-                        serverIndex === safeServerIndex
-                          ? "border-yellow-300/40 bg-yellow-300/5"
-                          : "border-white/10 bg-white/[0.03]",
-                      ].join(" ")}
-                    >
-                      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-xl font-black">
-                            {normalizeServerName(server.server_name)}
-                          </h3>
-
-                          <p className="mt-1 text-sm text-slate-400">
-                            {serverEpisodes.length} tập
-                          </p>
-                        </div>
-
-                        {serverEpisodes.length > 0 && (
-                          <Link
-                            href={getEpisodeUrl(movie.slug, serverIndex, 0)}
-                            data-tv-skip
-                            tabIndex={-1}
-                            onClick={() => setEpisodePanelOpen(false)}
-                            className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold hover:bg-red-500"
-                          >
-                            Xem server này
-                          </Link>
-                        )}
-                      </div>
-
-                      {serverEpisodes.length === 0 ? (
-                        <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm text-slate-400">
-                          Server này chưa có tập.
-                        </div>
-                      ) : (
-                        <div
-                          data-tv-row
-                          className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8"
-                        >
-                          {serverEpisodes.map((episodeItem, episodeIndex) => {
-                            const active =
-                              serverIndex === safeServerIndex &&
-                              episodeIndex === safeEpisodeIndex;
-
-                            const watchedKey = getNormalWatchedKey(
-                              movie.slug,
-                              serverIndex,
-                              episodeIndex
-                            );
-
-                            const watched =
-                              watchedEpisodes.includes(watchedKey);
-
-                            return (
-                              <Link
-                                key={`${serverIndex}-${episodeItem.name}-${episodeIndex}`}
-                                href={getEpisodeUrl(
-                                  movie.slug,
-                                  serverIndex,
-                                  episodeIndex
-                                )}
-                                data-tv-default={active ? true : undefined}
-                                onClick={() => setEpisodePanelOpen(false)}
-                                className={[
-                                  "flex min-h-[54px] items-center justify-center rounded-xl border px-3 py-3 text-center text-sm font-bold",
-                                  active
-                                    ? "border-red-500 bg-red-600 text-white"
-                                    : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-                                ].join(" ")}
-                              >
-                                <span className="inline-flex items-center justify-center gap-1">
-                                  {watched && (
-                                    <span className="text-yellow-300">✓</span>
-                                  )}
-                                  <span>{episodeItem.name}</span>
-                                </span>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div data-tv-row className="mt-6 flex flex-wrap gap-3">
-                <Link
-                  href={`/phim/${movie.slug}`}
-                  onClick={() => setEpisodePanelOpen(false)}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
-                >
-                  Về trang chi tiết
-                </Link>
-              </div>
-
-              <div className="h-6" />
-            </div>
-          </section>
-        </div>
+        <EpisodePickerModal
+          movie={movie}
+          servers={servers}
+          safeServerIndex={safeServerIndex}
+          safeEpisodeIndex={safeEpisodeIndex}
+          watchedEpisodes={watchedEpisodes}
+          onClose={() => setEpisodePanelOpen(false)}
+        />
       )}
     </div>
   );

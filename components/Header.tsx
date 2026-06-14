@@ -455,7 +455,9 @@ export default function Header() {
 
 const isSearchPage = pathname === "/tim-kiem";
 const isTvMode = pathname === "/tv";
-const isWatchPage = pathname.startsWith("/xem");
+const isWatchPage =
+  pathname.startsWith("/xem") ||
+  (pathname.startsWith("/ca-nhan/") && pathname.includes("/xem"));
   const currentKeyword =
     searchParams.get("q") || searchParams.get("keyword") || "";
 

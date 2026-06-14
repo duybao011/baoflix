@@ -63,10 +63,7 @@ function focusOverlayDefault() {
 
     if (!target) return;
 
-    target.focus({
-      preventScroll: true,
-    });
-
+    target.focus({ preventScroll: true });
     target.scrollIntoView({
       behavior: "smooth",
       block: "nearest",
@@ -98,9 +95,7 @@ export default function TvWatchOverlay({
 
   const shouldShowEpisodeStrip = hasMultipleEpisodes;
   const shouldShowFullBottomControls = hasMultipleEpisodes;
-  const shouldShowCompactSourceButton = !hasMultipleEpisodes && hasMultipleServers;
-  const shouldShowBottomArea =
-    hasMultipleServers || shouldShowEpisodeStrip || shouldShowFullBottomControls;
+  const shouldShowBottomArea = hasMultipleServers || shouldShowEpisodeStrip || shouldShowFullBottomControls;
 
   const episodeWindow = useMemo(() => {
     if (currentEpisodes.length <= EPISODE_WINDOW_SIZE) {
@@ -115,13 +110,11 @@ export default function TvWatchOverlay({
     }
 
     const half = Math.floor(EPISODE_WINDOW_SIZE / 2);
-
     const start = clamp(
       safeEpisodeIndex - half,
       0,
       Math.max(0, currentEpisodes.length - EPISODE_WINDOW_SIZE)
     );
-
     const end = Math.min(currentEpisodes.length, start + EPISODE_WINDOW_SIZE);
 
     return {
@@ -147,9 +140,7 @@ export default function TvWatchOverlay({
     const overlay = overlayRef.current;
     const activeElement = document.activeElement;
 
-    if (!overlay || !(activeElement instanceof HTMLElement)) {
-      return false;
-    }
+    if (!overlay || !(activeElement instanceof HTMLElement)) return false;
 
     return overlay.contains(activeElement);
   }
@@ -193,9 +184,7 @@ export default function TvWatchOverlay({
 
   function handleOverlayFocusOut() {
     window.setTimeout(() => {
-      if (!isFocusInsideOverlay()) {
-        scheduleHide();
-      }
+      if (!isFocusInsideOverlay()) scheduleHide();
     }, 0);
   }
 
@@ -270,8 +259,7 @@ export default function TvWatchOverlay({
             </h1>
 
             <p className="mt-1 line-clamp-1 text-sm font-bold text-slate-300 md:text-base">
-              {episodeName || "Đang xem"} •{" "}
-              {normalizeServerName(currentServer?.server_name)}
+              {episodeName || "Đang xem"} • {normalizeServerName(currentServer?.server_name)}
             </p>
           </div>
         </div>
@@ -286,9 +274,7 @@ export default function TvWatchOverlay({
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
-              <h2 className="mb-2 text-base font-black text-white">
-                Âm thanh / Server
-              </h2>
+              <h2 className="mb-2 text-base font-black text-white">Phiên bản</h2>
 
               <div
                 data-tv-row
@@ -324,14 +310,11 @@ export default function TvWatchOverlay({
               ].join(" ")}
             >
               <div className="mb-2 flex items-center justify-between gap-3">
-                <h2 className="text-base font-black text-white">
-                  Danh sách tập
-                </h2>
+                <h2 className="text-base font-black text-white">Danh sách tập</h2>
 
                 {currentEpisodes.length > EPISODE_WINDOW_SIZE && (
                   <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
-                    {episodeWindow.start + 1}-{episodeWindow.end}/
-                    {currentEpisodes.length}
+                    {episodeWindow.start + 1}-{episodeWindow.end}/{currentEpisodes.length}
                   </span>
                 )}
               </div>
@@ -342,23 +325,17 @@ export default function TvWatchOverlay({
               >
                 {episodeWindow.items.map(({ episode, episodeIndex }) => {
                   const active = episodeIndex === safeEpisodeIndex;
-
                   const watchedKey = getNormalWatchedKey(
                     movie.slug,
                     safeServerIndex,
                     episodeIndex
                   );
-
                   const watched = watchedEpisodes.includes(watchedKey);
 
                   return (
                     <Link
                       key={`${episode.name}-${episodeIndex}`}
-                      href={getEpisodeUrl(
-                        movie.slug,
-                        safeServerIndex,
-                        episodeIndex
-                      )}
+                      href={getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex)}
                       data-tv-overlay-default={active ? true : undefined}
                       {...hiddenFocusProps}
                       className={[
@@ -369,9 +346,7 @@ export default function TvWatchOverlay({
                       ].join(" ")}
                     >
                       <span className="inline-flex items-center justify-center gap-1">
-                        {watched && !active && (
-                          <span className="text-yellow-300">✓</span>
-                        )}
+                        {watched && !active && <span className="text-yellow-300">✓</span>}
                         {watched && active && <span>✓</span>}
                         <span>{episode.name}</span>
                       </span>
@@ -413,7 +388,7 @@ export default function TvWatchOverlay({
                 onClick={onOpenEpisodePanel}
                 className="flex min-h-[54px] items-center justify-center rounded-2xl bg-yellow-300 px-4 py-3 text-center text-sm font-black text-black hover:bg-yellow-200"
               >
-                Chọn tập
+                Tập / nguồn
               </button>
 
               {nextHref ? (
@@ -432,25 +407,6 @@ export default function TvWatchOverlay({
                   Tập sau →
                 </button>
               )}
-            </div>
-          )}
-
-          {shouldShowCompactSourceButton && (
-            <div
-              data-tv-row
-              className={[
-                "mt-4 flex justify-end",
-                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-              ].join(" ")}
-            >
-              <button
-                type="button"
-                {...hiddenFocusProps}
-                onClick={onOpenEpisodePanel}
-                className="rounded-2xl border border-white/15 bg-black/45 px-5 py-3 text-sm font-black text-white backdrop-blur hover:bg-white/15"
-              >
-                Mở danh sách nguồn
-              </button>
             </div>
           )}
         </div>
