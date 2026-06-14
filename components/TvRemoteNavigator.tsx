@@ -78,20 +78,21 @@ function shouldWakeHiddenWatchOverlay(key: string) {
   const direction = getDirectionFromKey(key);
 
   // TV player logic:
-  // - Up/Down/OK/Back gọi overlay.
+  // - Up/Down/OK gọi overlay.
   // - Left/Right ưu tiên tua phim hoặc nhường cho player iframe.
-  // Như vậy bấm trái/phải sẽ không làm overlay bật liên tục khi đang xem.
-  return (
-    direction === "up" ||
-    direction === "down" ||
-    isActivationKey(key) ||
-    isBackKey(key)
-  );
+  // - Back khi overlay đang ẩn sẽ quay lại trang trước, không gọi overlay.
+  return direction === "up" || direction === "down" || isActivationKey(key);
 }
 
 function getHiddenWatchOverlay() {
   return document.querySelector<HTMLElement>(
     "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
+  );
+}
+
+function getVisibleWatchOverlay() {
+  return document.querySelector<HTMLElement>(
+    "[data-tv-overlay='watch'][data-tv-overlay-visible='true']"
   );
 }
 
@@ -457,18 +458,45 @@ export default function TvRemoteNavigator() {
       const activeElement = document.activeElement;
       const openModalScope = getModalScope();
       const hiddenOverlay = getHiddenWatchOverlay();
+      const visibleOverlay = getVisibleWatchOverlay();
+
+      // TV watch-page Back flow:
+      // - Overlay đang hiện: Back chỉ ẩn overlay.
+      // - Overlay đang ẩn: Back mới quay lại trang trước.
+      // - Modal đang mở: Back vẫn ưu tiên đóng modal ở handleBack bên dưới.
+      if (
+        !openModalScope &&
+        !isTextInput(activeElement) &&
+        visibleOverlay &&
+        isBackKey(event.key)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        window.dispatchEvent(new Event("baoflix-hide-tv-overlay"));
+        return;
+      }
 
       // Khi đang xem TV immersive và overlay đang ẩn:
       // - Left/Right ưu tiên tua HLS video hoặc nhường cho iframe.
-      // - Up/Down/OK/Back mới gọi overlay.
+      // - Up/Down/OK gọi overlay.
+      // - Back quay lại trang trước.
       // Điều này tránh cảm giác cứ bấm tua là overlay bật lên che màn hình.
       if (!openModalScope && !isTextInput(activeElement) && hiddenOverlay) {
+        if (isBackKey(event.key)) {
+          event.preventDefault();
+          event.stopPropagation();
+          handleBack(event);
+          return;
+        }
+
         if (handleHiddenPlayerKey(event)) {
+          event.stopPropagation();
           return;
         }
 
         if (shouldWakeHiddenWatchOverlay(event.key)) {
           event.preventDefault();
+          event.stopPropagation();
           window.dispatchEvent(new Event("baoflix-show-tv-overlay"));
           return;
         }
@@ -487,6 +515,7 @@ export default function TvRemoteNavigator() {
 
         if (video) {
           event.preventDefault();
+          event.stopPropagation();
 
           if (isPlayPauseKey(event.key)) {
             toggleVideo(video);
@@ -502,11 +531,13 @@ export default function TvRemoteNavigator() {
       }
 
       if (isBackKey(event.key) && !isTextInput(activeElement)) {
+        event.stopPropagation();
         handleBack(event);
         return;
       }
 
       if (isActivationKey(event.key) && !isTextInput(activeElement)) {
+        event.stopPropagation();
         clickActiveElement(event);
         return;
       }
@@ -577,6 +608,7 @@ export default function TvRemoteNavigator() {
       }
 
       event.preventDefault();
+      event.stopPropagation();
       focusElement(nextElement);
     }
 

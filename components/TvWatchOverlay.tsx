@@ -177,6 +177,11 @@ export default function TvWatchOverlay({
     focusOverlayDefault();
   }
 
+  function hideOverlay() {
+    clearHideTimer();
+    setOverlayVisible(false);
+  }
+
   function handleOverlayFocusIn() {
     setOverlayVisible(true);
     clearHideTimer();
@@ -205,11 +210,16 @@ export default function TvWatchOverlay({
       showOverlayAndFocus();
     }
 
+    function handleHideOverlay() {
+      hideOverlay();
+    }
+
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("mousedown", handleActivity);
     window.addEventListener("touchstart", handleActivity);
     window.addEventListener("keydown", handleActivity);
     window.addEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
+    window.addEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
 
     return () => {
       clearHideTimer();
@@ -218,6 +228,7 @@ export default function TvWatchOverlay({
       window.removeEventListener("touchstart", handleActivity);
       window.removeEventListener("keydown", handleActivity);
       window.removeEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
+      window.removeEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
     };
   }, []);
 
