@@ -56,6 +56,29 @@ export default function FullscreenPlayerBox({
 
   const expanded = tvImmersive || cinemaMode || isFullscreen;
 
+  function focusPlayerSurface() {
+    const box = boxRef.current;
+
+    if (!box) return;
+
+    const video = box.querySelector<HTMLVideoElement>(
+      "video[data-tv-player='video'], video"
+    );
+
+    window.setTimeout(() => {
+      try {
+        if (video) {
+          video.focus({ preventScroll: true });
+          return;
+        }
+
+        box.focus({ preventScroll: true });
+      } catch {
+        // Ignore focus errors in WebView.
+      }
+    }, 30);
+  }
+
   async function enterFullscreen() {
     const box = boxRef.current;
 
@@ -116,6 +139,10 @@ export default function FullscreenPlayerBox({
     document.body.style.touchAction = "none";
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.overscrollBehavior = "none";
+
+    // Khi vào TV watch mode, để focus nằm ở player surface.
+    // Overlay vẫn hiện vài giây, nhưng nếu nó tự ẩn thì remote trái/phải đã sẵn sàng tua.
+    focusPlayerSurface();
 
     return () => {
       document.body.style.overflow = oldBodyOverflow;
@@ -182,7 +209,12 @@ export default function FullscreenPlayerBox({
       }, 850);
     }
 
+    function handleFocusPlayer() {
+      focusPlayerSurface();
+    }
+
     window.addEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
+    window.addEventListener("baoflix-focus-tv-player", handleFocusPlayer);
 
     return () => {
       if (hudTimerRef.current) {
@@ -190,15 +222,19 @@ export default function FullscreenPlayerBox({
       }
 
       window.removeEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
+      window.removeEventListener("baoflix-focus-tv-player", handleFocusPlayer);
     };
   }, []);
 
   return (
     <div
       ref={boxRef}
+      tabIndex={0}
+      data-tv-player-surface="true"
+      data-tv-skip
       data-tv-player-immersive={tvImmersive ? "true" : "false"}
       className={[
-        "baoflix-fullscreen-player bg-black transition-all duration-300",
+        "baoflix-fullscreen-player bg-black outline-none transition-all duration-300",
         tvImmersive
           ? "fixed inset-0 z-[90] overflow-hidden border-0"
           : "relative overflow-hidden border border-white/10",

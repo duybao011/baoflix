@@ -24,6 +24,11 @@ type TvWatchOverlayProps = {
   onOpenEpisodePanel: () => void;
 };
 
+type ShowOverlayDetail = {
+  pinned?: boolean;
+  focus?: boolean;
+};
+
 const AUTO_HIDE_MS = 2000;
 const EPISODE_WINDOW_SIZE = 12;
 
@@ -72,6 +77,10 @@ function focusOverlayDefault() {
   }, 60);
 }
 
+function focusPlayerSurface() {
+  window.dispatchEvent(new Event("baoflix-focus-tv-player"));
+}
+
 export default function TvWatchOverlay({
   movie,
   currentServer,
@@ -88,6 +97,7 @@ export default function TvWatchOverlay({
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
+  const overlayPinnedRef = useRef(false);
 
   const currentEpisodes = currentServer?.server_data ?? [];
   const hasMultipleEpisodes = currentEpisodes.length > 1;
@@ -95,7 +105,8 @@ export default function TvWatchOverlay({
 
   const shouldShowEpisodeStrip = hasMultipleEpisodes;
   const shouldShowFullBottomControls = hasMultipleEpisodes;
-  const shouldShowBottomArea = hasMultipleServers || shouldShowEpisodeStrip || shouldShowFullBottomControls;
+  const shouldShowBottomArea =
+    hasMultipleServers || shouldShowEpisodeStrip || shouldShowFullBottomControls;
 
   const episodeWindow = useMemo(() => {
     if (currentEpisodes.length <= EPISODE_WINDOW_SIZE) {
@@ -152,34 +163,66 @@ export default function TvWatchOverlay({
     }
   }
 
+  function setOverlayPinned(value: boolean) {
+    overlayPinnedRef.current = value;
+  }
+
+  function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
+    clearHideTimer();
+    setOverlayPinned(false);
+    setOverlayVisible(false);
+
+    if (focusPlayer) {
+      focusPlayerSurface();
+    }
+  }
+
   function scheduleHide() {
     clearHideTimer();
 
+    if (overlayPinnedRef.current) return;
+
     hideTimerRef.current = window.setTimeout(() => {
+      if (overlayPinnedRef.current) {
+        hideTimerRef.current = null;
+        return;
+      }
+
       if (isFocusInsideOverlay()) {
         hideTimerRef.current = null;
         return;
       }
 
-      setOverlayVisible(false);
+      hideOverlay({ focusPlayer: true });
       hideTimerRef.current = null;
     }, AUTO_HIDE_MS);
   }
 
-  function showOverlay() {
+  function showOverlay({
+    pinned = false,
+    focus = false,
+    autoHide = true,
+  }: {
+    pinned?: boolean;
+    focus?: boolean;
+    autoHide?: boolean;
+  } = {}) {
+    setOverlayPinned(pinned);
     setOverlayVisible(true);
-    scheduleHide();
+
+    if (focus) {
+      focusOverlayDefault();
+    }
+
+    if (pinned || !autoHide) {
+      clearHideTimer();
+    } else {
+      scheduleHide();
+    }
   }
 
   function showOverlayAndFocus() {
-    setOverlayVisible(true);
-    clearHideTimer();
-    focusOverlayDefault();
-  }
-
-  function hideOverlay() {
-    clearHideTimer();
-    setOverlayVisible(false);
+    showOverlay({ pinned: false, focus: true, autoHide: false });
   }
 
   function handleOverlayFocusIn() {
@@ -194,46 +237,66 @@ export default function TvWatchOverlay({
   }
 
   useEffect(() => {
-    showOverlay();
+    showOverlay({ pinned: false, focus: false, autoHide: true });
 
     function handleActivity() {
+      if (overlayPinnedRef.current) return;
+
       if (isFocusInsideOverlay()) {
         setOverlayVisible(true);
         clearHideTimer();
         return;
       }
 
-      showOverlay();
+      showOverlay({ pinned: false, focus: false, autoHide: true });
     }
 
-    function handleWakeOverlay() {
-      showOverlayAndFocus();
+    function handleWakeOverlay(event: Event) {
+      const detail = (event as CustomEvent<ShowOverlayDetail>).detail || {};
+
+      showOverlay({
+        pinned: Boolean(detail.pinned),
+        focus: detail.focus !== false,
+        autoHide: !detail.pinned,
+      });
     }
 
     function handleHideOverlay() {
-      hideOverlay();
+      hideOverlay({ focusPlayer: true });
+    }
+
+    function handlePlayerPaused() {
+      // Pause = overlay hiện và giữ nguyên cho tới khi play lại hoặc Back.
+      showOverlay({ pinned: true, focus: false, autoHide: false });
+    }
+
+    function handlePlayerPlaying() {
+      // Play lại = ẩn overlay ngay, không chờ vài giây.
+      hideOverlay({ focusPlayer: true });
     }
 
     window.addEventListener("mousemove", handleActivity);
     window.addEventListener("mousedown", handleActivity);
     window.addEventListener("touchstart", handleActivity);
-    window.addEventListener("keydown", handleActivity);
-    window.addEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
+    window.addEventListener("baoflix-show-tv-overlay", handleWakeOverlay as EventListener);
     window.addEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
+    window.addEventListener("baoflix-tv-player-paused", handlePlayerPaused);
+    window.addEventListener("baoflix-tv-player-playing", handlePlayerPlaying);
 
     return () => {
       clearHideTimer();
       window.removeEventListener("mousemove", handleActivity);
       window.removeEventListener("mousedown", handleActivity);
       window.removeEventListener("touchstart", handleActivity);
-      window.removeEventListener("keydown", handleActivity);
-      window.removeEventListener("baoflix-show-tv-overlay", handleWakeOverlay);
+      window.removeEventListener("baoflix-show-tv-overlay", handleWakeOverlay as EventListener);
       window.removeEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
+      window.removeEventListener("baoflix-tv-player-paused", handlePlayerPaused);
+      window.removeEventListener("baoflix-tv-player-playing", handlePlayerPlaying);
     };
   }, []);
 
   useEffect(() => {
-    showOverlay();
+    showOverlay({ pinned: false, focus: false, autoHide: true });
   }, [safeServerIndex, safeEpisodeIndex]);
 
   return (
@@ -241,6 +304,7 @@ export default function TvWatchOverlay({
       ref={overlayRef}
       data-tv-overlay="watch"
       data-tv-overlay-visible={overlayVisible ? "true" : "false"}
+      data-tv-overlay-pinned={overlayPinnedRef.current ? "true" : "false"}
       onFocus={handleOverlayFocusIn}
       onBlur={handleOverlayFocusOut}
       className={[

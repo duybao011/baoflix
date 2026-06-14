@@ -9,6 +9,22 @@ type HlsPlayerProps = {
   autoResume?: boolean;
 };
 
+function emitPlaybackEvent(type: "playing" | "paused") {
+  try {
+    window.dispatchEvent(new Event(`baoflix-tv-player-${type}`));
+    window.dispatchEvent(
+      new CustomEvent("baoflix-tv-player-state", {
+        detail: {
+          playing: type === "playing",
+          paused: type === "paused",
+        },
+      })
+    );
+  } catch {
+    // Ignore if the runtime blocks CustomEvent for any reason.
+  }
+}
+
 export default function HlsPlayer({
   src,
   storageKey,
@@ -18,11 +34,11 @@ export default function HlsPlayer({
   const hasSeekedRef = useRef(false);
 
   useEffect(() => {
-const videoElement = videoRef.current;
+    const videoElement = videoRef.current;
 
-if (!videoElement || !src) return;
+    if (!videoElement || !src) return;
 
-const video = videoElement;
+    const video = videoElement;
 
     hasSeekedRef.current = false;
 
@@ -95,9 +111,20 @@ const video = videoElement;
       }
     }
 
+    function handlePlay() {
+      emitPlaybackEvent("playing");
+    }
+
+    function handlePause() {
+      if (video.ended) return;
+      emitPlaybackEvent("paused");
+    }
+
     video.addEventListener("timeupdate", saveTime);
     video.addEventListener("pause", saveTime);
     video.addEventListener("ended", saveTime);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("pause", handlePause);
 
     return () => {
       saveTime();
@@ -105,6 +132,8 @@ const video = videoElement;
       video.removeEventListener("timeupdate", saveTime);
       video.removeEventListener("pause", saveTime);
       video.removeEventListener("ended", saveTime);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("pause", handlePause);
       video.removeEventListener("loadedmetadata", seekToSavedTime);
       video.removeEventListener("canplay", seekToSavedTime);
 
@@ -117,11 +146,12 @@ const video = videoElement;
   return (
     <video
       ref={videoRef}
-      data-baoflix-video="true"
       controls
       playsInline
-      preload="metadata"
-      className="h-full w-full bg-black object-contain"
+      tabIndex={0}
+      data-tv-player="video"
+      data-tv-skip
+      className="h-full w-full bg-black object-contain outline-none"
     />
   );
 }
