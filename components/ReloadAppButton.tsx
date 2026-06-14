@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
 const HIDE_SESSION_KEY = "baoflix_hide_reload_button";
+const PHONE_BREAKPOINT = 768;
 
 function isStandalonePwa() {
   if (typeof window === "undefined") return false;
@@ -49,6 +50,12 @@ function isWebViewLike() {
   );
 }
 
+function isPhoneViewport() {
+  if (typeof window === "undefined") return false;
+
+  return window.innerWidth < PHONE_BREAKPOINT;
+}
+
 export default function ReloadAppButton() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -58,10 +65,17 @@ export default function ReloadAppButton() {
   useEffect(() => {
     function refreshVisible() {
       const tvContext = isTvModePath(pathname) || isTvModeSession();
+      const phoneContext = isPhoneViewport();
       const hidden = sessionStorage.getItem(HIDE_SESSION_KEY) === "1";
 
-      // TV mode now uses /cai-dat for reload, so the floating button stays hidden.
-      setVisible(!tvContext && !hidden && (isStandalonePwa() || isWebViewLike()));
+      // Phone/mobile already has /cai-dat in bottom nav, so do not show
+      // the floating reload button there. TV mode also uses /cai-dat.
+      setVisible(
+        !tvContext &&
+          !phoneContext &&
+          !hidden &&
+          (isStandalonePwa() || isWebViewLike())
+      );
     }
 
     setMounted(true);
@@ -108,7 +122,7 @@ export default function ReloadAppButton() {
   if (!mounted || !visible) return null;
 
   return (
-    <div className="fixed bottom-24 right-4 z-[80] flex items-center gap-2 md:bottom-5">
+    <div className="fixed bottom-5 right-4 z-[80] hidden items-center gap-2 md:flex">
       <button
         type="button"
         onClick={reloadApp}
