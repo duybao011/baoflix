@@ -6,12 +6,24 @@ import type { MovieItem } from "@/lib/kkphim";
 
 const FAVORITE_KEY = "baoflix_favorites";
 const IMAGE_BASE = "https://phimimg.com";
+const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
 function getCardImageUrl(url?: string) {
-  if (!url) return "/placeholder.png";
-  if (url.startsWith("/")) return url;
-  if (url.startsWith("http")) return url;
-  return `${IMAGE_BASE}/${url.replace(/^\/+/, "")}`;
+  const rawUrl = String(url || "").trim();
+
+  if (!rawUrl) return PLACEHOLDER_IMAGE;
+  if (
+    rawUrl === "/placeholder.png" ||
+    rawUrl === "placeholder.png" ||
+    rawUrl.endsWith("/placeholder.png")
+  ) {
+    return PLACEHOLDER_IMAGE;
+  }
+
+  if (rawUrl.startsWith("/")) return rawUrl;
+  if (rawUrl.startsWith("http")) return rawUrl;
+
+  return `${IMAGE_BASE}/${rawUrl.replace(/^\/+/, "")}`;
 }
 
 function readFavorites(): MovieItem[] {

@@ -61,14 +61,14 @@ export default function FullscreenPlayerBox({
 
     if (!box) return;
 
-    const video = box.querySelector<HTMLVideoElement>(
-      "video[data-tv-player='video'], video"
+    const player = box.querySelector<HTMLElement>(
+      "video[data-tv-player='video'], iframe[data-tv-player='iframe'], video, iframe"
     );
 
     window.setTimeout(() => {
       try {
-        if (video) {
-          video.focus({ preventScroll: true });
+        if (player) {
+          player.focus({ preventScroll: true });
           return;
         }
 
@@ -141,7 +141,7 @@ export default function FullscreenPlayerBox({
     document.documentElement.style.overscrollBehavior = "none";
 
     // Khi vào TV watch mode, để focus nằm ở player surface.
-    // Overlay vẫn hiện vài giây, nhưng nếu nó tự ẩn thì remote trái/phải đã sẵn sàng tua.
+    // Nếu là HLS thì focus video, nếu là embed thì focus iframe để remote được player nhận.
     focusPlayerSurface();
 
     return () => {

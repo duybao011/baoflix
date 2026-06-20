@@ -79,8 +79,8 @@ function shouldWakeHiddenWatchOverlay(key: string) {
 
   // TV player logic:
   // - Up/Down/OK gọi overlay.
-  // - Left/Right ưu tiên tua phim hoặc nhường cho iframe.
-  // - Back khi overlay ẩn thì quay lại trang trước, không gọi overlay nữa.
+  // - Left/Right và media keys ưu tiên player.
+  // - Back khi overlay ẩn thì quay lại trang trước.
   return direction === "up" || direction === "down" || isActivationKey(key);
 }
 
@@ -377,6 +377,30 @@ function getVisibleVideo() {
   return videos.find((video) => isVisibleElement(video)) || null;
 }
 
+function getVisiblePlayerIframe() {
+  const iframes = Array.from(
+    document.querySelectorAll<HTMLIFrameElement>(
+      "iframe[data-tv-player='iframe'], iframe"
+    )
+  );
+
+  return iframes.find((iframe) => isVisibleElement(iframe)) || null;
+}
+
+function focusIframePlayer() {
+  const iframe = getVisiblePlayerIframe();
+
+  if (!iframe) return false;
+
+  try {
+    iframe.focus({ preventScroll: true });
+  } catch {
+    focusPlayer();
+  }
+
+  return true;
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
@@ -473,11 +497,10 @@ function handleHiddenPlayerKey(event: KeyboardEvent) {
     return true;
   }
 
-  // Embed iframe thường cross-origin nên app web không tua trực tiếp được.
-  // Không bật overlay với trái/phải; nhường phím cho player/iframe nếu nó hỗ trợ remote.
-  // Đồng thời return true để TV navigator không kéo focus xuống các nút bên dưới.
-  if (isBackward || isForward) {
-    focusPlayer();
+  // Embed iframe thường cross-origin nên app web không tua/play trực tiếp được.
+  // Ở nhánh này chỉ focus iframe và dừng navigator, không preventDefault.
+  // Lần bấm tiếp theo remote sẽ đi thẳng vào player embed nếu player hỗ trợ.
+  if (focusIframePlayer()) {
     return true;
   }
 
@@ -539,7 +562,7 @@ export default function TvRemoteNavigator() {
       }
 
       // Media key riêng của một số remote: xử lý HLS video kể cả khi overlay đang hiện.
-      // ArrowLeft/Right khi overlay đang hiện vẫn để điều hướng focus trong overlay.
+      // Với iframe thì chỉ focus iframe, không cố điều khiển cross-origin player.
       if (
         !openModalScope &&
         !isTextInput(activeElement) &&
@@ -563,10 +586,14 @@ export default function TvRemoteNavigator() {
 
           return;
         }
+
+        if (focusIframePlayer()) {
+          return;
+        }
       }
 
       // Khi đang xem TV immersive và overlay đang ẩn:
-      // - Left/Right ưu tiên tua HLS video hoặc nhường cho iframe.
+      // - Left/Right ưu tiên HLS seek hoặc focus iframe.
       // - Up/Down/OK mới gọi overlay.
       if (!openModalScope && !isTextInput(activeElement) && hiddenOverlay) {
         if (handleHiddenPlayerKey(event)) {

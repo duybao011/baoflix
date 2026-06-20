@@ -303,9 +303,12 @@ export default function WatchClient({
             {episode?.link_embed ? (
               <iframe
                 src={episode.link_embed}
+                tabIndex={0}
+                data-tv-player="iframe"
+                data-tv-skip
                 allowFullScreen
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                className="h-full w-full"
+                className="h-full w-full bg-black outline-none"
                 title={`${movie.name} - ${episode.name}`}
               />
             ) : episode?.link_m3u8 ? (

@@ -29,8 +29,10 @@ type ShowOverlayDetail = {
   focus?: boolean;
 };
 
-const AUTO_HIDE_MS = 2000;
+const AUTO_HIDE_MS = 4500;
 const EPISODE_WINDOW_SIZE = 12;
+const TV_FOCUS_CLASS =
+  "focus-visible:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 function normalizeServerName(name?: string) {
   const text = String(name || "").toLowerCase();
@@ -221,10 +223,6 @@ export default function TvWatchOverlay({
     }
   }
 
-  function showOverlayAndFocus() {
-    showOverlay({ pinned: false, focus: true, autoHide: false });
-  }
-
   function handleOverlayFocusIn() {
     setOverlayVisible(true);
     clearHideTimer();
@@ -312,48 +310,55 @@ export default function TvWatchOverlay({
         overlayVisible ? "opacity-100" : "opacity-0",
       ].join(" ")}
     >
-      <div className="pointer-events-none bg-gradient-to-b from-black/85 via-black/45 to-transparent px-4 pb-16 pt-4 md:px-6">
+      <div className="pointer-events-none bg-gradient-to-b from-black/90 via-black/55 to-transparent px-6 pb-16 pt-8 md:px-10 md:pt-10">
         <div
           data-tv-row
           className={[
-            "flex flex-wrap items-center gap-3",
+            "flex flex-wrap items-center gap-4",
             overlayVisible ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
         >
           <Link
             href={`/phim/${movie.slug}`}
             {...hiddenFocusProps}
-            className="rounded-full bg-yellow-300 px-5 py-3 text-sm font-black text-black shadow-xl hover:bg-yellow-200"
+            className={[
+              "rounded-full bg-yellow-300 px-6 py-4 text-base font-black text-black shadow-2xl transition hover:bg-yellow-200",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             ← Quay lại
           </Link>
 
           <div className="min-w-0 flex-1">
-            <h1 className="line-clamp-1 text-2xl font-black text-white md:text-3xl">
+            <h1 className="line-clamp-1 text-3xl font-black text-white drop-shadow md:text-4xl">
               {movie.name}
             </h1>
 
-            <p className="mt-1 line-clamp-1 text-sm font-bold text-slate-300 md:text-base">
+            <p className="mt-2 line-clamp-1 text-base font-bold text-slate-200 md:text-lg">
               {episodeName || "Đang xem"} • {normalizeServerName(currentServer?.server_name)}
             </p>
+          </div>
+
+          <div className="hidden rounded-full border border-white/10 bg-black/50 px-4 py-2 text-sm font-bold text-slate-200 backdrop-blur md:block">
+            OK: menu • Back: ẩn
           </div>
         </div>
       </div>
 
       {shouldShowBottomArea && (
-        <div className="pointer-events-none bg-gradient-to-t from-black/90 via-black/65 to-transparent px-4 pb-5 pt-20 md:px-6">
+        <div className="pointer-events-none bg-gradient-to-t from-black/95 via-black/75 to-transparent px-6 pb-10 pt-24 md:px-10 md:pb-12">
           {hasMultipleServers && (
             <section
               className={[
-                "mb-4",
+                "mb-5",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
-              <h2 className="mb-2 text-base font-black text-white">Phiên bản</h2>
+              <h2 className="mb-3 text-lg font-black text-white">Phiên bản</h2>
 
               <div
                 data-tv-row
-                className="baoflix-tv-overlay-scroll flex gap-2 overflow-x-auto pb-1"
+                className="baoflix-tv-overlay-scroll flex gap-3 overflow-x-auto pb-2"
               >
                 {sameEpisodeServerLinks.map((item) => {
                   const active = item.serverIndex === safeServerIndex;
@@ -364,10 +369,11 @@ export default function TvWatchOverlay({
                       href={item.href}
                       {...hiddenFocusProps}
                       className={[
-                        "shrink-0 rounded-full border px-5 py-3 text-sm font-black backdrop-blur",
+                        "shrink-0 rounded-full border px-6 py-4 text-base font-black shadow-xl backdrop-blur transition",
+                        TV_FOCUS_CLASS,
                         active
                           ? "border-yellow-300 bg-yellow-300 text-black"
-                          : "border-white/15 bg-black/45 text-white hover:bg-white/15",
+                          : "border-white/15 bg-black/55 text-white hover:bg-white/15",
                       ].join(" ")}
                     >
                       {normalizeServerName(item.server.server_name)}
@@ -384,11 +390,11 @@ export default function TvWatchOverlay({
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h2 className="text-base font-black text-white">Danh sách tập</h2>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-black text-white">Danh sách tập</h2>
 
                 {currentEpisodes.length > EPISODE_WINDOW_SIZE && (
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
+                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-slate-200">
                     {episodeWindow.start + 1}-{episodeWindow.end}/{currentEpisodes.length}
                   </span>
                 )}
@@ -396,7 +402,7 @@ export default function TvWatchOverlay({
 
               <div
                 data-tv-row
-                className="baoflix-tv-overlay-scroll flex gap-2 overflow-x-auto pb-1"
+                className="baoflix-tv-overlay-scroll flex gap-3 overflow-x-auto pb-2"
               >
                 {episodeWindow.items.map(({ episode, episodeIndex }) => {
                   const active = episodeIndex === safeEpisodeIndex;
@@ -414,10 +420,11 @@ export default function TvWatchOverlay({
                       data-tv-overlay-default={active ? true : undefined}
                       {...hiddenFocusProps}
                       className={[
-                        "flex min-w-[110px] shrink-0 items-center justify-center rounded-2xl border px-5 py-3 text-center text-sm font-black backdrop-blur",
+                        "flex min-w-[128px] shrink-0 items-center justify-center rounded-2xl border px-6 py-4 text-center text-base font-black shadow-xl backdrop-blur transition",
+                        TV_FOCUS_CLASS,
                         active
                           ? "border-yellow-300 bg-yellow-300 text-black"
-                          : "border-white/15 bg-black/45 text-white hover:bg-white/15",
+                          : "border-white/15 bg-black/55 text-white hover:bg-white/15",
                       ].join(" ")}
                     >
                       <span className="inline-flex items-center justify-center gap-1">
@@ -436,7 +443,7 @@ export default function TvWatchOverlay({
             <div
               data-tv-row
               className={[
-                "mt-4 grid grid-cols-3 gap-3",
+                "mt-5 grid grid-cols-3 gap-4",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
@@ -444,14 +451,17 @@ export default function TvWatchOverlay({
                 <Link
                   href={previousHref}
                   {...hiddenFocusProps}
-                  className="flex min-h-[54px] items-center justify-center rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center text-sm font-black text-white backdrop-blur hover:bg-white/15"
+                  className={[
+                    "flex min-h-[64px] items-center justify-center rounded-2xl border border-white/15 bg-black/55 px-5 py-4 text-center text-base font-black text-white shadow-xl backdrop-blur transition hover:bg-white/15",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
                 >
                   ← Tập trước
                 </Link>
               ) : (
                 <button
                   disabled
-                  className="flex min-h-[54px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-center text-sm font-black text-white opacity-35"
+                  className="flex min-h-[64px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-center text-base font-black text-white opacity-35"
                 >
                   ← Tập trước
                 </button>
@@ -461,7 +471,10 @@ export default function TvWatchOverlay({
                 type="button"
                 {...hiddenFocusProps}
                 onClick={onOpenEpisodePanel}
-                className="flex min-h-[54px] items-center justify-center rounded-2xl bg-yellow-300 px-4 py-3 text-center text-sm font-black text-black hover:bg-yellow-200"
+                className={[
+                  "flex min-h-[64px] items-center justify-center rounded-2xl bg-yellow-300 px-5 py-4 text-center text-base font-black text-black shadow-xl transition hover:bg-yellow-200",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
               >
                 Tập / nguồn
               </button>
@@ -470,14 +483,17 @@ export default function TvWatchOverlay({
                 <Link
                   href={nextHref}
                   {...hiddenFocusProps}
-                  className="flex min-h-[54px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-sm font-black text-white hover:bg-red-500"
+                  className={[
+                    "flex min-h-[64px] items-center justify-center rounded-2xl bg-red-600 px-5 py-4 text-center text-base font-black text-white shadow-xl transition hover:bg-red-500",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
                 >
                   Tập sau →
                 </Link>
               ) : (
                 <button
                   disabled
-                  className="flex min-h-[54px] items-center justify-center rounded-2xl bg-red-600 px-4 py-3 text-center text-sm font-black text-white opacity-35"
+                  className="flex min-h-[64px] items-center justify-center rounded-2xl bg-red-600 px-5 py-4 text-center text-base font-black text-white opacity-35"
                 >
                   Tập sau →
                 </button>
