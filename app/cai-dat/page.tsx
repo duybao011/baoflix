@@ -4,9 +4,60 @@ import Link from "next/link";
 import { useState } from "react";
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
+const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
+
+type TvLaunchMode = "manual" | "always_tv" | "auto_detect";
+
+const launchOptions: {
+  value: TvLaunchMode;
+  title: string;
+  desc: string;
+}[] = [
+  {
+    value: "manual",
+    title: "Thủ công",
+    desc: "Chỉ bật TV Mode khi vào /tv, bấm nút TV hoặc dùng ?tv=1.",
+  },
+  {
+    value: "always_tv",
+    title: "Luôn mở TV",
+    desc: "Hợp với APK/WebView Android TV. Mở app là bật TV mode, nếu đang ở trang chủ sẽ vào TV hub.",
+  },
+  {
+    value: "auto_detect",
+    title: "Tự nhận diện TV",
+    desc: "Tự bật nếu thiết bị có dấu hiệu là Android TV/Smart TV.",
+  },
+];
+
+function readLaunchMode(): TvLaunchMode {
+  if (typeof window === "undefined") return "manual";
+
+  try {
+    const value = localStorage.getItem(TV_LAUNCH_MODE_KEY);
+
+    if (
+      value === "manual" ||
+      value === "always_tv" ||
+      value === "auto_detect"
+    ) {
+      return value;
+    }
+  } catch {
+    // bỏ qua nếu storage bị chặn
+  }
+
+  return "manual";
+}
+
+function notifyTvModeChanged() {
+  window.dispatchEvent(new Event("baoflix-tv-mode-change"));
+  window.dispatchEvent(new Event("baoflix-tv-launch-mode-change"));
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
+  const [launchMode, setLaunchMode] = useState<TvLaunchMode>(() => readLaunchMode());
 
   async function reloadApp() {
     setLoading(true);
@@ -28,9 +79,34 @@ export default function SettingsPage() {
     window.location.href = url.toString();
   }
 
+  function saveLaunchMode(value: TvLaunchMode) {
+    setLaunchMode(value);
+
+    try {
+      localStorage.setItem(TV_LAUNCH_MODE_KEY, value);
+
+      if (value === "manual") {
+        sessionStorage.removeItem(TV_SESSION_KEY);
+        document.documentElement.dataset.baoflixTvMode = "0";
+      }
+
+      if (value === "always_tv" || value === "auto_detect") {
+        sessionStorage.setItem(TV_SESSION_KEY, "1");
+        document.documentElement.dataset.baoflixTvMode = "1";
+      }
+
+      notifyTvModeChanged();
+    } catch {
+      // bỏ qua nếu storage bị chặn
+    }
+  }
+
   function turnOffTvMode() {
     sessionStorage.removeItem(TV_SESSION_KEY);
-    window.dispatchEvent(new Event("baoflix-tv-mode-change"));
+    localStorage.setItem(TV_LAUNCH_MODE_KEY, "manual");
+    setLaunchMode("manual");
+    document.documentElement.dataset.baoflixTvMode = "0";
+    notifyTvModeChanged();
   }
 
   return (
@@ -80,7 +156,7 @@ export default function SettingsPage() {
           >
             Tắt trạng thái TV Mode
             <span className="mt-1 block text-xs font-bold text-slate-400">
-              Dùng khi lỡ bật TV Mode trên điện thoại/laptop.
+              Tắt TV Mode và đưa chế độ mở app về thủ công.
             </span>
           </button>
 
@@ -93,6 +169,44 @@ export default function SettingsPage() {
               Quay lại giao diện thường.
             </span>
           </Link>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
+        <h2 className="text-2xl font-black">Chế độ mở TV</h2>
+
+        <p className="mt-2 text-sm leading-6 text-slate-400">
+          Chọn cách BảoFlix bật TV Mode khi chạy bằng APK/WebView hoặc mở trên TV.
+        </p>
+
+        <div data-tv-row className="mt-5 grid gap-3 md:grid-cols-3">
+          {launchOptions.map((option) => {
+            const active = option.value === launchMode;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => saveLaunchMode(option.value)}
+                className={[
+                  "rounded-3xl border p-5 text-left transition",
+                  active
+                    ? "border-yellow-300 bg-yellow-300 text-black"
+                    : "border-white/10 bg-black/20 text-white hover:bg-white/10",
+                ].join(" ")}
+              >
+                <span className="text-lg font-black">{option.title}</span>
+                <span
+                  className={[
+                    "mt-2 block text-sm font-bold leading-6",
+                    active ? "text-black/70" : "text-slate-400",
+                  ].join(" ")}
+                >
+                  {option.desc}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
     </div>

@@ -6,17 +6,19 @@ import { useRouter } from "next/navigation";
 
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
 
-const quickKeywords = [
-  "Phim bộ Trung",
-  "Hàn Quốc",
-  "Nhật Bản",
-  "Moving",
-  "Monster",
-  "Yêu",
-  "Anime",
-  "Cổ trang",
-  "Lồng tiếng",
-  "Thuyết minh",
+const quickKeywordGroups = [
+  {
+    title: "Hay tìm trên TV",
+    items: ["Anime", "Phim bộ Trung", "Hàn Quốc", "Nhật Bản", "Cổ trang"],
+  },
+  {
+    title: "Ngôn ngữ",
+    items: ["Vietsub", "Thuyết minh", "Lồng tiếng"],
+  },
+  {
+    title: "Nhanh theo năm",
+    items: ["2026", "2025", "2024", "Phim lẻ", "Phim bộ"],
+  },
 ];
 
 const quickFilters = [
@@ -33,6 +35,10 @@ const quickFilters = [
     href: "/loc?country=nhat-ban",
   },
   {
+    label: "Anime",
+    href: "/danh-sach/hoat-hinh",
+  },
+  {
     label: "Vietsub",
     href: "/loc?sort_lang=vietsub",
   },
@@ -44,9 +50,15 @@ const quickFilters = [
     label: "Lồng tiếng",
     href: "/loc?sort_lang=long-tieng",
   },
+  {
+    label: "Phim lẻ",
+    href: "/danh-sach/phim-le",
+  },
 ];
 
 function readSearchHistory() {
+  if (typeof window === "undefined") return [];
+
   try {
     const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
     const list = raw ? JSON.parse(raw) : [];
@@ -80,11 +92,9 @@ export default function TvSearchBox() {
   const router = useRouter();
 
   const [keyword, setKeyword] = useState("");
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<string[]>(() => readSearchHistory());
 
   useEffect(() => {
-    setHistory(readSearchHistory());
-
     function refresh() {
       setHistory(readSearchHistory());
     }
@@ -123,10 +133,10 @@ export default function TvSearchBox() {
   return (
     <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 md:p-6">
       <div className="mb-4">
-        <h2 className="text-2xl font-black">Tìm nhanh trên TV</h2>
+        <h2 className="text-2xl font-black md:text-3xl">Tìm nhanh trên TV</h2>
 
         <p className="mt-1 text-sm text-slate-400">
-          Ô tìm lớn hơn để dễ thao tác bằng remote hoặc iPhone.
+          Nhập bằng remote khá cực, nên BảoFlix ưu tiên chip tìm nhanh và bộ lọc lớn.
         </p>
       </div>
 
@@ -135,12 +145,12 @@ export default function TvSearchBox() {
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
           placeholder="Nhập tên phim..."
-          className="h-16 rounded-3xl border border-white/10 bg-black/30 px-5 text-lg font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300"
+          className="h-16 rounded-3xl border border-white/10 bg-black/30 px-5 text-lg font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300 md:h-20 md:text-2xl"
         />
 
         <button
           type="submit"
-          className="h-16 rounded-3xl bg-yellow-300 px-8 text-lg font-black text-black hover:bg-yellow-200"
+          className="h-16 rounded-3xl bg-yellow-300 px-8 text-lg font-black text-black hover:bg-yellow-200 md:h-20 md:text-2xl"
         >
           Tìm
         </button>
@@ -160,13 +170,13 @@ export default function TvSearchBox() {
             </button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div data-tv-row className="flex flex-wrap gap-2">
             {history.slice(0, 10).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => goSearch(item)}
-                className="max-w-[180px] truncate rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-red-600 hover:text-white"
+                className="max-w-[220px] truncate rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-red-600 hover:text-white"
                 title={item}
               >
                 {item}
@@ -176,29 +186,33 @@ export default function TvSearchBox() {
         </div>
       )}
 
-      <div className="mt-5">
-        <p className="mb-3 text-sm font-black text-slate-200">Từ khóa nhanh</p>
+      <div className="mt-6 grid gap-5">
+        {quickKeywordGroups.map((group) => (
+          <div key={group.title}>
+            <p className="mb-3 text-sm font-black text-slate-200">{group.title}</p>
 
-        <div className="flex flex-wrap gap-2">
-          {quickKeywords.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => goSearch(item)}
-              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-slate-200 hover:bg-white/10"
-            >
-              {item}
-            </button>
-          ))}
-        </div>
+            <div data-tv-row className="flex flex-wrap gap-2">
+              {group.items.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => goSearch(item)}
+                  className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-white/10"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {quickFilters.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-4 text-center text-sm font-black hover:border-yellow-300/60 hover:bg-white/10"
+            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-center text-sm font-black hover:border-yellow-300/60 hover:bg-white/10"
           >
             {item.label}
           </Link>

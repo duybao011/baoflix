@@ -80,7 +80,7 @@ function shouldWakeHiddenWatchOverlay(key: string) {
   // TV player logic:
   // - Up/Down/OK gọi overlay.
   // - Left/Right và media keys ưu tiên player.
-  // - Back khi overlay ẩn thì quay lại trang trước.
+  // - Back khi overlay ẩn thì quay lại detail hoặc TV hub.
   return direction === "up" || direction === "down" || isActivationKey(key);
 }
 
@@ -253,6 +253,22 @@ function buildRows(root: ParentNode, elements: HTMLElement[]) {
   return [...explicitRows, ...buildRectRows(outsideElements)];
 }
 
+function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect) {
+  const currentCenter = currentRect.left + currentRect.width / 2;
+
+  return row.reduce<FocusEntry | null>((best, entry) => {
+    if (!best) return entry;
+
+    const bestCenter = best.rect.left + best.rect.width / 2;
+    const entryCenter = entry.rect.left + entry.rect.width / 2;
+
+    return Math.abs(entryCenter - currentCenter) <
+      Math.abs(bestCenter - currentCenter)
+      ? entry
+      : best;
+  }, null)?.element || null;
+}
+
 function getLinearCandidate(
   current: HTMLElement,
   root: ParentNode,
@@ -283,25 +299,27 @@ function getLinearCandidate(
   const currentRow = rows[rowIndex];
   const previousRow = rows[rowIndex - 1];
   const nextRow = rows[rowIndex + 1];
+  const currentEntry = currentRow[itemIndex];
 
+  // TV app style:
+  // - Left/Right chỉ đi trong hàng hiện tại, tới mép thì đứng lại.
+  // - Up/Down mới đổi hàng, ưu tiên item gần cùng trục ngang nhất.
   if (direction === "right") {
-    return currentRow[itemIndex + 1]?.element || nextRow?.[0]?.element || null;
+    return currentRow[itemIndex + 1]?.element || current;
   }
 
   if (direction === "left") {
-    return (
-      currentRow[itemIndex - 1]?.element ||
-      previousRow?.[previousRow.length - 1]?.element ||
-      null
-    );
+    return currentRow[itemIndex - 1]?.element || current;
   }
 
   if (direction === "down") {
-    return nextRow?.[0]?.element || null;
+    return nextRow ? getClosestByHorizontalCenter(nextRow, currentEntry.rect) : current;
   }
 
   if (direction === "up") {
-    return previousRow?.[0]?.element || null;
+    return previousRow
+      ? getClosestByHorizontalCenter(previousRow, currentEntry.rect)
+      : current;
   }
 
   return null;
@@ -345,11 +363,39 @@ function closeModalIfNeeded(event: KeyboardEvent) {
   return true;
 }
 
-function goBack(event: KeyboardEvent) {
-  if (window.history.length > 1) {
-    event.preventDefault();
-    window.history.back();
+function getFallbackBackHref() {
+  const path = window.location.pathname;
+  const normalWatchMatch = path.match(/^\/xem\/([^/?#]+)/);
+  const customWatchMatch = path.match(/^\/ca-nhan\/([^/]+)\/xem/);
+
+  if (normalWatchMatch?.[1]) {
+    return `/phim/${normalWatchMatch[1]}`;
   }
+
+  if (customWatchMatch?.[1]) {
+    return `/ca-nhan/${customWatchMatch[1]}`;
+  }
+
+  if (isTvRemoteEnabled() && path !== "/tv") {
+    return "/tv";
+  }
+
+  if (path !== "/") {
+    return "/";
+  }
+
+  return "/tv";
+}
+
+function goBack(event: KeyboardEvent) {
+  event.preventDefault();
+
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+
+  window.location.href = getFallbackBackHref();
 }
 
 function dispatchShowOverlay(options?: { pinned?: boolean; focus?: boolean }) {
@@ -685,7 +731,7 @@ export default function TvRemoteNavigator() {
         direction
       );
 
-      if (!nextElement) {
+      if (!nextElement || nextElement === current) {
         if (
           root instanceof HTMLElement &&
           (root.dataset.tvLock === "true" || root.dataset.tvModal)

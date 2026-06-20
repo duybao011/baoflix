@@ -56,6 +56,14 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
     setSaved(!exists);
   }
 
+  function handleImageError(event: React.SyntheticEvent<HTMLImageElement>) {
+    const image = event.currentTarget;
+
+    if (image.src.endsWith(PLACEHOLDER_IMAGE)) return;
+
+    image.src = PLACEHOLDER_IMAGE;
+  }
+
   return (
     <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg transition hover:-translate-y-1 hover:bg-white/[0.07] focus-within:border-yellow-300">
       <Link
@@ -69,6 +77,8 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
             alt={movie.name}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
             loading="lazy"
+            decoding="async"
+            onError={handleImageError}
           />
 
           {movie.episode_current && (

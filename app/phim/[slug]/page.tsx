@@ -5,6 +5,7 @@ import LocalCustomMovieRouteSync from "@/components/LocalCustomMovieRouteSync";
 import MovieDetailActions from "@/components/MovieDetailActions";
 import MovieDetailTabs from "@/components/MovieDetailTabs";
 import RelatedMovies from "@/components/RelatedMovies";
+import TvMovieDetailShell from "@/components/TvMovieDetailShell";
 import {
   getImageUrl,
   getMovieDetail,
@@ -237,106 +238,111 @@ export default async function MovieDetailPage({ params }: PageProps) {
   const relatedTab = <RelatedMovies movie={movie} />;
 
   return (
-    <div
-      data-tv-scope="movie-detail"
-      data-tv-lock="true"
-      data-tv-autofocus="true"
-    >
-      <LocalCustomMovieRouteSync slug={movie.slug} mode="detail" />
+    <>
+      <TvMovieDetailShell movie={movie} servers={servers} content={content} />
 
-      <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
-        <aside className="lg:sticky lg:top-24 lg:self-start">
-          <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#111521] shadow-2xl">
-            <div className="p-5">
-              <div className="overflow-hidden rounded-2xl bg-white/5">
-                <img
-                  src={getImageUrl(movie.poster_url || movie.thumb_url)}
-                  alt={movie.name}
-                  className="aspect-[2/3] w-full object-cover"
-                />
-              </div>
+      <div
+        data-baoflix-normal-detail="true"
+        data-tv-scope="movie-detail"
+        data-tv-lock="true"
+        data-tv-autofocus="true"
+      >
+        <LocalCustomMovieRouteSync slug={movie.slug} mode="detail" />
 
-              <h1 className="mt-5 text-2xl font-black leading-tight">
-                {movie.name}
-              </h1>
+        <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <section className="overflow-hidden rounded-3xl border border-white/10 bg-[#111521] shadow-2xl">
+              <div className="p-5">
+                <div className="overflow-hidden rounded-2xl bg-white/5">
+                  <img
+                    src={getImageUrl(movie.poster_url || movie.thumb_url)}
+                    alt={movie.name}
+                    className="aspect-[2/3] w-full object-cover"
+                  />
+                </div>
 
-              {movie.origin_name && (
-                <p className="mt-1 text-sm font-bold text-yellow-300">
-                  {movie.origin_name}
-                </p>
-              )}
+                <h1 className="mt-5 text-2xl font-black leading-tight">
+                  {movie.name}
+                </h1>
 
-              <div className="mt-4 flex flex-wrap gap-2">
-                {movie.year && <InfoPill>{movie.year}</InfoPill>}
-                {movie.quality && <InfoPill>{movie.quality}</InfoPill>}
-                {movie.time && <InfoPill>{movie.time}</InfoPill>}
-                {movie.lang && <InfoPill>{movie.lang}</InfoPill>}
-              </div>
+                {movie.origin_name && (
+                  <p className="mt-1 text-sm font-bold text-yellow-300">
+                    {movie.origin_name}
+                  </p>
+                )}
 
-              <SidebarSection title="Giới thiệu">
-                <p className="line-clamp-[10] text-sm leading-6 text-slate-300">
-                  {content || "Chưa có mô tả."}
-                </p>
-              </SidebarSection>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {movie.year && <InfoPill>{movie.year}</InfoPill>}
+                  {movie.quality && <InfoPill>{movie.quality}</InfoPill>}
+                  {movie.time && <InfoPill>{movie.time}</InfoPill>}
+                  {movie.lang && <InfoPill>{movie.lang}</InfoPill>}
+                </div>
 
-              {movie.country && movie.country.length > 0 && (
-                <SidebarSection title="Quốc gia">
-                  <div className="flex flex-wrap gap-2">
-                    {movie.country.map((item) => (
-                      <InfoPill key={item.slug}>{item.name}</InfoPill>
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
-
-              {movie.category && movie.category.length > 0 && (
-                <SidebarSection title="Thể loại">
-                  <div className="flex flex-wrap gap-2">
-                    {movie.category.slice(0, 6).map((item) => (
-                      <InfoPill key={item.slug}>{item.name}</InfoPill>
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
-
-              {directors.length > 0 && (
-                <SidebarSection title="Đạo diễn">
-                  <p className="text-sm text-slate-300">
-                    {directors.join(", ")}
+                <SidebarSection title="Giới thiệu">
+                  <p className="line-clamp-[10] text-sm leading-6 text-slate-300">
+                    {content || "Chưa có mô tả."}
                   </p>
                 </SidebarSection>
-              )}
 
-              {actors.length > 0 && (
-                <SidebarSection title="Diễn viên">
-                  <div className="flex flex-wrap gap-2">
-                    {actors.slice(0, 8).map((actor) => (
-                      <span
-                        key={actor}
-                        className="rounded-full border border-yellow-300/20 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-200"
-                      >
-                        {actor}
-                      </span>
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
-            </div>
-          </section>
-        </aside>
+                {movie.country && movie.country.length > 0 && (
+                  <SidebarSection title="Quốc gia">
+                    <div className="flex flex-wrap gap-2">
+                      {movie.country.map((item) => (
+                        <InfoPill key={item.slug}>{item.name}</InfoPill>
+                      ))}
+                    </div>
+                  </SidebarSection>
+                )}
 
-        <main>
-          <MovieDetailActions movie={movie} servers={servers} />
+                {movie.category && movie.category.length > 0 && (
+                  <SidebarSection title="Thể loại">
+                    <div className="flex flex-wrap gap-2">
+                      {movie.category.slice(0, 6).map((item) => (
+                        <InfoPill key={item.slug}>{item.name}</InfoPill>
+                      ))}
+                    </div>
+                  </SidebarSection>
+                )}
 
-          <MovieDetailTabs
-            defaultTab="episodes"
-            episodes={episodesTab}
-            cast={castTab}
-            related={relatedTab}
-            info={infoTab}
-          />
-        </main>
+                {directors.length > 0 && (
+                  <SidebarSection title="Đạo diễn">
+                    <p className="text-sm text-slate-300">
+                      {directors.join(", ")}
+                    </p>
+                  </SidebarSection>
+                )}
+
+                {actors.length > 0 && (
+                  <SidebarSection title="Diễn viên">
+                    <div className="flex flex-wrap gap-2">
+                      {actors.slice(0, 8).map((actor) => (
+                        <span
+                          key={actor}
+                          className="rounded-full border border-yellow-300/20 bg-yellow-300/10 px-3 py-1 text-xs font-bold text-yellow-200"
+                        >
+                          {actor}
+                        </span>
+                      ))}
+                    </div>
+                  </SidebarSection>
+                )}
+              </div>
+            </section>
+          </aside>
+
+          <main>
+            <MovieDetailActions movie={movie} servers={servers} />
+
+            <MovieDetailTabs
+              defaultTab="episodes"
+              episodes={episodesTab}
+              cast={castTab}
+              related={relatedTab}
+              info={infoTab}
+            />
+          </main>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
