@@ -6,6 +6,7 @@ import PwaRegister from "@/components/PwaRegister";
 import MobileBackButton from "@/components/MobileBackButton";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import TvModeFloatingButton from "@/components/TvModeFloatingButton";
+import TvRemoteKeyBridge from "@/components/TvRemoteKeyBridge";
 import TvRemoteNavigator from "@/components/TvRemoteNavigator";
 import TvAutoFocus from "@/components/TvAutoFocus";
 import TvModeToggleButton from "@/components/TvModeToggleButton";
@@ -38,6 +39,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <PwaRegister />
         <TvLaunchController />
+        <TvRemoteKeyBridge />
         <TvRemoteNavigator />
         <TvAutoFocus />
         <TvFocusMemory />
