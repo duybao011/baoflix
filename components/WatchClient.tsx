@@ -208,12 +208,20 @@ export default function WatchClient({
       ? getEpisodeUrl(movie.slug, safeServerIndex, safeEpisodeIndex + 1)
       : "";
 
-  const watchTimeKey = `baoflix_watch_time_${movie.slug}_episode_${safeEpisodeIndex}`;
+  const watchTimeKey = `baoflix_watch_time_${movie.slug}_server_${safeServerIndex}_episode_${safeEpisodeIndex}`;
 
   const sameEpisodeServerLinks = useMemo(() => {
     return servers
       .map((server, index) => {
-        const serverEpisode = server.server_data?.[safeEpisodeIndex];
+        const serverEpisodes = server.server_data ?? [];
+
+        if (!serverEpisodes.length) return null;
+
+        const targetEpisodeIndex = Math.min(
+          safeEpisodeIndex,
+          Math.max(serverEpisodes.length - 1, 0)
+        );
+        const serverEpisode = serverEpisodes[targetEpisodeIndex];
 
         if (!serverEpisode) return null;
 
@@ -221,16 +229,20 @@ export default function WatchClient({
           server,
           serverIndex: index,
           episode: serverEpisode,
-          href: getEpisodeUrl(movie.slug, index, safeEpisodeIndex),
+          episodeIndex: targetEpisodeIndex,
+          href: getEpisodeUrl(movie.slug, index, targetEpisodeIndex),
         };
       })
       .filter(Boolean) as {
       server: EpisodeServer;
       serverIndex: number;
       episode: NonNullable<typeof episode>;
+      episodeIndex: number;
       href: string;
     }[];
   }, [servers, safeEpisodeIndex, movie.slug]);
+
+  const shouldUseHlsFirst = tvOverlayEnabled && Boolean(episode?.link_m3u8);
 
   return (
     <div
@@ -265,6 +277,12 @@ export default function WatchClient({
               {normalizeServerName(currentServer?.server_name)}
             </span>
 
+            {sameEpisodeServerLinks.length > 1 && (
+              <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-black">
+                {sameEpisodeServerLinks.length} phiên bản
+              </span>
+            )}
+
             {movie.quality && (
               <span className="rounded-full bg-white/10 px-3 py-1">
                 {movie.quality}
@@ -294,22 +312,23 @@ export default function WatchClient({
           <h2 className="mb-3 text-lg font-black">Phiên bản</h2>
 
           <p className="mb-3 text-sm text-slate-400">
-            Đổi nhanh phiên bản cùng tập đang xem, hoặc mở “Tập / nguồn” để chọn đầy đủ.
+            Hiện tất cả server có tập phù hợp. Server thiếu đúng tập sẽ mở tập gần nhất.
           </p>
 
           <div data-tv-row className="flex flex-wrap gap-2">
             {sameEpisodeServerLinks.map((item) => (
               <Link
-                key={`${item.serverIndex}-${item.episode.name}`}
+                key={`${item.serverIndex}-${item.episode.name}-${item.episodeIndex}`}
                 href={item.href}
                 className={[
                   "rounded-xl border px-4 py-2 text-sm font-bold",
                   item.serverIndex === safeServerIndex
                     ? "border-yellow-300 bg-yellow-300 text-black"
-                    : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                    : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black",
                 ].join(" ")}
               >
                 {normalizeServerName(item.server.server_name)}
+                <span className="ml-1 opacity-70">• {item.episode.name}</span>
               </Link>
             ))}
           </div>
@@ -319,7 +338,13 @@ export default function WatchClient({
       <div className="baoflix-player-fill mt-5">
         <FullscreenPlayerBox tvImmersive={tvOverlayEnabled}>
           <div className="relative h-full w-full overflow-hidden bg-black">
-            {episode?.link_embed ? (
+            {shouldUseHlsFirst ? (
+              <HlsPlayer
+                src={episode!.link_m3u8!}
+                storageKey={watchTimeKey}
+                autoResume
+              />
+            ) : episode?.link_embed ? (
               <iframe
                 src={episode.link_embed}
                 tabIndex={tvOverlayEnabled ? -1 : 0}

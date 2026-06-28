@@ -27,6 +27,10 @@ const quickFilters = [
     href: "/loc?type=phim-bo&country=trung-quoc",
   },
   {
+    label: "Phim bộ Trung LT mới",
+    href: "/loc?type=phim-bo&country=trung-quoc&sort_lang=long-tieng&sort_field=year&sort_type=desc",
+  },
+  {
     label: "Phim Hàn",
     href: "/loc?country=han-quoc",
   },
@@ -92,12 +96,18 @@ export default function TvSearchBox() {
   const router = useRouter();
 
   const [keyword, setKeyword] = useState("");
-  const [history, setHistory] = useState<string[]>(() => readSearchHistory());
+  // Đừng đọc localStorage trong initial render. Server render không có localStorage,
+  // còn client có thể có lịch sử tìm kiếm, khiến cây HTML lệch và báo hydration mismatch.
+  const [history, setHistory] = useState<string[]>([]);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     function refresh() {
       setHistory(readSearchHistory());
     }
+
+    setHydrated(true);
+    refresh();
 
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
@@ -130,6 +140,8 @@ export default function TvSearchBox() {
     setHistory([]);
   }
 
+  const showHistory = hydrated && history.length > 0;
+
   return (
     <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 md:p-6">
       <div className="mb-4">
@@ -156,7 +168,7 @@ export default function TvSearchBox() {
         </button>
       </form>
 
-      {history.length > 0 && (
+      {showHistory && (
         <div className="mt-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-sm font-black text-slate-200">Tìm gần đây</p>
@@ -207,7 +219,7 @@ export default function TvSearchBox() {
         ))}
       </div>
 
-      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-9">
         {quickFilters.map((item) => (
           <Link
             key={item.href}

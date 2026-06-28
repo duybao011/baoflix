@@ -44,7 +44,7 @@ function focusPlayerSurface() {
   window.dispatchEvent(new Event("baoflix-focus-tv-player"));
 }
 
-function focusIframePlayer() {
+function focusIframePlayer({ hideOverlay = true }: { hideOverlay?: boolean } = {}) {
   const iframe = getVisiblePlayerIframe();
 
   if (!iframe) return false;
@@ -55,7 +55,41 @@ function focusIframePlayer() {
     focusPlayerSurface();
   }
 
-  window.dispatchEvent(new Event("baoflix-hide-tv-overlay"));
+  if (hideOverlay) {
+    window.dispatchEvent(new Event("baoflix-hide-tv-overlay"));
+  }
+
+  return true;
+}
+
+function sendIframeRemoteKey(command: PlayerCommand) {
+  const iframe = getVisiblePlayerIframe();
+
+  if (!iframe) return false;
+
+  const key =
+    command.action === "seek"
+      ? Number(command.seconds || 0) < 0
+        ? "ArrowLeft"
+        : "ArrowRight"
+      : command.action === "play" || command.action === "pause" || command.action === "toggle-play"
+        ? " "
+        : "Enter";
+
+  try {
+    iframe.focus({ preventScroll: true });
+
+    const keyboardEvent = new KeyboardEvent("keydown", {
+      key,
+      code: key === " " ? "Space" : key,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    iframe.dispatchEvent(keyboardEvent);
+  } catch {
+    return focusIframePlayer({ hideOverlay: false });
+  }
 
   return true;
 }
@@ -158,8 +192,14 @@ export default function TvPlayerCommandBridge() {
         return;
       }
 
-      // Iframe server ngoài thường cross-origin nên web không tua/play trực tiếp được.
-      // Khi không có <video> nội bộ, ta focus iframe và để remote đi vào player embed.
+      // Iframe server ngoài thường cross-origin nên web không tua/play trực tiếp chắc 100%.
+      // Fallback này giữ overlay, focus iframe và bắn phím tương ứng để player nào hỗ trợ phím thì nhận được.
+      if (command.action === "seek" || command.action === "toggle-play" || command.action === "play" || command.action === "pause") {
+        if (sendIframeRemoteKey(command)) {
+          return;
+        }
+      }
+
       focusIframePlayer();
     }
 

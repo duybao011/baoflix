@@ -13,6 +13,12 @@ type TvMovieDetailShellProps = {
   content: string;
 };
 
+type ServerPreview = {
+  server: EpisodeServer;
+  serverIndex: number;
+  episodes: NonNullable<EpisodeServer["server_data"]>;
+};
+
 const TV_SESSION_KEY = "baoflix_tv_mode";
 
 function isTvModeEnabled() {
@@ -28,14 +34,26 @@ function isTvModeEnabled() {
   }
 }
 
+function getServerPreviews(servers: EpisodeServer[]): ServerPreview[] {
+  return servers
+    .map((server, serverIndex) => ({
+      server,
+      serverIndex,
+      episodes: server.server_data ?? [],
+    }))
+    .filter((item) => item.episodes.length > 0);
+}
+
+function getEpisodeHref(movieSlug: string, serverIndex: number, episodeIndex: number) {
+  return `/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`;
+}
+
 function getFirstWatchHref(movieSlug: string, servers: EpisodeServer[]) {
-  const firstServerIndex = servers.findIndex(
-    (server) => (server.server_data ?? []).length > 0
-  );
+  const firstServer = getServerPreviews(servers)[0];
 
-  if (firstServerIndex < 0) return "";
+  if (!firstServer) return "";
 
-  return `/xem/${movieSlug}?server=${firstServerIndex}&tap=0`;
+  return getEpisodeHref(movieSlug, firstServer.serverIndex, 0);
 }
 
 function getLatestEpisodeHref(movieSlug: string, servers: EpisodeServer[]) {
@@ -55,7 +73,7 @@ function getLatestEpisodeHref(movieSlug: string, servers: EpisodeServer[]) {
 
   if (bestServerIndex < 0 || bestEpisodeIndex < 0) return "";
 
-  return `/xem/${movieSlug}?server=${bestServerIndex}&tap=${bestEpisodeIndex}`;
+  return getEpisodeHref(movieSlug, bestServerIndex, bestEpisodeIndex);
 }
 
 function normalizeServerName(name?: string) {
@@ -103,9 +121,12 @@ export default function TvMovieDetailShell({
     [movie.slug, servers]
   );
 
-  const firstServer = servers.find((server) => (server.server_data ?? []).length > 0);
-  const firstEpisodes = firstServer?.server_data ?? [];
-  const episodePreview = firstEpisodes.slice(0, 14);
+  const serverPreviews = useMemo(() => getServerPreviews(servers), [servers]);
+  const visibleServerPreviews = serverPreviews.slice(0, 3);
+  const totalEpisodeCount = serverPreviews.reduce(
+    (total, item) => total + item.episodes.length,
+    0
+  );
 
   if (!enabled) return null;
 
@@ -123,7 +144,7 @@ export default function TvMovieDetailShell({
         data-tv-autofocus="true"
         className="baoflix-tv-page space-y-8"
       >
-        <div className="grid gap-6 rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-6 lg:grid-cols-[300px_1fr] lg:p-8">
+        <div className="grid gap-6 rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-6 lg:grid-cols-[270px_1fr] lg:p-8">
           <div className="overflow-hidden rounded-[2rem] border border-white/10 bg-black/30">
             <img
               src={getImageUrl(movie.poster_url || movie.thumb_url)}
@@ -171,18 +192,28 @@ export default function TvMovieDetailShell({
                   {movie.episode_current}
                 </span>
               )}
+
+              {visibleServerPreviews.length > 1 && (
+                <span className="rounded-full bg-yellow-300 px-4 py-2 font-black text-black">
+                  {visibleServerPreviews.length} phiên bản
+                </span>
+              )}
             </div>
 
-            <p className="mt-5 line-clamp-4 max-w-4xl text-lg leading-8 text-slate-300">
-              {content || "Chưa có mô tả."}
-            </p>
+            <div className="mt-6 rounded-3xl border border-white/10 bg-black/20 p-5">
+              <h2 className="text-xl font-black text-white">Nội dung phim</h2>
+
+              <p className="mt-3 line-clamp-6 max-w-5xl text-lg leading-8 text-slate-300">
+                {content || "Chưa có mô tả."}
+              </p>
+            </div>
 
             <div data-tv-row className="mt-6 flex flex-wrap gap-3">
               {firstWatchHref && (
                 <Link
                   href={firstWatchHref}
                   data-tv-default
-                  className="rounded-2xl bg-yellow-300 px-7 py-4 text-lg font-black text-black hover:bg-yellow-200"
+                  className="rounded-2xl bg-yellow-300 px-7 py-4 text-lg font-black text-black hover:bg-yellow-200 focus-visible:scale-[1.03]"
                 >
                   ▶ Xem ngay
                 </Link>
@@ -191,7 +222,7 @@ export default function TvMovieDetailShell({
               {latestEpisodeHref && latestEpisodeHref !== firstWatchHref && (
                 <Link
                   href={latestEpisodeHref}
-                  className="rounded-2xl bg-red-600 px-7 py-4 text-lg font-black text-white hover:bg-red-500"
+                  className="rounded-2xl bg-red-600 px-7 py-4 text-lg font-black text-white hover:bg-red-500 focus-visible:scale-[1.03]"
                 >
                   Tập mới nhất
                 </Link>
@@ -201,7 +232,7 @@ export default function TvMovieDetailShell({
 
               <Link
                 href="/tv"
-                className="rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-lg font-black text-white hover:bg-white/10"
+                className="rounded-2xl border border-white/10 bg-white/5 px-7 py-4 text-lg font-black text-white hover:bg-white/10 focus-visible:scale-[1.03]"
               >
                 Về TV Hub
               </Link>
@@ -211,31 +242,77 @@ export default function TvMovieDetailShell({
 
         <MovieDetailActions movie={movie} servers={servers} />
 
-        {episodePreview.length > 0 && (
+        {visibleServerPreviews.length > 0 && (
           <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5">
-            <div className="mb-4 flex items-end justify-between gap-3">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-3xl font-black">Tập phim</h2>
+                <h2 className="text-3xl font-black">Phiên bản & tập</h2>
                 <p className="mt-1 text-sm text-slate-400">
-                  {normalizeServerName(firstServer?.server_name)} • Chọn nhanh bằng remote.
+                  Hiện tối đa 3 phiên bản đầu tiên có tập • Tổng {totalEpisodeCount} tập từ các nguồn.
                 </p>
               </div>
 
               <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-black text-slate-200">
-                {firstEpisodes.length} tập
+                {serverPreviews.length} nguồn có tập
               </span>
             </div>
 
-            <div data-tv-row className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-              {episodePreview.map((episode, index) => (
-                <Link
-                  key={`${episode.name}-${index}`}
-                  href={`/xem/${movie.slug}?server=${servers.indexOf(firstServer!)}&tap=${index}`}
-                  className="flex min-h-[72px] items-center justify-center rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-center font-black text-white hover:border-yellow-300 hover:bg-white/10"
-                >
-                  {episode.name}
-                </Link>
-              ))}
+            <div className="grid gap-4 lg:grid-cols-3">
+              {visibleServerPreviews.map((item) => {
+                const episodePreview = item.episodes.slice(0, 12);
+                const latestEpisodeIndex = item.episodes.length - 1;
+
+                return (
+                  <article
+                    key={`${item.server.server_name}-${item.serverIndex}`}
+                    className="rounded-3xl border border-white/10 bg-black/25 p-4"
+                  >
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="line-clamp-1 text-xl font-black text-white">
+                          {normalizeServerName(item.server.server_name)}
+                        </h3>
+
+                        <p className="mt-1 text-sm text-slate-400">
+                          {item.episodes.length} tập
+                        </p>
+                      </div>
+
+                      <span className="shrink-0 rounded-full bg-yellow-300 px-3 py-1 text-xs font-black text-black">
+                        Nguồn {item.serverIndex + 1}
+                      </span>
+                    </div>
+
+                    <div data-tv-row className="mb-3 grid grid-cols-2 gap-2">
+                      <Link
+                        href={getEpisodeHref(movie.slug, item.serverIndex, 0)}
+                        className="rounded-xl bg-yellow-300 px-3 py-3 text-center text-sm font-black text-black hover:bg-yellow-200 focus-visible:scale-[1.03]"
+                      >
+                        Tập đầu
+                      </Link>
+
+                      <Link
+                        href={getEpisodeHref(movie.slug, item.serverIndex, latestEpisodeIndex)}
+                        className="rounded-xl bg-red-600 px-3 py-3 text-center text-sm font-black text-white hover:bg-red-500 focus-visible:scale-[1.03]"
+                      >
+                        Tập mới
+                      </Link>
+                    </div>
+
+                    <div data-tv-row className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4">
+                      {episodePreview.map((episode, index) => (
+                        <Link
+                          key={`${item.serverIndex}-${episode.name}-${index}`}
+                          href={getEpisodeHref(movie.slug, item.serverIndex, index)}
+                          className="flex min-h-[52px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2 py-2 text-center text-xs font-black text-white hover:border-yellow-300 hover:bg-white/10 focus-visible:scale-[1.03] focus-visible:border-yellow-300 focus-visible:bg-yellow-300 focus-visible:text-black"
+                        >
+                          {episode.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
         )}

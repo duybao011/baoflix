@@ -9,6 +9,7 @@ import TvModeFloatingButton from "@/components/TvModeFloatingButton";
 import TvRemoteKeyBridge from "@/components/TvRemoteKeyBridge";
 import TvPlayerCommandBridge from "@/components/TvPlayerCommandBridge";
 import TvRemoteNavigator from "@/components/TvRemoteNavigator";
+import TvSeekFocusBridge from "@/components/TvSeekFocusBridge";
 import TvAutoFocus from "@/components/TvAutoFocus";
 import TvModeToggleButton from "@/components/TvModeToggleButton";
 import ReloadAppButton from "@/components/ReloadAppButton";
@@ -43,6 +44,7 @@ export default function RootLayout({
         <TvRemoteKeyBridge />
         <TvPlayerCommandBridge />
         <TvRemoteNavigator />
+        <TvSeekFocusBridge />
         <TvAutoFocus />
         <TvFocusMemory />
         <Suspense
