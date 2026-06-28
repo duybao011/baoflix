@@ -4,10 +4,26 @@ import { useEffect } from "react";
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
 
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
 
-  const userAgent = navigator.userAgent.toLowerCase();
+  return navigator.userAgent.toLowerCase();
+}
+
+function isBaoflixTvShell() {
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview/.test(
+    getUserAgent()
+  );
+}
+
+function isMobileDevice() {
+  const userAgent = getUserAgent();
+
+  if (!userAgent) return false;
+  if (isBaoflixTvShell()) return false;
+  if (/android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(userAgent)) {
+    return false;
+  }
 
   return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
 }
@@ -15,20 +31,20 @@ function isMobileDevice() {
 export default function TvModeSession() {
   useEffect(() => {
     try {
-      // Học theo logic TV app:
-      // mobile dù vào /tv cũng không bật TV overlay.
       if (isMobileDevice()) {
         sessionStorage.removeItem(TV_SESSION_KEY);
         localStorage.removeItem(TV_SESSION_KEY);
+        document.documentElement.dataset.baoflixTvMode = "0";
         window.dispatchEvent(new Event("baoflix-tv-mode-change"));
         return;
       }
 
       sessionStorage.setItem(TV_SESSION_KEY, "1");
       localStorage.removeItem(TV_SESSION_KEY);
+      document.documentElement.dataset.baoflixTvMode = "1";
       window.dispatchEvent(new Event("baoflix-tv-mode-change"));
     } catch {
-      // bỏ qua nếu browser chặn storage
+      // bỏ qua nếu browser/WebView chặn storage
     }
   }, []);
 

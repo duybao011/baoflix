@@ -39,6 +39,30 @@ function normalizeServerName(name?: string) {
   return name || "Server";
 }
 
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
+
+  return navigator.userAgent.toLowerCase();
+}
+
+function isBaoflixTvShell() {
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview/.test(
+    getUserAgent()
+  );
+}
+
+function isMobileDevice() {
+  const userAgent = getUserAgent();
+
+  if (!userAgent) return false;
+  if (isBaoflixTvShell()) return false;
+  if (/android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(userAgent)) {
+    return false;
+  }
+
+  return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
+}
+
 function detectTvOverlayEnabled() {
   try {
     const searchParams = new URLSearchParams(window.location.search);
@@ -46,18 +70,13 @@ function detectTvOverlayEnabled() {
     const forceNormal = searchParams.get("tv") === "0";
 
     if (forceNormal) return false;
+    if (forceTv || isBaoflixTvShell()) return true;
 
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isMobile = /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
-
-    // Điện thoại không dùng TV overlay, trừ khi cố tình test bằng ?tv=1.
-    if (isMobile && !forceTv) {
+    if (isMobileDevice()) {
       sessionStorage.removeItem("baoflix_tv_mode");
       localStorage.removeItem("baoflix_tv_mode");
       return false;
     }
-
-    if (forceTv) return true;
 
     return sessionStorage.getItem("baoflix_tv_mode") === "1";
   } catch {
@@ -303,7 +322,7 @@ export default function WatchClient({
             {episode?.link_embed ? (
               <iframe
                 src={episode.link_embed}
-                tabIndex={0}
+                tabIndex={tvOverlayEnabled ? -1 : 0}
                 data-tv-player="iframe"
                 data-tv-skip
                 allowFullScreen

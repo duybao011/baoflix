@@ -1,7 +1,6 @@
-const CACHE_NAME = "baoflix-shell-v1";
+const CACHE_NAME = "baoflix-shell-v2";
 
 const STATIC_ASSETS = [
-  "/",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -38,15 +37,12 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/_next/")) return;
 
   event.respondWith(
     fetch(event.request).catch(async () => {
       const cache = await caches.open(CACHE_NAME);
-      return (
-        (await cache.match(event.request)) ||
-        (await cache.match("/")) ||
-        Response.error()
-      );
+      return (await cache.match(event.request)) || Response.error();
     })
   );
 });

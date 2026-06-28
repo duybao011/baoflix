@@ -7,10 +7,26 @@ const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
 
 type TvLaunchMode = "manual" | "always_tv" | "auto_detect";
 
-function isMobileDevice() {
-  if (typeof navigator === "undefined") return false;
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
 
-  const userAgent = navigator.userAgent.toLowerCase();
+  return navigator.userAgent.toLowerCase();
+}
+
+function isBaoflixTvShell() {
+  const userAgent = getUserAgent();
+
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview/.test(userAgent);
+}
+
+function isMobileDevice() {
+  const userAgent = getUserAgent();
+
+  if (!userAgent) return false;
+  if (isBaoflixTvShell()) return false;
+  if (/android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(userAgent)) {
+    return false;
+  }
 
   return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
 }
@@ -20,7 +36,9 @@ function isProbablyTvDevice() {
     return false;
   }
 
-  const userAgent = navigator.userAgent.toLowerCase();
+  if (isBaoflixTvShell()) return true;
+
+  const userAgent = getUserAgent();
   const hasTvAgent = /smart-tv|smarttv|tizen|webos|appletv|google tv|android tv|aft|bravia|crkey|shield/i.test(
     userAgent
   );
@@ -74,15 +92,24 @@ function getTvParam() {
 function applyTvLaunchMode() {
   try {
     const tvParam = getTvParam();
-    const isMobile = isMobileDevice();
 
-    if (tvParam === "0" || isMobile) {
+    if (tvParam === "0") {
       disableTvMode();
       return;
     }
 
-    if (tvParam === "1") {
+    if (tvParam === "1" || isBaoflixTvShell()) {
       enableTvMode();
+
+      if (window.location.pathname === "/") {
+        window.location.replace("/tv");
+      }
+
+      return;
+    }
+
+    if (isMobileDevice()) {
+      disableTvMode();
       return;
     }
 
