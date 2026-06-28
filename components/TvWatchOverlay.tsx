@@ -28,7 +28,10 @@ type ShowOverlayDetail = {
   focus?: boolean;
 };
 
-const AUTO_HIDE_MS = 2600;
+type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+
+const AUTO_HIDE_MS = 2800;
+const SEEK_SECONDS = 10;
 const TV_FOCUS_CLASS =
   "focus-visible:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
@@ -40,6 +43,17 @@ function normalizeServerName(name?: string) {
   if (text.includes("vietsub") || text.includes("sub")) return "Vietsub";
 
   return name || "Server";
+}
+
+function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-player-command", {
+      detail: {
+        action,
+        seconds,
+      },
+    })
+  );
 }
 
 function focusOverlayDefault() {
@@ -302,16 +316,61 @@ export default function TvWatchOverlay({
           </div>
 
           <div className="hidden rounded-full border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold text-slate-200/85 backdrop-blur-md md:block">
-            OK: menu • Back: ẩn
+            OK: phát/tạm dừng • Back: ẩn
           </div>
         </div>
       </div>
 
-      <div className="pointer-events-none bg-gradient-to-t from-black/65 via-black/30 to-transparent px-4 pb-5 pt-12 md:px-6 md:pb-6">
+      <div className="pointer-events-none bg-gradient-to-t from-black/70 via-black/28 to-transparent px-4 pb-5 pt-12 md:px-6 md:pb-6">
         <div
           data-tv-row
           className={[
-            "mx-auto grid max-w-3xl grid-cols-3 gap-3",
+            "mx-auto grid max-w-lg grid-cols-3 gap-3",
+            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+          ].join(" ")}
+        >
+          <button
+            type="button"
+            {...hiddenFocusProps}
+            onClick={() => dispatchPlayerCommand("seek", -SEEK_SECONDS)}
+            className={[
+              "flex min-h-[46px] items-center justify-center rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            ↶ 10s
+          </button>
+
+          <button
+            type="button"
+            data-tv-overlay-default
+            {...hiddenFocusProps}
+            onClick={() => dispatchPlayerCommand("toggle-play")}
+            className={[
+              "flex min-h-[46px] items-center justify-center rounded-xl bg-yellow-300 px-3 py-2 text-center text-sm font-black text-black shadow-lg transition hover:bg-yellow-200",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            ▶/Ⅱ
+          </button>
+
+          <button
+            type="button"
+            {...hiddenFocusProps}
+            onClick={() => dispatchPlayerCommand("seek", SEEK_SECONDS)}
+            className={[
+              "flex min-h-[46px] items-center justify-center rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            10s ↷
+          </button>
+        </div>
+
+        <div
+          data-tv-row
+          className={[
+            "mx-auto mt-3 grid max-w-3xl grid-cols-3 gap-3",
             overlayVisible ? "pointer-events-auto" : "pointer-events-none",
           ].join(" ")}
         >
@@ -320,28 +379,27 @@ export default function TvWatchOverlay({
               href={previousHref}
               {...hiddenFocusProps}
               className={[
-                "flex min-h-[46px] items-center justify-center rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
+                "flex min-h-[42px] items-center justify-center rounded-xl border border-white/15 bg-black/40 px-3 py-2 text-center text-xs font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15 md:text-sm",
                 TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              ← Trước
+              ← Tập trước
             </Link>
           ) : (
             <button
               disabled
-              className="flex min-h-[46px] items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-center text-sm font-black text-white opacity-35"
+              className="flex min-h-[42px] items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-center text-xs font-black text-white opacity-35 md:text-sm"
             >
-              ← Trước
+              ← Tập trước
             </button>
           )}
 
           <button
             type="button"
-            data-tv-overlay-default
             {...hiddenFocusProps}
             onClick={onOpenEpisodePanel}
             className={[
-              "flex min-h-[46px] items-center justify-center rounded-xl bg-yellow-300 px-3 py-2 text-center text-sm font-black text-black shadow-lg transition hover:bg-yellow-200",
+              "flex min-h-[42px] items-center justify-center rounded-xl bg-white/90 px-3 py-2 text-center text-xs font-black text-black shadow-lg transition hover:bg-white md:text-sm",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -353,24 +411,26 @@ export default function TvWatchOverlay({
               href={nextHref}
               {...hiddenFocusProps}
               className={[
-                "flex min-h-[46px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow-lg transition hover:bg-red-500",
+                "flex min-h-[42px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white shadow-lg transition hover:bg-red-500 md:text-sm",
                 TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              Sau →
+              Tập sau →
             </Link>
           ) : (
             <button
               disabled
-              className="flex min-h-[46px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white opacity-35"
+              className="flex min-h-[42px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white opacity-35 md:text-sm"
             >
-              Sau →
+              Tập sau →
             </button>
           )}
         </div>
 
         <p className="mt-3 text-center text-xs font-semibold text-white/55">
-          {overlayPinned ? "Đang tạm dừng • OK để chọn tập/nguồn • Back để ẩn" : "Lên/Xuống/OK hiện menu • Trái/Phải tua hoặc điều khiển player"}
+          {overlayPinned
+            ? "Đang tạm dừng • Lên/Xuống đổi hàng • Back để ẩn"
+            : "Trái/Phải chọn nút • OK xác nhận • Tập/nguồn để đổi server"}
         </p>
       </div>
     </div>
