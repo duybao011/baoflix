@@ -2,7 +2,17 @@
 
 import { useEffect } from "react";
 
-const ANDROID_KEY_TO_WEB_KEY: Record<number, string> = {
+type RemoteKeyboardEvent = KeyboardEvent & {
+  __baoflixSyntheticRemoteKey?: boolean;
+};
+
+type NativeRemoteEvent = CustomEvent<{
+  keyCode?: number;
+  repeat?: number;
+  source?: string;
+}>;
+
+const ANDROID_TV_KEY_TO_WEB_KEY: Record<number, string> = {
   4: "Escape", // KEYCODE_BACK
   19: "ArrowUp", // KEYCODE_DPAD_UP
   20: "ArrowDown", // KEYCODE_DPAD_DOWN
@@ -10,163 +20,159 @@ const ANDROID_KEY_TO_WEB_KEY: Record<number, string> = {
   22: "ArrowRight", // KEYCODE_DPAD_RIGHT
   23: "Enter", // KEYCODE_DPAD_CENTER
   66: "Enter", // KEYCODE_ENTER
+  82: "Enter", // KEYCODE_MENU: dùng như mở menu/overlay
   85: "MediaPlayPause", // KEYCODE_MEDIA_PLAY_PAUSE
+  87: "MediaTrackNext", // KEYCODE_MEDIA_NEXT
+  88: "MediaTrackPrevious", // KEYCODE_MEDIA_PREVIOUS
   89: "MediaRewind", // KEYCODE_MEDIA_REWIND
   90: "MediaFastForward", // KEYCODE_MEDIA_FAST_FORWARD
+  96: "Enter", // KEYCODE_BUTTON_A
+  97: "Escape", // KEYCODE_BUTTON_B
+  109: "Enter", // KEYCODE_BUTTON_SELECT
   126: "Play", // KEYCODE_MEDIA_PLAY
   127: "Pause", // KEYCODE_MEDIA_PAUSE
+  160: "Enter", // KEYCODE_NUMPAD_ENTER
 };
 
-const ANDROID_KEY_NAME_TO_WEB_KEY: Record<string, string> = {
-  BACK: "Escape",
-  KEYCODE_BACK: "Escape",
-  DPAD_UP: "ArrowUp",
-  KEYCODE_DPAD_UP: "ArrowUp",
-  DPAD_DOWN: "ArrowDown",
-  KEYCODE_DPAD_DOWN: "ArrowDown",
-  DPAD_LEFT: "ArrowLeft",
-  KEYCODE_DPAD_LEFT: "ArrowLeft",
-  DPAD_RIGHT: "ArrowRight",
-  KEYCODE_DPAD_RIGHT: "ArrowRight",
-  DPAD_CENTER: "Enter",
-  KEYCODE_DPAD_CENTER: "Enter",
-  ENTER: "Enter",
-  KEYCODE_ENTER: "Enter",
-  MEDIA_PLAY_PAUSE: "MediaPlayPause",
-  KEYCODE_MEDIA_PLAY_PAUSE: "MediaPlayPause",
-  MEDIA_REWIND: "MediaRewind",
-  KEYCODE_MEDIA_REWIND: "MediaRewind",
-  MEDIA_FAST_FORWARD: "MediaFastForward",
-  KEYCODE_MEDIA_FAST_FORWARD: "MediaFastForward",
-  MEDIA_PLAY: "Play",
-  KEYCODE_MEDIA_PLAY: "Play",
-  MEDIA_PAUSE: "Pause",
-  KEYCODE_MEDIA_PAUSE: "Pause",
-};
+const WEB_KEYS_ALREADY_OK = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "Enter",
+  "NumpadEnter",
+  " ",
+  "Spacebar",
+  "OK",
+  "Accept",
+  "Escape",
+  "Backspace",
+  "BrowserBack",
+  "MediaPlayPause",
+  "MediaRewind",
+  "MediaFastForward",
+  "Play",
+  "Pause",
+]);
 
-type NativeRemoteDetail = {
-  key?: string;
-  code?: string;
-  keyCode?: number | string;
-  which?: number | string;
-};
+function getAndroidKeyCode(event: KeyboardEvent) {
+  const legacyEvent = event as KeyboardEvent & {
+    keyCode?: number;
+    which?: number;
+  };
 
-const normalizedEvents = new WeakSet<Event>();
-
-function toNumber(value: unknown) {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
+  return legacyEvent.keyCode || legacyEvent.which || 0;
 }
 
-function normalizeKeyName(value: unknown) {
-  if (typeof value !== "string") return "";
+function getActiveElementTag() {
+  const active = document.activeElement;
 
-  return value.trim().toUpperCase().replace(/^KEYCODE_/, "KEYCODE_");
+  if (!(active instanceof HTMLElement)) return "";
+
+  return active.tagName.toLowerCase();
 }
 
-function getWebKeyFromNativeDetail(detail: NativeRemoteDetail) {
-  const keyCode = toNumber(detail.keyCode || detail.which || detail.code);
+function shouldLetTextInputHandle(event: KeyboardEvent) {
+  const active = document.activeElement;
 
-  if (keyCode && ANDROID_KEY_TO_WEB_KEY[keyCode]) {
-    return ANDROID_KEY_TO_WEB_KEY[keyCode];
-  }
+  if (!(active instanceof HTMLElement)) return false;
 
-  const keyName = normalizeKeyName(detail.key || detail.code);
+  const tagName = active.tagName.toLowerCase();
+  const isTextInput =
+    tagName === "input" || tagName === "textarea" || active.isContentEditable;
 
-  if (keyName && ANDROID_KEY_NAME_TO_WEB_KEY[keyName]) {
-    return ANDROID_KEY_NAME_TO_WEB_KEY[keyName];
-  }
+  if (!isTextInput) return false;
 
-  return "";
+  // Khi đang nhập tìm kiếm, cho text input giữ trái/phải để sửa chữ.
+  return event.key === "ArrowLeft" || event.key === "ArrowRight";
 }
 
-function getWebKeyFromKeyboardEvent(event: KeyboardEvent) {
-  if (
-    event.key === "ArrowUp" ||
-    event.key === "ArrowDown" ||
-    event.key === "ArrowLeft" ||
-    event.key === "ArrowRight" ||
-    event.key === "Enter" ||
-    event.key === "Escape" ||
-    event.key === "Backspace" ||
-    event.key === "BrowserBack" ||
-    event.key === "MediaPlayPause" ||
-    event.key === "MediaRewind" ||
-    event.key === "MediaFastForward" ||
-    event.key === "Play" ||
-    event.key === "Pause"
-  ) {
-    return "";
-  }
-
-  const keyCode = event.keyCode || event.which;
-
-  return ANDROID_KEY_TO_WEB_KEY[keyCode] || "";
-}
-
-function getCodeForKey(key: string) {
-  if (key === "ArrowUp") return "ArrowUp";
-  if (key === "ArrowDown") return "ArrowDown";
-  if (key === "ArrowLeft") return "ArrowLeft";
-  if (key === "ArrowRight") return "ArrowRight";
-  if (key === "Enter") return "Enter";
-  if (key === "Escape") return "Escape";
-  return key;
-}
-
-function dispatchNormalizedKey(key: string) {
-  const event = new KeyboardEvent("keydown", {
+function dispatchSyntheticKey(key: string, keyCode: number, repeat = 0) {
+  const syntheticEvent = new KeyboardEvent("keydown", {
     key,
-    code: getCodeForKey(key),
+    code: key,
     bubbles: true,
     cancelable: true,
+    repeat: repeat > 0,
+  }) as RemoteKeyboardEvent;
+
+  syntheticEvent.__baoflixSyntheticRemoteKey = true;
+
+  Object.defineProperty(syntheticEvent, "keyCode", {
+    configurable: true,
+    get: () => keyCode,
   });
 
-  normalizedEvents.add(event);
-  document.dispatchEvent(event);
+  Object.defineProperty(syntheticEvent, "which", {
+    configurable: true,
+    get: () => keyCode,
+  });
+
+  document.dispatchEvent(syntheticEvent);
+}
+
+function mapAndDispatchAndroidKey(keyCode: number, repeat = 0) {
+  const mappedKey = ANDROID_TV_KEY_TO_WEB_KEY[keyCode];
+
+  if (!mappedKey) return false;
+
+  dispatchSyntheticKey(mappedKey, keyCode, repeat);
+  return true;
 }
 
 export default function TvRemoteKeyBridge() {
   useEffect(() => {
-    function handleRawKeyDown(event: KeyboardEvent) {
-      if (normalizedEvents.has(event)) return;
+    function handleKeyDown(event: KeyboardEvent) {
+      const remoteEvent = event as RemoteKeyboardEvent;
 
-      const key = getWebKeyFromKeyboardEvent(event);
+      if (remoteEvent.__baoflixSyntheticRemoteKey) return;
+      if (shouldLetTextInputHandle(event)) return;
 
-      if (!key) return;
+      // Nếu browser/WebView đã trả key chuẩn, để TvRemoteNavigator xử lý như cũ.
+      if (WEB_KEYS_ALREADY_OK.has(event.key)) return;
 
+      const keyCode = getAndroidKeyCode(event);
+      const mapped = ANDROID_TV_KEY_TO_WEB_KEY[keyCode];
+
+      if (!mapped) return;
+
+      // TCL/Google TV WebView đôi khi trả event.key = "Unidentified" nhưng keyCode vẫn đúng.
+      // Chặn event gốc rồi phát lại event chuẩn để navigator nghe được.
       event.preventDefault();
       event.stopImmediatePropagation();
-      dispatchNormalizedKey(key);
+
+      mapAndDispatchAndroidKey(keyCode, event.repeat ? 1 : 0);
     }
 
-    function handleNativeRemote(event: Event) {
-      const detail = (event as CustomEvent<NativeRemoteDetail>).detail || {};
-      const key = getWebKeyFromNativeDetail(detail);
+    function handleNativeRemoteKey(event: Event) {
+      const detail = (event as NativeRemoteEvent).detail || {};
+      const keyCode = Number(detail.keyCode || 0);
+      const repeat = Number(detail.repeat || 0);
 
-      if (!key) return;
+      if (!keyCode) return;
 
-      dispatchNormalizedKey(key);
+      // Nếu iframe/embed đang có focus, native bridge vẫn bơm event về app shell được.
+      // Đây là đường cứu TCL WebView khi keydown không nổi lên document.
+      const activeTag = getActiveElementTag();
+
+      if (activeTag === "iframe") {
+        try {
+          (document.activeElement as HTMLElement | null)?.blur();
+        } catch {
+          // ignore
+        }
+      }
+
+      mapAndDispatchAndroidKey(keyCode, repeat);
     }
 
-    document.addEventListener("keydown", handleRawKeyDown, true);
-    window.addEventListener(
-      "baoflix-tv-remote-key",
-      handleNativeRemote as EventListener
-    );
+    // capture=true để bridge chạy trước navigator.
+    document.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("baoflix-native-remote-key", handleNativeRemoteKey);
 
     return () => {
-      document.removeEventListener("keydown", handleRawKeyDown, true);
-      window.removeEventListener(
-        "baoflix-tv-remote-key",
-        handleNativeRemote as EventListener
-      );
+      document.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("baoflix-native-remote-key", handleNativeRemoteKey);
     };
   }, []);
 
