@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
-import { getNormalWatchedKey } from "@/lib/watchStore";
 
 type SameEpisodeServerLink = {
   server: EpisodeServer;
@@ -29,10 +28,9 @@ type ShowOverlayDetail = {
   focus?: boolean;
 };
 
-const AUTO_HIDE_MS = 4500;
-const EPISODE_WINDOW_SIZE = 12;
+const AUTO_HIDE_MS = 2600;
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 function normalizeServerName(name?: string) {
   const text = String(name || "").toLowerCase();
@@ -42,18 +40,6 @@ function normalizeServerName(name?: string) {
   if (text.includes("vietsub") || text.includes("sub")) return "Vietsub";
 
   return name || "Server";
-}
-
-function getEpisodeUrl(
-  movieSlug: string,
-  serverIndex: number,
-  episodeIndex: number
-) {
-  return `/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
 }
 
 function focusOverlayDefault() {
@@ -86,16 +72,15 @@ function focusPlayerSurface() {
 export default function TvWatchOverlay({
   movie,
   currentServer,
-  safeServerIndex,
   safeEpisodeIndex,
   episodeName,
   previousHref,
   nextHref,
-  watchedEpisodes,
   sameEpisodeServerLinks,
   onOpenEpisodePanel,
 }: TvWatchOverlayProps) {
   const [overlayVisible, setOverlayVisible] = useState(true);
+  const [overlayPinned, setOverlayPinnedState] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -104,41 +89,32 @@ export default function TvWatchOverlay({
   const currentEpisodes = currentServer?.server_data ?? [];
   const hasMultipleEpisodes = currentEpisodes.length > 1;
   const hasMultipleServers = sameEpisodeServerLinks.length > 1;
+  const serverName = normalizeServerName(currentServer?.server_name);
 
-  const shouldShowEpisodeStrip = hasMultipleEpisodes;
-  const shouldShowFullBottomControls = hasMultipleEpisodes;
-  const shouldShowBottomArea =
-    hasMultipleServers || shouldShowEpisodeStrip || shouldShowFullBottomControls;
+  const compactMeta = useMemo(() => {
+    const parts = [
+      episodeName || `Tập ${safeEpisodeIndex + 1}`,
+      serverName,
+    ];
 
-  const episodeWindow = useMemo(() => {
-    if (currentEpisodes.length <= EPISODE_WINDOW_SIZE) {
-      return {
-        start: 0,
-        end: currentEpisodes.length,
-        items: currentEpisodes.map((episode, index) => ({
-          episode,
-          episodeIndex: index,
-        })),
-      };
+    if (hasMultipleEpisodes) {
+      parts.push(`${currentEpisodes.length} tập`);
     }
 
-    const half = Math.floor(EPISODE_WINDOW_SIZE / 2);
-    const start = clamp(
-      safeEpisodeIndex - half,
-      0,
-      Math.max(0, currentEpisodes.length - EPISODE_WINDOW_SIZE)
-    );
-    const end = Math.min(currentEpisodes.length, start + EPISODE_WINDOW_SIZE);
+    if (hasMultipleServers) {
+      parts.push(`${sameEpisodeServerLinks.length} phiên bản`);
+    }
 
-    return {
-      start,
-      end,
-      items: currentEpisodes.slice(start, end).map((episode, offset) => ({
-        episode,
-        episodeIndex: start + offset,
-      })),
-    };
-  }, [currentEpisodes, safeEpisodeIndex]);
+    return parts.filter(Boolean).join(" • ");
+  }, [
+    currentEpisodes.length,
+    episodeName,
+    hasMultipleEpisodes,
+    hasMultipleServers,
+    safeEpisodeIndex,
+    sameEpisodeServerLinks.length,
+    serverName,
+  ]);
 
   const hiddenFocusProps = useMemo(() => {
     return overlayVisible
@@ -167,6 +143,7 @@ export default function TvWatchOverlay({
 
   function setOverlayPinned(value: boolean) {
     overlayPinnedRef.current = value;
+    setOverlayPinnedState(value);
   }
 
   function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
@@ -264,12 +241,10 @@ export default function TvWatchOverlay({
     }
 
     function handlePlayerPaused() {
-      // Pause = overlay hiện và giữ nguyên cho tới khi play lại hoặc Back.
       showOverlay({ pinned: true, focus: false, autoHide: false });
     }
 
     function handlePlayerPlaying() {
-      // Play lại = ẩn overlay ngay, không chờ vài giây.
       hideOverlay({ focusPlayer: true });
     }
 
@@ -295,213 +270,109 @@ export default function TvWatchOverlay({
 
   useEffect(() => {
     showOverlay({ pinned: false, focus: false, autoHide: true });
-  }, [safeServerIndex, safeEpisodeIndex]);
+  }, [safeEpisodeIndex, currentServer?.server_name]);
 
   return (
     <div
       ref={overlayRef}
       data-tv-overlay="watch"
       data-tv-overlay-visible={overlayVisible ? "true" : "false"}
-      data-tv-overlay-pinned={overlayPinnedRef.current ? "true" : "false"}
+      data-tv-overlay-pinned={overlayPinned ? "true" : "false"}
       onFocus={handleOverlayFocusIn}
       onBlur={handleOverlayFocusOut}
       className={[
-        "pointer-events-none absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-300",
+        "pointer-events-none absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-200",
         overlayVisible ? "opacity-100" : "opacity-0",
       ].join(" ")}
     >
-      <div className="pointer-events-none bg-gradient-to-b from-black/90 via-black/55 to-transparent px-6 pb-16 pt-8 md:px-10 md:pt-10">
-        <div
-          data-tv-row
-          className={[
-            "flex flex-wrap items-center gap-4",
-            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-          ].join(" ")}
-        >
-          <Link
-            href={`/phim/${movie.slug}`}
-            {...hiddenFocusProps}
-            className={[
-              "rounded-full bg-yellow-300 px-6 py-4 text-base font-black text-black shadow-2xl transition hover:bg-yellow-200",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            ← Quay lại
-          </Link>
+      <div className="pointer-events-none bg-gradient-to-b from-black/55 via-black/20 to-transparent px-4 pb-10 pt-4 md:px-6 md:pt-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 rounded-2xl border border-white/10 bg-black/35 px-4 py-3 shadow-xl backdrop-blur-md">
+            <p className="mb-1 text-[11px] font-black uppercase tracking-[0.22em] text-yellow-300/90">
+              BảoFlix TV
+            </p>
 
-          <div className="min-w-0 flex-1">
-            <h1 className="line-clamp-1 text-3xl font-black text-white drop-shadow md:text-4xl">
+            <h1 className="line-clamp-1 max-w-[62vw] text-lg font-black text-white drop-shadow md:text-xl">
               {movie.name}
             </h1>
 
-            <p className="mt-2 line-clamp-1 text-base font-bold text-slate-200 md:text-lg">
-              {episodeName || "Đang xem"} • {normalizeServerName(currentServer?.server_name)}
+            <p className="mt-1 line-clamp-1 max-w-[62vw] text-xs font-bold text-slate-200/90 md:text-sm">
+              {compactMeta}
             </p>
           </div>
 
-          <div className="hidden rounded-full border border-white/10 bg-black/50 px-4 py-2 text-sm font-bold text-slate-200 backdrop-blur md:block">
+          <div className="hidden rounded-full border border-white/10 bg-black/35 px-3 py-2 text-xs font-bold text-slate-200/85 backdrop-blur-md md:block">
             OK: menu • Back: ẩn
           </div>
         </div>
       </div>
 
-      {shouldShowBottomArea && (
-        <div className="pointer-events-none bg-gradient-to-t from-black/95 via-black/75 to-transparent px-6 pb-10 pt-24 md:px-10 md:pb-12">
-          {hasMultipleServers && (
-            <section
+      <div className="pointer-events-none bg-gradient-to-t from-black/65 via-black/30 to-transparent px-4 pb-5 pt-12 md:px-6 md:pb-6">
+        <div
+          data-tv-row
+          className={[
+            "mx-auto grid max-w-3xl grid-cols-3 gap-3",
+            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+          ].join(" ")}
+        >
+          {previousHref ? (
+            <Link
+              href={previousHref}
+              {...hiddenFocusProps}
               className={[
-                "mb-5",
-                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+                "flex min-h-[46px] items-center justify-center rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
+                TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              <h2 className="mb-3 text-lg font-black text-white">Phiên bản</h2>
-
-              <div
-                data-tv-row
-                className="baoflix-tv-overlay-scroll flex gap-3 overflow-x-auto pb-2"
-              >
-                {sameEpisodeServerLinks.map((item) => {
-                  const active = item.serverIndex === safeServerIndex;
-
-                  return (
-                    <Link
-                      key={`${item.serverIndex}-${item.server.server_name}`}
-                      href={item.href}
-                      {...hiddenFocusProps}
-                      className={[
-                        "shrink-0 rounded-full border px-6 py-4 text-base font-black shadow-xl backdrop-blur transition",
-                        TV_FOCUS_CLASS,
-                        active
-                          ? "border-yellow-300 bg-yellow-300 text-black"
-                          : "border-white/15 bg-black/55 text-white hover:bg-white/15",
-                      ].join(" ")}
-                    >
-                      {normalizeServerName(item.server.server_name)}
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
+              ← Trước
+            </Link>
+          ) : (
+            <button
+              disabled
+              className="flex min-h-[46px] items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-center text-sm font-black text-white opacity-35"
+            >
+              ← Trước
+            </button>
           )}
 
-          {shouldShowEpisodeStrip && episodeWindow.items.length > 0 && (
-            <section
+          <button
+            type="button"
+            data-tv-overlay-default
+            {...hiddenFocusProps}
+            onClick={onOpenEpisodePanel}
+            className={[
+              "flex min-h-[46px] items-center justify-center rounded-xl bg-yellow-300 px-3 py-2 text-center text-sm font-black text-black shadow-lg transition hover:bg-yellow-200",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            Tập / nguồn
+          </button>
+
+          {nextHref ? (
+            <Link
+              href={nextHref}
+              {...hiddenFocusProps}
               className={[
-                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+                "flex min-h-[46px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white shadow-lg transition hover:bg-red-500",
+                TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-black text-white">Danh sách tập</h2>
-
-                {currentEpisodes.length > EPISODE_WINDOW_SIZE && (
-                  <span className="rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-slate-200">
-                    {episodeWindow.start + 1}-{episodeWindow.end}/{currentEpisodes.length}
-                  </span>
-                )}
-              </div>
-
-              <div
-                data-tv-row
-                className="baoflix-tv-overlay-scroll flex gap-3 overflow-x-auto pb-2"
-              >
-                {episodeWindow.items.map(({ episode, episodeIndex }) => {
-                  const active = episodeIndex === safeEpisodeIndex;
-                  const watchedKey = getNormalWatchedKey(
-                    movie.slug,
-                    safeServerIndex,
-                    episodeIndex
-                  );
-                  const watched = watchedEpisodes.includes(watchedKey);
-
-                  return (
-                    <Link
-                      key={`${episode.name}-${episodeIndex}`}
-                      href={getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex)}
-                      data-tv-overlay-default={active ? true : undefined}
-                      {...hiddenFocusProps}
-                      className={[
-                        "flex min-w-[128px] shrink-0 items-center justify-center rounded-2xl border px-6 py-4 text-center text-base font-black shadow-xl backdrop-blur transition",
-                        TV_FOCUS_CLASS,
-                        active
-                          ? "border-yellow-300 bg-yellow-300 text-black"
-                          : "border-white/15 bg-black/55 text-white hover:bg-white/15",
-                      ].join(" ")}
-                    >
-                      <span className="inline-flex items-center justify-center gap-1">
-                        {watched && !active && <span className="text-yellow-300">✓</span>}
-                        {watched && active && <span>✓</span>}
-                        <span>{episode.name}</span>
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {shouldShowFullBottomControls && (
-            <div
-              data-tv-row
-              className={[
-                "mt-5 grid grid-cols-3 gap-4",
-                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-              ].join(" ")}
+              Sau →
+            </Link>
+          ) : (
+            <button
+              disabled
+              className="flex min-h-[46px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-sm font-black text-white opacity-35"
             >
-              {previousHref ? (
-                <Link
-                  href={previousHref}
-                  {...hiddenFocusProps}
-                  className={[
-                    "flex min-h-[64px] items-center justify-center rounded-2xl border border-white/15 bg-black/55 px-5 py-4 text-center text-base font-black text-white shadow-xl backdrop-blur transition hover:bg-white/15",
-                    TV_FOCUS_CLASS,
-                  ].join(" ")}
-                >
-                  ← Tập trước
-                </Link>
-              ) : (
-                <button
-                  disabled
-                  className="flex min-h-[64px] items-center justify-center rounded-2xl border border-white/10 bg-black/30 px-5 py-4 text-center text-base font-black text-white opacity-35"
-                >
-                  ← Tập trước
-                </button>
-              )}
-
-              <button
-                type="button"
-                {...hiddenFocusProps}
-                onClick={onOpenEpisodePanel}
-                className={[
-                  "flex min-h-[64px] items-center justify-center rounded-2xl bg-yellow-300 px-5 py-4 text-center text-base font-black text-black shadow-xl transition hover:bg-yellow-200",
-                  TV_FOCUS_CLASS,
-                ].join(" ")}
-              >
-                Tập / nguồn
-              </button>
-
-              {nextHref ? (
-                <Link
-                  href={nextHref}
-                  {...hiddenFocusProps}
-                  className={[
-                    "flex min-h-[64px] items-center justify-center rounded-2xl bg-red-600 px-5 py-4 text-center text-base font-black text-white shadow-xl transition hover:bg-red-500",
-                    TV_FOCUS_CLASS,
-                  ].join(" ")}
-                >
-                  Tập sau →
-                </Link>
-              ) : (
-                <button
-                  disabled
-                  className="flex min-h-[64px] items-center justify-center rounded-2xl bg-red-600 px-5 py-4 text-center text-base font-black text-white opacity-35"
-                >
-                  Tập sau →
-                </button>
-              )}
-            </div>
+              Sau →
+            </button>
           )}
         </div>
-      )}
+
+        <p className="mt-3 text-center text-xs font-semibold text-white/55">
+          {overlayPinned ? "Đang tạm dừng • OK để chọn tập/nguồn • Back để ẩn" : "Lên/Xuống/OK hiện menu • Trái/Phải tua hoặc điều khiển player"}
+        </p>
+      </div>
     </div>
   );
 }
