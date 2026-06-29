@@ -2,31 +2,29 @@
 set -euo pipefail
 
 TARGET="${1:-}"
-
 if [ -z "$TARGET" ]; then
-  echo "Usage: ./apply_patch.sh /path/to/baoflix"
-  exit 1
+  echo "Nhap duong dan project baoflix:"
+  read -r TARGET
 fi
 
 if [ ! -d "$TARGET" ]; then
-  echo "Target folder not found: $TARGET"
+  echo "Khong thay thu muc: $TARGET"
   exit 1
 fi
 
-mkdir -p "$TARGET/app" "$TARGET/components"
+if [ ! -f "$TARGET/package.json" ]; then
+  echo "Thu muc nay khong co package.json: $TARGET"
+  exit 1
+fi
 
-cp app/layout.tsx "$TARGET/app/layout.tsx"
-cp components/TvRemoteNavigator.tsx "$TARGET/components/TvRemoteNavigator.tsx"
-cp components/TvPlayerCommandBridge.tsx "$TARGET/components/TvPlayerCommandBridge.tsx"
-cp components/TvWatchOverlay.tsx "$TARGET/components/TvWatchOverlay.tsx"
-cp components/TvSearchBox.tsx "$TARGET/components/TvSearchBox.tsx"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Bản remote mới gộp logic seek bridge vào TvRemoteNavigator.
-# Nếu file cũ còn tồn tại thì xóa để tránh nhầm lẫn.
+echo "Copy patch vao: $TARGET"
+mkdir -p "$TARGET/app/xem/[slug]" "$TARGET/components"
+cp "$SCRIPT_DIR/app/layout.tsx" "$TARGET/app/layout.tsx"
+cp "$SCRIPT_DIR/app/xem/[slug]/page.tsx" "$TARGET/app/xem/[slug]/page.tsx"
+cp "$SCRIPT_DIR/components/WatchClient.tsx" "$TARGET/components/WatchClient.tsx"
+
 rm -f "$TARGET/components/TvSeekFocusBridge.tsx"
 
-echo "Applied BảoFlix TV remote best drop-in."
-echo "Next:"
-echo "  cd \"$TARGET\""
-echo "  npm run lint"
-echo "  npm run build"
+echo "Done. Nen chay: npm run build"

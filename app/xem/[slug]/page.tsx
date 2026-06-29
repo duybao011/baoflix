@@ -11,6 +11,10 @@ type PageProps = {
   }>;
 };
 
+function getFirstPlayableServerIndex(servers: { server_data?: unknown[] }[]) {
+  return servers.findIndex((server) => (server.server_data ?? []).length > 0);
+}
+
 export default async function WatchPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const query = await searchParams;
@@ -20,13 +24,24 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
   const rawServerIndex = Number(query.server || 0);
   const rawEpisodeIndex = Number(query.tap || 0);
+  const firstPlayableServerIndex = getFirstPlayableServerIndex(servers);
 
-  const safeServerIndex =
+  const requestedServerIndex =
     Number.isNaN(rawServerIndex) ||
     rawServerIndex < 0 ||
     rawServerIndex >= servers.length
-      ? 0
+      ? firstPlayableServerIndex
       : rawServerIndex;
+
+  const requestedServer = servers[requestedServerIndex];
+  const requestedEpisodes = requestedServer?.server_data ?? [];
+
+  const safeServerIndex =
+    requestedEpisodes.length > 0
+      ? requestedServerIndex
+      : firstPlayableServerIndex >= 0
+        ? firstPlayableServerIndex
+        : 0;
 
   const currentServer = servers[safeServerIndex];
   const episodes = currentServer?.server_data ?? [];
@@ -38,7 +53,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       ? 0
       : rawEpisodeIndex;
 
-  if (!servers.length) {
+  if (!episodes.length) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
         <LocalCustomMovieRouteSync

@@ -1,93 +1,61 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 
-title BaoFlix TV Remote Patch
-
-set "PATCH_DIR=%~dp0"
 set "TARGET=%~1"
-
 if "%TARGET%"=="" (
-  echo.
-  echo === BaoFlix TV Remote Best Drop-in ===
-  echo Keo tha thu muc project baoflix vao cua so nay roi bam Enter,
-  echo hoac dan duong dan vi du: C:\Users\Bao\baoflix
-  echo.
-  set /p "TARGET=Duong dan project baoflix: "
+  echo Nhap hoac keo-tha thu muc project baoflix vao day roi Enter:
+  set /p "TARGET=> "
 )
 
-if "%TARGET%"=="" (
-  echo.
-  echo Chua nhap duong dan. Thoat.
-  pause
-  exit /b 1
-)
-
-rem Remove wrapping quotes if the path was drag-dropped with quotes.
 set "TARGET=%TARGET:"=%"
 
 if not exist "%TARGET%\package.json" (
   echo.
-  echo Khong thay package.json trong:
-  echo %TARGET%
-  echo.
-  echo Hay chon dung thu muc goc cua project baoflix.
+  echo [LOI] Khong thay package.json trong: %TARGET%
+  echo Hay chon dung thu muc project baoflix.
   pause
   exit /b 1
 )
 
-echo.
-echo Dang copy patch vao:
-echo %TARGET%
-echo.
+set "PATCH_DIR=%~dp0"
 
-robocopy "%PATCH_DIR%app" "%TARGET%\app" /E /NFL /NDL /NJH /NJS /NP
-if %ERRORLEVEL% GEQ 8 goto copy_error
+echo.
+ echo Dang copy patch TV Watch Fix vao:
+ echo %TARGET%
+ echo.
 
-robocopy "%PATCH_DIR%components" "%TARGET%\components" /E /NFL /NDL /NJH /NJS /NP
-if %ERRORLEVEL% GEQ 8 goto copy_error
+if not exist "%TARGET%\app\xem\[slug]" mkdir "%TARGET%\app\xem\[slug]"
+if not exist "%TARGET%\components" mkdir "%TARGET%\components"
+
+copy /Y "%PATCH_DIR%app\layout.tsx" "%TARGET%\app\layout.tsx" >nul
+if errorlevel 1 goto :copy_error
+
+copy /Y "%PATCH_DIR%app\xem\[slug]\page.tsx" "%TARGET%\app\xem\[slug]\page.tsx" >nul
+if errorlevel 1 goto :copy_error
+
+copy /Y "%PATCH_DIR%components\WatchClient.tsx" "%TARGET%\components\WatchClient.tsx" >nul
+if errorlevel 1 goto :copy_error
 
 if exist "%TARGET%\components\TvSeekFocusBridge.tsx" (
-  echo Xoa TvSeekFocusBridge.tsx de tranh 2 lop bat remote...
   del /F /Q "%TARGET%\components\TvSeekFocusBridge.tsx"
 )
 
+echo [OK] Da apply patch. Khong dung API/lib/kkphim/app page.
 echo.
-echo Da apply xong patch remote TV.
-echo.
-choice /C YN /N /M "Chay npm run lint va npm run build luon? [Y/N]: "
-if errorlevel 2 goto done
-
-cd /d "%TARGET%"
-echo.
-echo Dang chay npm run lint...
-call npm run lint
-if errorlevel 1 goto npm_error
+set /p RUNBUILD="Chay npm run build luon khong? (Y/N): "
+if /I "%RUNBUILD%"=="Y" (
+  cd /d "%TARGET%"
+  call npm run build
+)
 
 echo.
-echo Dang chay npm run build...
-call npm run build
-if errorlevel 1 goto npm_error
-
-echo.
-echo Xong: lint/build deu qua.
-goto done
+echo Xong. Test lai /tv - phim - Xem ngay.
+pause
+exit /b 0
 
 :copy_error
 echo.
-echo Loi khi copy file bang robocopy. Ma loi: %ERRORLEVEL%
-echo Kiem tra lai quyen ghi file hoac dong VS Code/dev server neu file dang bi khoa.
+echo [LOI] Copy file that bai. Hay kiem tra quyen ghi file / duong dan project.
 pause
 exit /b 1
-
-:npm_error
-echo.
-echo npm bao loi. Copy log loi gui lai de minh dong ZIP fix tiep.
-pause
-exit /b 1
-
-:done
-echo.
-echo Hoan tat. Bam phim bat ky de dong cua so.
-pause >nul
-exit /b 0
