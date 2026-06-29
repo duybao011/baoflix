@@ -30,12 +30,19 @@ type ShowOverlayDetail = {
 };
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+type OverlayPanel = "episodes" | "sources" | null;
 
 const AUTO_HIDE_MS = 3200;
 const SEEK_SECONDS = 10;
-const QUICK_EPISODE_WINDOW = 24;
+
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.055] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300 focus-visible:ring-offset-4 focus-visible:ring-offset-black focus-visible:shadow-[0_0_34px_rgba(250,204,21,0.42)]";
+
+const SURFACE_BUTTON_CLASS =
+  "rounded-2xl border border-white/[0.12] bg-white/[0.09] text-white shadow-2xl shadow-black/30 backdrop-blur-xl transition hover:bg-white/[0.16]";
+
+const PRIMARY_BUTTON_CLASS =
+  "rounded-2xl bg-yellow-300 text-black shadow-2xl shadow-yellow-950/20 transition hover:bg-yellow-200";
 
 function normalizeServerName(name?: string) {
   const text = String(name || "").toLowerCase();
@@ -51,6 +58,10 @@ function getEpisodeUrl(movieSlug: string, serverIndex: number, episodeIndex: num
   return `/xem/${movieSlug}?server=${serverIndex}&tap=${episodeIndex}`;
 }
 
+function getWatchedKey(movieSlug: string, serverIndex: number, episodeIndex: number) {
+  return `${movieSlug}|server:${serverIndex}|episode:${episodeIndex}`;
+}
+
 function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
   window.dispatchEvent(
     new CustomEvent("baoflix-tv-player-command", {
@@ -62,34 +73,9 @@ function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
   );
 }
 
-function focusOverlayDefault() {
+function focusElement(selector: string) {
   window.setTimeout(() => {
-    const overlay = document.querySelector<HTMLElement>(
-      "[data-tv-overlay='watch']"
-    );
-
-    if (!overlay) return;
-
-    const target =
-      overlay.querySelector<HTMLElement>("[data-tv-overlay-default]") ||
-      overlay.querySelector<HTMLElement>("a[href], button:not([disabled])");
-
-    if (!target) return;
-
-    target.focus({ preventScroll: true });
-    target.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "center",
-    });
-  }, 60);
-}
-
-function focusQuickEpisodeDefault() {
-  window.setTimeout(() => {
-    const target = document.querySelector<HTMLElement>(
-      "[data-tv-quick-episode-default]"
-    );
+    const target = document.querySelector<HTMLElement>(selector);
 
     if (!target) return;
 
@@ -100,6 +86,18 @@ function focusQuickEpisodeDefault() {
       inline: "center",
     });
   }, 70);
+}
+
+function focusOverlayDefault() {
+  focusElement(
+    "[data-tv-overlay='watch'] [data-tv-overlay-default], [data-tv-overlay='watch'] a[href], [data-tv-overlay='watch'] button:not([disabled])"
+  );
+}
+
+function focusPanelDefault(panel: Exclude<OverlayPanel, null>) {
+  focusElement(
+    `[data-tv-panel-default='${panel}'], [data-tv-panel='${panel}'] a[href], [data-tv-panel='${panel}'] button:not([disabled])`
+  );
 }
 
 function focusPlayerSurface() {
@@ -114,12 +112,13 @@ export default function TvWatchOverlay({
   episodeName,
   previousHref,
   nextHref,
+  watchedEpisodes,
   sameEpisodeServerLinks,
   onOpenEpisodePanel,
 }: TvWatchOverlayProps) {
   const [overlayVisible, setOverlayVisible] = useState(true);
   const [overlayPinned, setOverlayPinnedState] = useState(false);
-  const [quickEpisodesOpen, setQuickEpisodesOpen] = useState(false);
+  const [overlayPanel, setOverlayPanel] = useState<OverlayPanel>(null);
   const [nativeHintVisible, setNativeHintVisible] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
@@ -131,50 +130,26 @@ export default function TvWatchOverlay({
   const hasMultipleEpisodes = currentEpisodes.length > 1;
   const hasMultipleServers = sameEpisodeServerLinks.length > 1;
   const serverName = normalizeServerName(currentServer?.server_name);
+  const panelOpen = overlayPanel !== null;
 
-  const quickEpisodeItems = useMemo(() => {
-    if (!currentEpisodes.length) return [];
-
-    const half = Math.floor(QUICK_EPISODE_WINDOW / 2);
-    const maxStart = Math.max(currentEpisodes.length - QUICK_EPISODE_WINDOW, 0);
-    const start = Math.min(Math.max(safeEpisodeIndex - half, 0), maxStart);
-    const end = Math.min(start + QUICK_EPISODE_WINDOW, currentEpisodes.length);
-
-    return currentEpisodes.slice(start, end).map((episode, localIndex) => {
-      const episodeIndex = start + localIndex;
-
-      return {
-        episode,
-        episodeIndex,
-        href: getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
-      };
-    });
-  }, [currentEpisodes, movie.slug, safeEpisodeIndex, safeServerIndex]);
+  const episodeItems = useMemo(() => {
+    return currentEpisodes.map((episode, episodeIndex) => ({
+      episode,
+      episodeIndex,
+      href: getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
+    }));
+  }, [currentEpisodes, movie.slug, safeServerIndex]);
 
   const compactMeta = useMemo(() => {
     const parts = [
       episodeName || `Tập ${safeEpisodeIndex + 1}`,
       serverName,
+      movie.quality,
+      movie.lang,
     ];
 
-    if (hasMultipleEpisodes) {
-      parts.push(`${currentEpisodes.length} tập`);
-    }
-
-    if (hasMultipleServers) {
-      parts.push(`${sameEpisodeServerLinks.length} phiên bản`);
-    }
-
     return parts.filter(Boolean).join(" • ");
-  }, [
-    currentEpisodes.length,
-    episodeName,
-    hasMultipleEpisodes,
-    hasMultipleServers,
-    safeEpisodeIndex,
-    sameEpisodeServerLinks.length,
-    serverName,
-  ]);
+  }, [episodeName, movie.lang, movie.quality, safeEpisodeIndex, serverName]);
 
   const hiddenFocusProps = useMemo(() => {
     return overlayVisible
@@ -209,7 +184,7 @@ export default function TvWatchOverlay({
   function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
     clearHideTimer();
     setOverlayPinned(false);
-    setQuickEpisodesOpen(false);
+    setOverlayPanel(null);
     setOverlayVisible(false);
 
     if (focusPlayer) {
@@ -220,10 +195,10 @@ export default function TvWatchOverlay({
   function scheduleHide() {
     clearHideTimer();
 
-    if (overlayPinnedRef.current || quickEpisodesOpen) return;
+    if (overlayPinnedRef.current || panelOpen) return;
 
     hideTimerRef.current = window.setTimeout(() => {
-      if (overlayPinnedRef.current || quickEpisodesOpen) {
+      if (overlayPinnedRef.current || panelOpen) {
         hideTimerRef.current = null;
         return;
       }
@@ -254,7 +229,7 @@ export default function TvWatchOverlay({
       focusOverlayDefault();
     }
 
-    if (pinned || !autoHide || quickEpisodesOpen) {
+    if (pinned || !autoHide || panelOpen) {
       clearHideTimer();
     } else {
       scheduleHide();
@@ -272,31 +247,40 @@ export default function TvWatchOverlay({
     }, 0);
   }
 
+  function openPanel(panel: Exclude<OverlayPanel, null>) {
+    setOverlayVisible(true);
+    setOverlayPinned(true);
+    setOverlayPanel(panel);
+    clearHideTimer();
+    focusPanelDefault(panel);
+  }
+
+  function closePanel({ keepOverlay = true }: { keepOverlay?: boolean } = {}) {
+    setOverlayPanel(null);
+    setOverlayPinned(false);
+
+    if (keepOverlay) {
+      showOverlay({ pinned: false, focus: true, autoHide: true });
+    } else {
+      hideOverlay({ focusPlayer: true });
+    }
+  }
+
   function openEpisodePanelFromOverlay() {
     showOverlay({ pinned: true, focus: false, autoHide: false });
     window.setTimeout(onOpenEpisodePanel, 0);
   }
 
-  function toggleQuickEpisodes() {
-    setQuickEpisodesOpen((open) => {
-      const next = !open;
-
-      showOverlay({ pinned: next, focus: false, autoHide: !next });
-
-      if (next) {
-        focusQuickEpisodeDefault();
-      }
-
-      return next;
-    });
-  }
-
   function handleSeek(direction: "backward" | "forward") {
-    showOverlay({ pinned: true, focus: false, autoHide: false });
+    showOverlay({ pinned: false, focus: false, autoHide: true });
     dispatchPlayerCommand(
       "seek",
       direction === "forward" ? SEEK_SECONDS : -SEEK_SECONDS
     );
+  }
+
+  function handleFocusPlayer() {
+    hideOverlay({ focusPlayer: true });
   }
 
   useEffect(() => {
@@ -338,7 +322,7 @@ export default function TvWatchOverlay({
       nativeHintTimerRef.current = window.setTimeout(() => {
         setNativeHintVisible(false);
         nativeHintTimerRef.current = null;
-      }, 2400);
+      }, 2200);
     }
 
     window.addEventListener("mousemove", handleActivity);
@@ -365,7 +349,7 @@ export default function TvWatchOverlay({
   }, []);
 
   useEffect(() => {
-    setQuickEpisodesOpen(false);
+    setOverlayPanel(null);
     showOverlay({ pinned: false, focus: false, autoHide: true });
   }, [safeEpisodeIndex, currentServer?.server_name]);
 
@@ -382,240 +366,338 @@ export default function TvWatchOverlay({
         overlayVisible ? "opacity-100" : "opacity-0",
       ].join(" ")}
     >
-      <div className="pointer-events-none bg-gradient-to-b from-black/60 via-black/25 to-transparent px-4 pb-10 pt-4 md:px-6 md:pt-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 shadow-xl backdrop-blur-md">
-            <p className="mb-1 text-[11px] font-black uppercase tracking-[0.22em] text-yellow-300/90">
-              BảoFlix TV WebPlayer
-            </p>
+      <div className="pointer-events-none bg-gradient-to-b from-black/70 via-black/30 to-transparent px-[5vw] pb-12 pt-[4vh]">
+        <div className="max-w-[68vw]">
+          <h1 className="line-clamp-1 text-[28px] font-black leading-tight text-white drop-shadow-2xl">
+            {movie.name}
+          </h1>
 
-            <h1 className="line-clamp-1 max-w-[62vw] text-lg font-black text-white drop-shadow md:text-xl">
-              {movie.name}
-            </h1>
-
-            <p className="mt-1 line-clamp-1 max-w-[62vw] text-xs font-bold text-slate-200/90 md:text-sm">
-              {compactMeta}
-            </p>
-          </div>
-
-          <div className="hidden rounded-full border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-slate-200/85 backdrop-blur-md md:block">
-            OK: chọn • Back: ẩn • Focus player để remote vào Web player
-          </div>
+          <p className="mt-2 line-clamp-1 text-[15px] font-semibold text-white/[0.78] drop-shadow">
+            {compactMeta}
+          </p>
         </div>
       </div>
 
-      <div className="pointer-events-none bg-gradient-to-t from-black/80 via-black/38 to-transparent px-4 pb-5 pt-12 md:px-6 md:pb-6">
+      <div className="pointer-events-none bg-gradient-to-t from-black/[0.88] via-black/[0.54] to-transparent px-[5vw] pb-[5vh] pt-20">
         {nativeHintVisible && (
-          <div className="pointer-events-none mx-auto mb-3 max-w-3xl rounded-2xl border border-yellow-300/30 bg-yellow-300/15 px-4 py-3 text-center text-xs font-bold text-yellow-100 shadow-xl backdrop-blur md:text-sm">
-            Chưa có bridge APK native, app chỉ focus Web player và thử gửi phím an toàn.
+          <div className="pointer-events-none mx-auto mb-4 w-fit rounded-2xl border border-yellow-300/[0.35] bg-black/[0.72] px-5 py-3 text-center text-sm font-bold text-yellow-100 shadow-2xl backdrop-blur-xl">
+            Chưa có bridge tua trong APK, đã thử chuyển quyền điều khiển vào player.
           </div>
         )}
 
-        <div
-          data-tv-row
-          className={[
-            "mx-auto grid max-w-2xl grid-cols-3 gap-3",
-            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-          ].join(" ")}
-        >
-          <button
-            type="button"
-            data-tv-seek="backward"
-            {...hiddenFocusProps}
-            onClick={() => handleSeek("backward")}
-            className={[
-              "flex min-h-[48px] items-center justify-center rounded-xl border border-white/15 bg-black/50 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            ↶ Thử tua
-          </button>
-
-          <button
-            type="button"
-            data-tv-overlay-default
-            {...hiddenFocusProps}
-            onClick={() => dispatchPlayerCommand("focus-player")}
-            className={[
-              "flex min-h-[48px] items-center justify-center rounded-xl bg-yellow-300 px-3 py-2 text-center text-sm font-black text-black shadow-lg transition hover:bg-yellow-200",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Focus player
-          </button>
-
-          <button
-            type="button"
-            data-tv-seek="forward"
-            {...hiddenFocusProps}
-            onClick={() => handleSeek("forward")}
-            className={[
-              "flex min-h-[48px] items-center justify-center rounded-xl border border-white/15 bg-black/50 px-3 py-2 text-center text-sm font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Thử tua ↷
-          </button>
-        </div>
-
-        <div
-          data-tv-row
-          className={[
-            "mx-auto mt-3 grid max-w-5xl grid-cols-4 gap-3",
-            overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-          ].join(" ")}
-        >
-          {previousHref ? (
-            <Link
-              href={previousHref}
-              {...hiddenFocusProps}
+        {!panelOpen && (
+          <div className="mx-auto max-w-[880px]">
+            <div
+              data-tv-row
               className={[
-                "flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-center text-xs font-black text-white shadow-lg backdrop-blur-md transition hover:bg-white/15 md:text-sm",
-                TV_FOCUS_CLASS,
+                "grid grid-cols-3 gap-4",
+                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
-              ← Tập trước
-            </Link>
-          ) : (
-            <button
-              disabled
-              className="flex min-h-[44px] items-center justify-center rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-center text-xs font-black text-white opacity-35 md:text-sm"
-            >
-              ← Tập trước
-            </button>
-          )}
-
-          <button
-            type="button"
-            {...hiddenFocusProps}
-            onClick={openEpisodePanelFromOverlay}
-            className={[
-              "flex min-h-[44px] items-center justify-center rounded-xl bg-white/90 px-3 py-2 text-center text-xs font-black text-black shadow-lg transition hover:bg-white md:text-sm",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Tập / nguồn
-          </button>
-
-          <button
-            type="button"
-            {...hiddenFocusProps}
-            onClick={toggleQuickEpisodes}
-            disabled={!currentEpisodes.length}
-            className={[
-              "flex min-h-[44px] items-center justify-center rounded-xl px-3 py-2 text-center text-xs font-black shadow-lg transition md:text-sm",
-              quickEpisodesOpen
-                ? "bg-yellow-300 text-black hover:bg-yellow-200"
-                : "bg-white/90 text-black hover:bg-white",
-              !currentEpisodes.length ? "opacity-40" : "",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Chọn tập
-          </button>
-
-          {nextHref ? (
-            <Link
-              href={nextHref}
-              {...hiddenFocusProps}
-              className={[
-                "flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white shadow-lg transition hover:bg-red-500 md:text-sm",
-                TV_FOCUS_CLASS,
-              ].join(" ")}
-            >
-              Tập sau →
-            </Link>
-          ) : (
-            <button
-              disabled
-              className="flex min-h-[44px] items-center justify-center rounded-xl bg-red-600 px-3 py-2 text-center text-xs font-black text-white opacity-35 md:text-sm"
-            >
-              Tập sau →
-            </button>
-          )}
-        </div>
-
-        {sameEpisodeServerLinks.length > 1 && (
-          <div
-            data-tv-row
-            className={[
-              "mx-auto mt-3 flex max-w-4xl flex-wrap justify-center gap-2",
-              overlayVisible ? "pointer-events-auto" : "pointer-events-none",
-            ].join(" ")}
-          >
-            {sameEpisodeServerLinks.slice(0, 6).map((item) => (
-              <Link
-                key={`${item.serverIndex}-${item.href}`}
-                href={item.href}
+              <button
+                type="button"
+                data-tv-seek="backward"
                 {...hiddenFocusProps}
+                onClick={() => handleSeek("backward")}
                 className={[
-                  "rounded-xl border px-3 py-2 text-xs font-black shadow-lg backdrop-blur-md transition md:text-sm",
-                  item.serverIndex === safeServerIndex
-                    ? "border-yellow-300 bg-yellow-300 text-black"
-                    : "border-white/15 bg-black/40 text-white hover:bg-white/15",
+                  "flex min-h-[64px] items-center justify-center px-5 text-[19px] font-black",
+                  SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
-                {normalizeServerName(item.server.server_name)}
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {quickEpisodesOpen && (
-          <div className="pointer-events-auto mx-auto mt-3 max-w-5xl rounded-2xl border border-white/10 bg-black/70 p-3 shadow-2xl backdrop-blur-md">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.18em] text-yellow-300">
-                  Chọn tập nhanh
-                </p>
-                <p className="mt-1 text-xs text-slate-300">
-                  {serverName} • {currentEpisodes.length} tập
-                </p>
-              </div>
+                ‹ {SEEK_SECONDS}s
+              </button>
 
               <button
                 type="button"
-                onClick={openEpisodePanelFromOverlay}
+                data-tv-overlay-default
+                {...hiddenFocusProps}
+                onClick={handleFocusPlayer}
                 className={[
-                  "rounded-xl bg-white px-3 py-2 text-xs font-black text-black hover:bg-yellow-200",
+                  "flex min-h-[64px] items-center justify-center px-6 text-[19px] font-black",
+                  PRIMARY_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
-                Tất cả tập
+                ▶ Player
+              </button>
+
+              <button
+                type="button"
+                data-tv-seek="forward"
+                {...hiddenFocusProps}
+                onClick={() => handleSeek("forward")}
+                className={[
+                  "flex min-h-[64px] items-center justify-center px-5 text-[19px] font-black",
+                  SURFACE_BUTTON_CLASS,
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                {SEEK_SECONDS}s ›
               </button>
             </div>
 
-            <div data-tv-row className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-              {quickEpisodeItems.map((item) => {
-                const active = item.episodeIndex === safeEpisodeIndex;
+            <div
+              data-tv-row
+              className={[
+                "mt-4 grid grid-cols-2 gap-4",
+                overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+              ].join(" ")}
+            >
+              <button
+                type="button"
+                {...hiddenFocusProps}
+                onClick={() => openPanel("episodes")}
+                disabled={!currentEpisodes.length}
+                className={[
+                  "flex min-h-[58px] items-center justify-center px-5 text-[17px] font-black",
+                  SURFACE_BUTTON_CLASS,
+                  !currentEpisodes.length ? "opacity-40" : "",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Chọn tập
+              </button>
 
-                return (
-                  <Link
-                    key={`${safeServerIndex}-${item.episode.name}-${item.episodeIndex}`}
-                    href={item.href}
-                    data-tv-quick-episode-default={active ? true : undefined}
-                    className={[
-                      "flex min-h-[44px] items-center justify-center rounded-xl border px-2 py-2 text-center text-xs font-black transition",
-                      active
-                        ? "border-yellow-300 bg-yellow-300 text-black"
-                        : "border-white/10 bg-white/5 text-white hover:bg-white/15 focus-visible:bg-yellow-300 focus-visible:text-black",
-                      TV_FOCUS_CLASS,
-                    ].join(" ")}
-                  >
-                    {item.episode.name || `Tập ${item.episodeIndex + 1}`}
-                  </Link>
-                );
-              })}
+              <button
+                type="button"
+                {...hiddenFocusProps}
+                onClick={() => openPanel("sources")}
+                disabled={!hasMultipleServers}
+                className={[
+                  "flex min-h-[58px] items-center justify-center px-5 text-[17px] font-black",
+                  SURFACE_BUTTON_CLASS,
+                  !hasMultipleServers ? "opacity-40" : "",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Đổi nguồn
+              </button>
             </div>
           </div>
         )}
 
-        <p className="mt-3 text-center text-xs font-semibold text-white/60">
-          {overlayPinned || quickEpisodesOpen
-            ? "Overlay đang ghim • Back để ẩn • Focus player để dùng remote trong Web player"
-            : "Web player là chính • Tua cần APK native bridge hoặc player tự nhận phím"}
-        </p>
+        {panelOpen && (
+          <div
+            data-tv-panel={overlayPanel || undefined}
+            className="pointer-events-auto mx-auto max-h-[62vh] w-full max-w-[1160px] overflow-hidden rounded-[30px] border border-white/[0.12] bg-[#090d16]/[0.92] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.68)] backdrop-blur-2xl"
+          >
+            <div className="mb-5 flex items-center justify-between gap-5">
+              <div className="min-w-0">
+                <p className="text-[12px] font-black uppercase tracking-[0.22em] text-yellow-300/90">
+                  {overlayPanel === "episodes" ? "Chọn tập" : "Đổi nguồn phát"}
+                </p>
+
+                <h2 className="mt-1 line-clamp-1 text-[22px] font-black text-white">
+                  {episodeName || `Tập ${safeEpisodeIndex + 1}`} • {serverName}
+                </h2>
+              </div>
+
+              <div data-tv-row className="flex shrink-0 items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openPanel("episodes")}
+                  className={[
+                    "rounded-2xl px-5 py-3 text-sm font-black transition",
+                    overlayPanel === "episodes"
+                      ? "bg-yellow-300 text-black"
+                      : "bg-white/10 text-white hover:bg-white/[0.16]",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
+                >
+                  Tập
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openPanel("sources")}
+                  disabled={!hasMultipleServers}
+                  className={[
+                    "rounded-2xl px-5 py-3 text-sm font-black transition",
+                    overlayPanel === "sources"
+                      ? "bg-yellow-300 text-black"
+                      : "bg-white/10 text-white hover:bg-white/[0.16]",
+                    !hasMultipleServers ? "opacity-40" : "",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
+                >
+                  Nguồn
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => closePanel({ keepOverlay: true })}
+                  className={[
+                    "rounded-2xl bg-white/10 px-5 py-3 text-sm font-black text-white transition hover:bg-white/[0.16]",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+
+            {overlayPanel === "episodes" && (
+              <div data-tv-panel="episodes">
+                {(previousHref || nextHref) && (
+                  <div data-tv-row className="mb-4 grid grid-cols-2 gap-3">
+                    {previousHref ? (
+                      <Link
+                        href={previousHref}
+                        className={[
+                          "flex min-h-[52px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] px-4 text-center text-sm font-black text-white transition hover:bg-white/15",
+                          TV_FOCUS_CLASS,
+                        ].join(" ")}
+                      >
+                        ← Tập trước
+                      </Link>
+                    ) : (
+                      <button
+                        disabled
+                        className="flex min-h-[52px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-4 text-center text-sm font-black text-white opacity-35"
+                      >
+                        ← Tập trước
+                      </button>
+                    )}
+
+                    {nextHref ? (
+                      <Link
+                        href={nextHref}
+                        className={[
+                          "flex min-h-[52px] items-center justify-center rounded-2xl bg-red-600 px-4 text-center text-sm font-black text-white transition hover:bg-red-500",
+                          TV_FOCUS_CLASS,
+                        ].join(" ")}
+                      >
+                        Tập sau →
+                      </Link>
+                    ) : (
+                      <button
+                        disabled
+                        className="flex min-h-[52px] items-center justify-center rounded-2xl bg-red-600 px-4 text-center text-sm font-black text-white opacity-35"
+                      >
+                        Tập sau →
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div data-tv-row className="max-h-[38vh] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-8 gap-3">
+                    {episodeItems.map((item) => {
+                      const active = item.episodeIndex === safeEpisodeIndex;
+                      const watched = watchedEpisodes.includes(
+                        getWatchedKey(movie.slug, safeServerIndex, item.episodeIndex)
+                      );
+
+                      return (
+                        <Link
+                          key={`${safeServerIndex}-${item.episode.name}-${item.episodeIndex}`}
+                          href={item.href}
+                          data-tv-panel-default={active ? "episodes" : undefined}
+                          className={[
+                            "relative flex min-h-[54px] items-center justify-center rounded-2xl border px-2 text-center text-[13px] font-black transition",
+                            active
+                              ? "border-yellow-300 bg-yellow-300 text-black"
+                              : watched
+                                ? "border-white/[0.12] bg-white/[0.14] text-white hover:bg-white/20"
+                                : "border-white/10 bg-white/[0.055] text-white hover:bg-white/15",
+                            TV_FOCUS_CLASS,
+                          ].join(" ")}
+                        >
+                          <span className="line-clamp-1">
+                            {item.episode.name || `Tập ${item.episodeIndex + 1}`}
+                          </span>
+
+                          {watched && !active && (
+                            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-yellow-300" />
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {currentEpisodes.length > 64 && (
+                  <p className="mt-4 text-center text-xs font-semibold text-white/[0.48]">
+                    Dùng phím xuống để xem thêm tập trong danh sách.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {overlayPanel === "sources" && (
+              <div data-tv-panel="sources">
+                {hasMultipleServers ? (
+                  <div data-tv-row className="grid grid-cols-3 gap-3">
+                    {sameEpisodeServerLinks.map((item) => {
+                      const active = item.serverIndex === safeServerIndex;
+                      const label = normalizeServerName(item.server.server_name);
+                      const targetEpisode =
+                        item.episodeIndex !== undefined ? `Tập ${item.episodeIndex + 1}` : "";
+
+                      return (
+                        <Link
+                          key={`${item.serverIndex}-${item.href}`}
+                          href={item.href}
+                          data-tv-panel-default={active ? "sources" : undefined}
+                          className={[
+                            "flex min-h-[76px] flex-col justify-center rounded-2xl border px-5 transition",
+                            active
+                              ? "border-yellow-300 bg-yellow-300 text-black"
+                              : "border-white/10 bg-white/[0.055] text-white hover:bg-white/15",
+                            TV_FOCUS_CLASS,
+                          ].join(" ")}
+                        >
+                          <span className="text-[17px] font-black">{label}</span>
+                          <span className={["mt-1 text-sm", active ? "text-black/70" : "text-white/[0.52]"].join(" ")}>
+                            {targetEpisode || "Nguồn phát"}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-6 text-center">
+                    <p className="text-lg font-black text-white">Chỉ có một nguồn phát</p>
+                    <p className="mt-2 text-sm text-white/[0.55]">
+                      Bấm Back hoặc Đóng để quay lại player.
+                    </p>
+                  </div>
+                )}
+
+                <div data-tv-row className="mt-4 grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={openEpisodePanelFromOverlay}
+                    className={[
+                      "flex min-h-[52px] items-center justify-center rounded-2xl bg-white/10 px-5 text-sm font-black text-white transition hover:bg-white/[0.16]",
+                      TV_FOCUS_CLASS,
+                    ].join(" ")}
+                  >
+                    Mở bảng đầy đủ
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleFocusPlayer}
+                    className={[
+                      "flex min-h-[52px] items-center justify-center rounded-2xl bg-yellow-300 px-5 text-sm font-black text-black transition hover:bg-yellow-200",
+                      TV_FOCUS_CLASS,
+                    ].join(" ")}
+                  >
+                    Vào player
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!panelOpen && (
+          <p className="mt-4 text-center text-[12px] font-semibold text-white/[0.42]">
+            ↑/↓ hiện overlay • ←/→ tua • Back ẩn
+          </p>
+        )}
       </div>
     </div>
   );
