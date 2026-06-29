@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 type FullscreenDocument = Document & {
   webkitFullscreenElement?: Element | null;
@@ -71,31 +71,25 @@ export default function FullscreenPlayerBox({
 
   const expanded = tvImmersive || cinemaMode || isFullscreen;
 
-  function getPreferredPlayerElement() {
+  const focusPlayerSurface = useCallback(() => {
     const box = boxRef.current;
 
-    if (!box) return null;
-
-    return (
-      box.querySelector<HTMLElement>("[data-tv-player-native='true']") ||
-      box.querySelector<HTMLElement>("[data-tv-player='iframe']") ||
-      box
-    );
-  }
-
-  function focusPlayerSurface() {
-    const target = getPreferredPlayerElement();
-
-    if (!target) return;
+    if (!box) return;
 
     window.setTimeout(() => {
       try {
-        target.focus({ preventScroll: true });
+        const active = document.activeElement;
+
+        if (active instanceof HTMLElement && active !== box && box.contains(active)) {
+          active.blur();
+        }
+
+        box.focus({ preventScroll: true });
       } catch {
         // Ignore focus errors in WebView.
       }
     }, 30);
-  }
+  }, []);
 
   async function enterFullscreen() {
     const box = boxRef.current;
@@ -166,7 +160,7 @@ export default function FullscreenPlayerBox({
       document.documentElement.style.overflow = oldHtmlOverflow;
       document.documentElement.style.overscrollBehavior = oldHtmlOverscroll;
     };
-  }, [tvImmersive]);
+  }, [focusPlayerSurface, tvImmersive]);
 
   useEffect(() => {
     function syncFullscreenState() {
@@ -222,7 +216,7 @@ export default function FullscreenPlayerBox({
       hudTimerRef.current = window.setTimeout(() => {
         setPlayerHud(null);
         hudTimerRef.current = null;
-      }, 760);
+      }, 620);
     }
 
     function handleFocusPlayer() {
@@ -255,6 +249,7 @@ export default function FullscreenPlayerBox({
 
     window.addEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
     window.addEventListener("baoflix-focus-tv-player", handleFocusPlayer);
+    window.addEventListener("baoflix-focus-tv-player-surface", handleFocusPlayer);
     window.addEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
 
     return () => {
@@ -264,9 +259,10 @@ export default function FullscreenPlayerBox({
 
       window.removeEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
       window.removeEventListener("baoflix-focus-tv-player", handleFocusPlayer);
+      window.removeEventListener("baoflix-focus-tv-player-surface", handleFocusPlayer);
       window.removeEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
     };
-  }, []);
+  }, [focusPlayerSurface]);
 
   return (
     <div
@@ -297,8 +293,8 @@ export default function FullscreenPlayerBox({
       </div>
 
       {tvImmersive && playerHud && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-black/72 px-5 py-3 text-center text-white shadow-2xl backdrop-blur">
-          <div className="text-2xl font-black">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-black/60 px-4 py-2 text-center text-white shadow-xl backdrop-blur">
+          <div className="text-xl font-black">
             {playerHud.type === "seek"
               ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta || 0}s`
               : playerHud.type === "play"
@@ -307,7 +303,7 @@ export default function FullscreenPlayerBox({
           </div>
 
           {playerHud.type === "seek" && (
-            <p className="mt-1 text-xs text-slate-300">
+            <p className="mt-0.5 text-[11px] text-slate-300">
               {formatTime(playerHud.currentTime)}
               {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
             </p>

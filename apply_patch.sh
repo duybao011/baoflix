@@ -1,21 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(pwd)"
-PATCH_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-copy_file() {
-  local rel="$1"
-  mkdir -p "$ROOT/$(dirname "$rel")"
-  cp "$PATCH_DIR/$rel" "$ROOT/$rel"
-  echo "patched $rel"
-}
-
-copy_file "components/TvRemoteNavigator.tsx"
-copy_file "components/TvDashboard.tsx"
-copy_file "components/TvSearchBox.tsx"
-copy_file "components/FilterPanel.tsx"
-copy_file "components/MovieGrid.tsx"
-copy_file "components/Pagination.tsx"
-copy_file "components/MovieCard.tsx"
-
+echo "Applying BảoFlix TV pause logic fix..."
+if [ ! -d "$ROOT/components" ]; then
+  echo "ERROR: Run this from the baoflix project root." >&2
+  exit 1
+fi
+cp "$(dirname "$0")/components/NativeVideoPlayer.tsx" "$ROOT/components/NativeVideoPlayer.tsx"
 echo "Done. Run: npm run lint && npm run build"

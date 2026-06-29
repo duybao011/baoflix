@@ -1,7 +1,7 @@
 "use client";
 
 import Hls from "hls.js";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
 
@@ -37,11 +37,18 @@ function emitHud(detail: {
   );
 }
 
-function safeSetMediaSessionHandler(action: MediaSessionAction, handler: MediaSessionActionHandler | null) {
+function focusRemoteSurface() {
+  window.dispatchEvent(new Event("baoflix-focus-tv-player-surface"));
+}
+
+function safeSetMediaSessionHandler(
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler | null
+) {
   try {
     navigator.mediaSession.setActionHandler(action, handler);
   } catch {
-    // Some TV WebViews expose Media Session partially. Ignore unsupported actions.
+    // Một số TV WebView chỉ hỗ trợ một phần Media Session.
   }
 }
 
@@ -52,45 +59,70 @@ export default function NativeVideoPlayer({
   poster,
 }: NativeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const userPausedRef = useRef(false);
+  const autoplayDoneRef = useRef(false);
   const [error, setError] = useState<string>("");
 
-  function focusVideo() {
+  const attemptPlay = useCallback(
+    async ({
+      showError = false,
+      forced = false,
+    }: {
+      showError?: boolean;
+      forced?: boolean;
+    } = {}) => {
+      const video = videoRef.current;
+
+      if (!video) return false;
+
+      if (userPausedRef.current && !forced) {
+        focusRemoteSurface();
+        return false;
+      }
+
+      try {
+        video.autoplay = true;
+        await video.play();
+        userPausedRef.current = false;
+        autoplayDoneRef.current = true;
+        setError("");
+        focusRemoteSurface();
+        return true;
+      } catch {
+        if (showError) {
+          setError("TV chặn tự phát. Bấm OK một lần để phát video.");
+        }
+
+        focusRemoteSurface();
+        return false;
+      }
+    },
+    []
+  );
+
+  const playVideo = useCallback(
+    async ({ showError = true, showHud = true }: { showError?: boolean; showHud?: boolean } = {}) => {
+      const played = await attemptPlay({ showError, forced: true });
+
+      if (played && showHud) {
+        emitHud({ type: "play" });
+      }
+    },
+    [attemptPlay]
+  );
+
+  const pauseVideo = useCallback(() => {
     const video = videoRef.current;
 
     if (!video) return;
 
-    try {
-      video.focus({ preventScroll: true });
-    } catch {
-      // Ignore focus errors in WebView.
-    }
-  }
-
-  async function playVideo() {
-    const video = videoRef.current;
-
-    if (!video) return;
-
-    focusVideo();
-
-    try {
-      await video.play();
-      emitHud({ type: "play" });
-    } catch {
-      setError("TV cần bấm OK thêm một lần để phát video.");
-    }
-  }
-
-  function pauseVideo() {
-    const video = videoRef.current;
-
-    if (!video) return;
-
+    userPausedRef.current = true;
     video.pause();
+    focusRemoteSurface();
     emitHud({ type: "pause" });
-  }
+  }, []);
 
-  function seekVideo(seconds: number) {
+  const seekVideo = useCallback((seconds: number) => {
     const video = videoRef.current;
 
     if (!video) return;
@@ -100,7 +132,7 @@ export default function NativeVideoPlayer({
     const nextTime = clamp(video.currentTime + seconds, 0, maxTime);
 
     video.currentTime = nextTime;
-    focusVideo();
+    focusRemoteSurface();
 
     emitHud({
       type: "seek",
@@ -108,44 +140,48 @@ export default function NativeVideoPlayer({
       currentTime: nextTime,
       duration,
     });
-  }
+  }, []);
 
-  function handleCommand(detail: PlayerCommandDetail) {
-    detail.handled = true;
+  const handleCommand = useCallback(
+    (detail: PlayerCommandDetail) => {
+      detail.handled = true;
 
-    if (detail.action === "focus-player") {
-      focusVideo();
-      return;
-    }
-
-    if (detail.action === "seek") {
-      seekVideo(detail.seconds || DEFAULT_SEEK_SECONDS);
-      return;
-    }
-
-    if (detail.action === "toggle-play") {
-      const video = videoRef.current;
-
-      if (!video) return;
-
-      if (video.paused) {
-        void playVideo();
-      } else {
-        pauseVideo();
+      if (detail.action === "focus-player") {
+        // Chỉ trả focus về bề mặt remote. Không được tự play lại khi user đã pause.
+        focusRemoteSurface();
+        return;
       }
 
-      return;
-    }
+      if (detail.action === "seek") {
+        seekVideo(detail.seconds || DEFAULT_SEEK_SECONDS);
+        return;
+      }
 
-    if (detail.action === "play") {
-      void playVideo();
-      return;
-    }
+      if (detail.action === "toggle-play") {
+        const video = videoRef.current;
 
-    if (detail.action === "pause") {
-      pauseVideo();
-    }
-  }
+        if (!video) return;
+
+        if (video.paused) {
+          void playVideo({ showError: true, showHud: true });
+        } else {
+          pauseVideo();
+        }
+
+        return;
+      }
+
+      if (detail.action === "play") {
+        void playVideo({ showError: true, showHud: true });
+        return;
+      }
+
+      if (detail.action === "pause") {
+        pauseVideo();
+      }
+    },
+    [pauseVideo, playVideo, seekVideo]
+  );
 
   useEffect(() => {
     const video = videoRef.current;
@@ -153,6 +189,21 @@ export default function NativeVideoPlayer({
     if (!video || !src) return;
 
     setError("");
+    userPausedRef.current = false;
+    autoplayDoneRef.current = false;
+    video.removeAttribute("controls");
+    video.controls = false;
+    video.autoplay = true;
+    video.preload = "auto";
+
+    function autoplayQuietly() {
+      if (userPausedRef.current || autoplayDoneRef.current) return;
+
+      void attemptPlay({ showError: false, forced: false });
+    }
+
+    video.addEventListener("loadedmetadata", autoplayQuietly);
+    video.addEventListener("canplay", autoplayQuietly, { once: true });
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -160,9 +211,13 @@ export default function NativeVideoPlayer({
         lowLatencyMode: false,
       });
 
-      hls.loadSource(src);
       hls.attachMedia(video);
-
+      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        hls.loadSource(src);
+      });
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        autoplayQuietly();
+      });
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data.fatal) {
           setError("Không phát được HLS bằng player native. Hãy thử đổi nguồn.");
@@ -170,17 +225,23 @@ export default function NativeVideoPlayer({
       });
 
       return () => {
+        video.removeEventListener("loadedmetadata", autoplayQuietly);
+        video.removeEventListener("canplay", autoplayQuietly);
         hls.destroy();
       };
     }
 
     video.src = src;
+    video.load();
+    autoplayQuietly();
 
     return () => {
+      video.removeEventListener("loadedmetadata", autoplayQuietly);
+      video.removeEventListener("canplay", autoplayQuietly);
       video.removeAttribute("src");
       video.load();
     };
-  }, [src]);
+  }, [attemptPlay, src]);
 
   useEffect(() => {
     function onPlayerCommand(event: Event) {
@@ -196,7 +257,7 @@ export default function NativeVideoPlayer({
     return () => {
       window.removeEventListener("baoflix-tv-player-command", onPlayerCommand as EventListener);
     };
-  }, []);
+  }, [handleCommand]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -214,11 +275,11 @@ export default function NativeVideoPlayer({
           : undefined,
       });
     } catch {
-      // Metadata artwork can fail with relative URLs in some WebViews.
+      // Metadata artwork có thể lỗi với URL tương đối trong vài WebView TV.
     }
 
     safeSetMediaSessionHandler("play", () => {
-      void playVideo();
+      void playVideo({ showError: true, showHud: true });
     });
     safeSetMediaSessionHandler("pause", () => {
       pauseVideo();
@@ -234,6 +295,7 @@ export default function NativeVideoPlayer({
 
       if (typeof seekTo === "number") {
         video.currentTime = seekTo;
+        focusRemoteSurface();
       }
     });
 
@@ -244,7 +306,7 @@ export default function NativeVideoPlayer({
       safeSetMediaSessionHandler("seekforward", null);
       safeSetMediaSessionHandler("seekto", null);
     };
-  }, [poster, subtitle, title]);
+  }, [pauseVideo, playVideo, poster, seekVideo, subtitle, title]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -282,13 +344,22 @@ export default function NativeVideoPlayer({
         ref={videoRef}
         data-tv-player="native-video"
         data-tv-player-native="true"
-        tabIndex={0}
-        controls
+        data-tv-skip
+        tabIndex={-1}
+        autoPlay
         playsInline
-        preload="metadata"
+        preload="auto"
         poster={poster}
-        className="h-full w-full bg-black outline-none"
-        onPlay={() => setError("")}
+        controlsList="nodownload nofullscreen noremoteplayback"
+        className="pointer-events-none h-full w-full bg-black object-contain outline-none"
+        onPlay={() => {
+          userPausedRef.current = false;
+          autoplayDoneRef.current = true;
+          setError("");
+        }}
+        onPause={() => {
+          userPausedRef.current = true;
+        }}
       />
 
       {error && (
