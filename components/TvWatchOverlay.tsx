@@ -20,6 +20,10 @@ type TvWatchOverlayProps = {
   nextHref: string;
   watchedEpisodes: string[];
   sameEpisodeServerLinks: SameEpisodeServerLink[];
+  playerMode: PlayerMode;
+  canUseEmbed: boolean;
+  canUseHls: boolean;
+  onSwitchPlayerMode: (mode: "embed" | "hls") => void;
   onOpenEpisodePanel: () => void;
 };
 
@@ -29,6 +33,7 @@ type ShowOverlayDetail = {
 };
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+type PlayerMode = "embed" | "hls" | "none";
 
 const AUTO_HIDE_MS = 2800;
 const SEEK_SECONDS = 10;
@@ -92,6 +97,10 @@ export default function TvWatchOverlay({
   previousHref,
   nextHref,
   sameEpisodeServerLinks,
+  playerMode,
+  canUseEmbed,
+  canUseHls,
+  onSwitchPlayerMode,
   onOpenEpisodePanel,
 }: TvWatchOverlayProps) {
   const [overlayVisible, setOverlayVisible] = useState(true);
@@ -105,11 +114,18 @@ export default function TvWatchOverlay({
   const hasMultipleEpisodes = currentEpisodes.length > 1;
   const hasMultipleServers = sameEpisodeServerLinks.length > 1;
   const serverName = normalizeServerName(currentServer?.server_name);
+  const modeLabel =
+    playerMode === "hls"
+      ? "HLS • app tua được"
+      : canUseEmbed
+        ? "Web player • ổn định"
+        : "Nguồn phát";
 
   const compactMeta = useMemo(() => {
     const parts = [
       episodeName || `Tập ${safeEpisodeIndex + 1}`,
       serverName,
+      modeLabel,
     ];
 
     if (hasMultipleEpisodes) {
@@ -129,6 +145,7 @@ export default function TvWatchOverlay({
     safeEpisodeIndex,
     sameEpisodeServerLinks.length,
     serverName,
+    modeLabel,
   ]);
 
   const hiddenFocusProps = useMemo(() => {
@@ -322,7 +339,7 @@ export default function TvWatchOverlay({
           </div>
 
           <div className="hidden rounded-full border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-slate-200/85 backdrop-blur-md md:block">
-            OK: chọn • Back: ẩn • Trái/Phải: nút tua
+            OK: chọn • Back: ẩn • Trái/Phải: tua/mở tua
           </div>
         </div>
       </div>
@@ -438,6 +455,46 @@ export default function TvWatchOverlay({
           )}
         </div>
 
+        {canUseEmbed && canUseHls && (
+          <div
+            data-tv-row
+            className={[
+              "mx-auto mt-3 grid max-w-xl grid-cols-2 gap-3",
+              overlayVisible ? "pointer-events-auto" : "pointer-events-none",
+            ].join(" ")}
+          >
+            <button
+              type="button"
+              {...hiddenFocusProps}
+              onClick={() => onSwitchPlayerMode("embed")}
+              className={[
+                "flex min-h-[42px] items-center justify-center rounded-xl border px-3 py-2 text-center text-xs font-black shadow-lg backdrop-blur-md transition md:text-sm",
+                playerMode === "embed"
+                  ? "border-yellow-300 bg-yellow-300 text-black"
+                  : "border-white/15 bg-black/45 text-white hover:bg-white/15",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              Web player
+            </button>
+
+            <button
+              type="button"
+              {...hiddenFocusProps}
+              onClick={() => onSwitchPlayerMode("hls")}
+              className={[
+                "flex min-h-[42px] items-center justify-center rounded-xl border px-3 py-2 text-center text-xs font-black shadow-lg backdrop-blur-md transition md:text-sm",
+                playerMode === "hls"
+                  ? "border-yellow-300 bg-yellow-300 text-black"
+                  : "border-white/15 bg-black/45 text-white hover:bg-white/15",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              HLS tua 10s
+            </button>
+          </div>
+        )}
+
         {sameEpisodeServerLinks.length > 1 && (
           <div
             data-tv-row
@@ -468,7 +525,7 @@ export default function TvWatchOverlay({
         <p className="mt-3 text-center text-xs font-semibold text-white/60">
           {overlayPinned
             ? "Overlay đang ghim • OK để bấm nút • Back để ẩn"
-            : "Trái/Phải: HLS tua ngay, iframe mở nút tua • Tập/nguồn để đổi server"}
+            : "Web player xem ổn định; HLS tua 10s bằng app • Tập/nguồn để đổi server"}
         </p>
       </div>
     </div>

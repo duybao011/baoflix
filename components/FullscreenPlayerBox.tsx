@@ -20,11 +20,6 @@ type PlayerHudDetail = {
 
 type FullscreenPlayerBoxProps = {
   children: ReactNode;
-  /**
-   * TV Mode dùng immersive CSS full viewport thay vì ép Fullscreen API.
-   * Cách này ổn hơn trong Android TV WebView vì requestFullscreen sau navigation
-   * thường bị browser chặn nếu không còn user gesture.
-   */
   tvImmersive?: boolean;
 };
 
@@ -61,14 +56,14 @@ export default function FullscreenPlayerBox({
 
     if (!box) return;
 
-    const player = box.querySelector<HTMLElement>(
-      "video[data-tv-player='video'], iframe[data-tv-player='iframe'], video, iframe"
-    );
+    const video = box.querySelector<HTMLElement>("video[data-tv-player='video'], video");
 
     window.setTimeout(() => {
       try {
-        if (player) {
-          player.focus({ preventScroll: true });
+        // HLS/video là same-document nên có thể focus video mà app vẫn bắt được keydown.
+        // Iframe cross-origin thì không focus mặc định, vì focus iframe sẽ làm app mất remote handler.
+        if (video) {
+          video.focus({ preventScroll: true });
           return;
         }
 
@@ -140,8 +135,6 @@ export default function FullscreenPlayerBox({
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.overscrollBehavior = "none";
 
-    // Khi vào TV watch mode, để focus nằm ở player surface.
-    // Nếu là HLS thì focus video, nếu là embed thì focus iframe để remote được player nhận.
     focusPlayerSurface();
 
     return () => {
@@ -258,16 +251,14 @@ export default function FullscreenPlayerBox({
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-black/75 px-7 py-5 text-center text-white shadow-2xl backdrop-blur">
           <div className="text-3xl font-black">
             {playerHud.type === "seek"
-              ? playerHud.delta && playerHud.delta > 0
-                ? `⏩ +${playerHud.delta}s`
-                : `⏪ ${playerHud.delta}s`
+              ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta}s`
               : playerHud.type === "play"
-                ? "▶ Phát"
-                : "⏸ Tạm dừng"}
+                ? "▶"
+                : "Ⅱ"}
           </div>
 
           {playerHud.type === "seek" && (
-            <div className="mt-2 text-sm font-bold text-slate-300">
+            <div className="mt-1 text-sm font-bold text-slate-200">
               {formatTime(playerHud.currentTime)}
               {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
             </div>
@@ -276,18 +267,13 @@ export default function FullscreenPlayerBox({
       )}
 
       {!tvImmersive && (
-        <div className="absolute right-4 top-4 z-50 flex gap-2">
+        <div className="absolute bottom-3 right-3 flex gap-2">
           <button
             type="button"
             onClick={toggleFullscreen}
-            className={[
-              "rounded-xl px-3 py-2 text-xs font-black text-white backdrop-blur sm:px-4 sm:text-sm",
-              expanded
-                ? "bg-red-600 hover:bg-red-500"
-                : "bg-black/75 hover:bg-yellow-300 hover:text-black",
-            ].join(" ")}
+            className="rounded-xl bg-black/70 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-black"
           >
-            {expanded ? "Thu nhỏ" : "Toàn màn hình"}
+            {expanded ? "Thu nhỏ" : "Phóng to"}
           </button>
         </div>
       )}

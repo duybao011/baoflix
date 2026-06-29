@@ -127,6 +127,11 @@ function sendIframeRemoteKey(command: PlayerCommand) {
     // Cross-origin iframe không cho điều khiển trực tiếp.
   }
 
+  // Trả focus về surface để app không mất quyền bắt remote sau khi thử gửi phím vào iframe.
+  window.setTimeout(() => {
+    focusPlayerSurface();
+  }, 120);
+
   return true;
 }
 

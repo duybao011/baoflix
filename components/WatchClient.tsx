@@ -99,11 +99,17 @@ function getFirstPlayableServerIndex(servers: EpisodeServer[]) {
 }
 
 function getInitialPlayerMode(episode?: Episode): PlayerMode {
-  // Ưu tiên xem được trước: iframe/web player là nguồn ổn nhất với KKPhim trên TV WebView.
-  // HLS chỉ dùng khi không có iframe hoặc khi user bấm đổi sang HLS.
+  // Ưu tiên xem được trước: KKPhim thường xem ổn nhất qua link_embed/web player.
+  // HLS chỉ dùng khi không có iframe hoặc khi user tự đổi sang HLS để tua bằng app.
   if (episode?.link_embed) return "embed";
   if (episode?.link_m3u8) return "hls";
   return "none";
+}
+
+function getPlayerModeLabel(playerMode: PlayerMode, canUseEmbed: boolean) {
+  if (playerMode === "hls") return "HLS • tua bằng app";
+  if (canUseEmbed) return "Web player • ổn định";
+  return "Nguồn phát";
 }
 
 export default function WatchClient({
@@ -284,6 +290,22 @@ export default function WatchClient({
       .filter(Boolean) as SameEpisodeServerLink[];
   }, [servers, safeEpisodeIndex, movie.slug]);
 
+  function switchPlayerMode(nextMode: "embed" | "hls") {
+    if (nextMode === "embed" && !canUseEmbed) return;
+    if (nextMode === "hls" && !canUseHls) return;
+
+    setPlayerMode(nextMode);
+
+    window.dispatchEvent(
+      new CustomEvent("baoflix-show-tv-overlay", {
+        detail: {
+          pinned: true,
+          focus: false,
+        },
+      })
+    );
+  }
+
   function renderPlayer() {
     if (playerMode === "hls" && episode?.link_m3u8) {
       return (
@@ -295,23 +317,7 @@ export default function WatchClient({
       );
     }
 
-    if (playerMode === "embed" && episode?.link_embed) {
-      return (
-        <iframe
-          src={episode.link_embed}
-          tabIndex={0}
-          data-tv-player="iframe"
-          data-tv-skip
-          allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          className="h-full w-full bg-black outline-none"
-          title={`${movie.name} - ${episode.name}`}
-        />
-      );
-    }
-
-    if (episode?.link_embed) {
+    if ((playerMode === "embed" || playerMode === "none") && episode?.link_embed) {
       return (
         <iframe
           src={episode.link_embed}
@@ -378,7 +384,7 @@ export default function WatchClient({
             </span>
 
             <span className="rounded-full bg-white/10 px-3 py-1">
-              {playerMode === "hls" ? "HLS" : canUseEmbed ? "Web player" : "Nguồn phát"}
+              {getPlayerModeLabel(playerMode, canUseEmbed)}
             </span>
 
             {sameEpisodeServerLinks.length > 1 && (
@@ -411,11 +417,11 @@ export default function WatchClient({
         </button>
       </div>
 
-      {(canUseEmbed && canUseHls) && (
+      {canUseEmbed && canUseHls && (
         <div data-tv-row className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setPlayerMode("embed")}
+            onClick={() => switchPlayerMode("embed")}
             className={[
               "rounded-xl border px-4 py-2 text-sm font-black",
               playerMode === "embed"
@@ -428,7 +434,7 @@ export default function WatchClient({
 
           <button
             type="button"
-            onClick={() => setPlayerMode("hls")}
+            onClick={() => switchPlayerMode("hls")}
             className={[
               "rounded-xl border px-4 py-2 text-sm font-black",
               playerMode === "hls"
@@ -436,7 +442,7 @@ export default function WatchClient({
                 : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
             ].join(" ")}
           >
-            HLS tua bằng remote
+            HLS tua bằng app
           </button>
         </div>
       )}
@@ -489,6 +495,10 @@ export default function WatchClient({
                   serverIndex: item.serverIndex,
                   href: item.href,
                 }))}
+                playerMode={playerMode}
+                canUseEmbed={canUseEmbed}
+                canUseHls={canUseHls}
+                onSwitchPlayerMode={switchPlayerMode}
                 onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
               />
             )}
