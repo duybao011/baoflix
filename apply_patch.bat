@@ -1,6 +1,6 @@
 @echo off
 setlocal
-node scripts\apply_restore_smooth_no_dynamic.cjs
+node scripts\apply_final_cleanup_fix.cjs
 if errorlevel 1 (
   echo Patch failed.
   exit /b 1

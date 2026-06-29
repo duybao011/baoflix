@@ -19,7 +19,29 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const query = await searchParams;
 
-  const data = await getMovieDetail(slug);
+  let data: Awaited<ReturnType<typeof getMovieDetail>>;
+
+  try {
+    data = await getMovieDetail(slug);
+  } catch {
+    return (
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+        <h1 className="text-2xl font-black">Không tải được phim</h1>
+
+        <p className="mt-2 text-slate-400">
+          Nguồn phim đang lỗi hoặc phản hồi quá chậm. Thử tải lại sau ít phút.
+        </p>
+
+        <Link
+          href={`/phim/${slug}`}
+          className="mt-5 inline-block rounded-2xl bg-red-600 px-5 py-3 font-bold hover:bg-red-500"
+        >
+          Quay lại chi tiết phim
+        </Link>
+      </div>
+    );
+  }
+
   const servers = data.episodes ?? [];
   const firstPlayableServerIndex = getFirstPlayableServerIndex(servers);
 

@@ -3,7 +3,11 @@
 import { usePathname, useRouter } from "next/navigation";
 
 function shouldHideBackButton(pathname: string) {
-  return pathname === "/" || pathname.startsWith("/xem");
+  return (
+    pathname === "/" ||
+    pathname.startsWith("/xem") ||
+    /^\/ca-nhan\/[^/]+\/xem/.test(pathname)
+  );
 }
 
 export default function MobileBackButton() {
