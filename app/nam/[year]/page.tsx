@@ -1,4 +1,3 @@
-import { connection } from "next/server";
 import MovieGrid from "@/components/MovieGrid";
 import { getMoviesByYear } from "@/lib/kkphim";
 

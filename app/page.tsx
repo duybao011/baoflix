@@ -1,12 +1,11 @@
-import { connection } from "next/server";
 import Link from "next/link";
 import MovieGrid from "@/components/MovieGrid";
 import ContinueWatching from "@/components/ContinueWatching";
 import PersonalDashboard from "@/components/PersonalDashboard";
 import { getImageUrl, getLatestMovies, getMoviesByList } from "@/lib/kkphim";
 
+export const revalidate = 1800;
 export default async function HomePage() {
-  await connection();
   const [latest, phimBo, phimLe, hoatHinh] = await Promise.all([
     getLatestMovies(1),
     getMoviesByList("phim-bo", 1, 12),

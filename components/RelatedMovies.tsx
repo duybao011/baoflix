@@ -1,34 +1,16 @@
 import MovieGrid from "@/components/MovieGrid";
-import {
-  getMoviesByCountry,
-  getMoviesByGenre,
-  getMoviesByYear,
-  MovieDetail,
-  MovieItem,
-  MovieListResult,
-} from "@/lib/kkphim";
+import { getMoviesByCountry, getMoviesByGenre, getMoviesByYear, MovieDetail, MovieItem, MovieListResult } from "@/lib/kkphim";
 
-function addUniqueMovies(
-  target: MovieItem[],
-  source: MovieItem[],
-  currentSlug: string
-) {
+function addUniqueMovies(target: MovieItem[], source: MovieItem[], currentSlug: string) {
   const existingSlugs = new Set(target.map((movie) => movie.slug));
-
   source.forEach((movie) => {
-    if (!movie?.slug) return;
-    if (movie.slug === currentSlug) return;
-    if (existingSlugs.has(movie.slug)) return;
-
+    if (!movie?.slug || movie.slug === currentSlug || existingSlugs.has(movie.slug)) return;
     target.push(movie);
     existingSlugs.add(movie.slug);
   });
 }
 
-async function safeRelatedResult(
-  label: string,
-  loader: () => Promise<MovieListResult>
-) {
+async function safeRelatedResult(label: string, loader: () => Promise<MovieListResult>) {
   try {
     return await loader();
   } catch (error) {
@@ -41,38 +23,25 @@ export default async function RelatedMovies({ movie }: { movie: MovieDetail }) {
   const countrySlug = movie.country?.[0]?.slug;
   const categorySlug = movie.category?.[0]?.slug;
   const year = movie.year ? String(movie.year) : "";
-
   const relatedMovies: MovieItem[] = [];
 
-  // Ưu tiên 1: cùng quốc gia
   if (countrySlug) {
-    const countryResult = await safeRelatedResult(countrySlug, () =>
-      getMoviesByCountry(countrySlug, 1, 24)
-    );
-    addUniqueMovies(relatedMovies, countryResult?.items || [], movie.slug);
+    const result = await safeRelatedResult(countrySlug, () => getMoviesByCountry(countrySlug, 1, 24));
+    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
   }
 
-  // Ưu tiên 2: cùng thể loại
   if (categorySlug && relatedMovies.length < 18) {
-    const categoryResult = await safeRelatedResult(categorySlug, () =>
-      getMoviesByGenre(categorySlug, 1, 24)
-    );
-    addUniqueMovies(relatedMovies, categoryResult?.items || [], movie.slug);
+    const result = await safeRelatedResult(categorySlug, () => getMoviesByGenre(categorySlug, 1, 24));
+    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
   }
 
-  // Ưu tiên 3: cùng năm, chỉ để bù thêm nếu chưa đủ
   if (year && relatedMovies.length < 18) {
-    const yearResult = await safeRelatedResult(year, () =>
-      getMoviesByYear(year, 1, 24)
-    );
-    addUniqueMovies(relatedMovies, yearResult?.items || [], movie.slug);
+    const result = await safeRelatedResult(year, () => getMoviesByYear(year, 1, 24));
+    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
   }
 
   const movies = relatedMovies.slice(0, 18);
-
-  if (movies.length === 0) {
-    return null;
-  }
+  if (!movies.length) return null;
 
   return (
     <section>
