@@ -12,26 +12,17 @@ type Props = {
   defaultTab?: TabKey;
 };
 
+const TV_FOCUS_CLASS =
+  "focus-visible:scale-[1.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+
 const tabs: {
   key: TabKey;
   label: string;
 }[] = [
-  {
-    key: "episodes",
-    label: "Tập phim",
-  },
-  {
-    key: "cast",
-    label: "Diễn viên",
-  },
-  {
-    key: "related",
-    label: "Liên quan",
-  },
-  {
-    key: "info",
-    label: "Thông tin",
-  },
+  { key: "episodes", label: "Tập phim" },
+  { key: "cast", label: "Diễn viên" },
+  { key: "related", label: "Liên quan" },
+  { key: "info", label: "Thông tin" },
 ];
 
 export default function MovieDetailTabs({
@@ -51,26 +42,57 @@ export default function MovieDetailTabs({
   };
 
   return (
-    <section className="mt-6">
-      <div className="mb-5 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-black/20 p-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={[
-              "rounded-2xl px-5 py-3 text-sm font-black transition",
-              activeTab === tab.key
-                ? "bg-red-600 text-white"
-                : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white",
-            ].join(" ")}
-          >
-            {tab.label}
-          </button>
-        ))}
+    <section
+      data-tv-tabs-root
+      data-tv-scope="movie-detail-tabs"
+      className="mt-5"
+    >
+      <div
+        data-tv-tab-list
+        data-tv-row
+        data-tv-row-loop="true"
+        className="mb-4 inline-flex max-w-full gap-1.5 rounded-2xl border border-white/10 bg-black/25 p-1.5"
+        role="tablist"
+        aria-label="Thông tin phim"
+      >
+        {tabs.map((tab) => {
+          const active = activeTab === tab.key;
+
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              aria-controls={`baoflix-tv-tab-panel-${tab.key}`}
+              data-tv-tab-button={tab.key}
+              data-tv-tab-active={active ? "true" : undefined}
+              data-tv-focus-key={`detail-tab:${tab.key}`}
+              data-tv-default={active ? "true" : undefined}
+              onClick={() => setActiveTab(tab.key)}
+              className={[
+                "rounded-xl px-4 py-2 text-xs font-black transition min-[1280px]:text-sm",
+                active
+                  ? "bg-yellow-300 text-black"
+                  : "bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div>{content[activeTab]}</div>
+      <div
+        id={`baoflix-tv-tab-panel-${activeTab}`}
+        role="tabpanel"
+        data-tv-tab-panel
+        data-tv-tab-panel-active="true"
+        data-tv-scope="movie-detail-tab-panel"
+      >
+        {content[activeTab]}
+      </div>
     </section>
   );
 }
