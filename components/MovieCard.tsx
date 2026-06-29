@@ -68,14 +68,15 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
     <article className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] shadow-lg transition hover:-translate-y-1 hover:bg-white/[0.07] focus-within:border-yellow-300">
       <Link
         href={`/phim/${movie.slug}`}
-        className="block"
+        data-tv-focus-key={`movie:${movie.slug}`}
+        className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
         aria-label={`Mở phim ${movie.name}`}
       >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
           <img
             src={getCardImageUrl(movie.poster_url || movie.thumb_url)}
             alt={movie.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-focus-visible:scale-105"
             loading="lazy"
             decoding="async"
             onError={handleImageError}
@@ -93,6 +94,21 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
             </div>
           )}
         </div>
+
+        <div className="space-y-1 p-3">
+          <h3 className="line-clamp-2 text-sm font-bold text-white group-hover:text-red-300">
+            {movie.name}
+          </h3>
+
+          <p className="line-clamp-1 text-xs text-slate-400">
+            {movie.origin_name || "Đang cập nhật"}
+          </p>
+
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span>{movie.year || "N/A"}</span>
+            <span>{movie.quality || "HD"}</span>
+          </div>
+        </div>
       </Link>
 
       {/* PC/mobile only: remote TV bỏ qua nút này */}
@@ -106,23 +122,6 @@ export default function MovieCard({ movie }: { movie: MovieItem }) {
       >
         ⋯
       </button>
-
-      <div className="space-y-1 p-3">
-        <Link href={`/phim/${movie.slug}`}>
-          <h3 className="line-clamp-2 text-sm font-bold text-white hover:text-red-300">
-            {movie.name}
-          </h3>
-        </Link>
-
-        <p className="line-clamp-1 text-xs text-slate-400">
-          {movie.origin_name || "Đang cập nhật"}
-        </p>
-
-        <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>{movie.year || "N/A"}</span>
-          <span>{movie.quality || "HD"}</span>
-        </div>
-      </div>
 
       {/* Overlay này vẫn dùng cho PC/mobile. TV remote sẽ không đi vào các nút bên trong. */}
       <div

@@ -26,17 +26,21 @@ type TvDashboardProps = {
 };
 
 const FAVORITES_KEY = "baoflix_favorites";
+const TV_CARD_FOCUS_CLASS =
+  "focus-visible:-translate-y-1 focus-visible:scale-[1.035] focus-visible:border-yellow-300 focus-visible:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black";
 
 const tvShortcuts = [
   {
-    label: "Tìm kiếm",
-    desc: "Tìm phim nhanh",
-    href: "/tim-kiem",
+    label: "Bộ lọc nhanh",
+    desc: "Chọn quốc gia, thể loại, ngôn ngữ",
+    href: "/loc",
+    hot: true,
   },
   {
-    label: "Bộ lọc",
-    desc: "Lọc theo quốc gia/ngôn ngữ",
-    href: "/loc",
+    label: "Phim bộ Trung",
+    desc: "Series Trung Quốc",
+    href: "/loc?type=phim-bo&country=trung-quoc",
+    hot: true,
   },
   {
     label: "Phim Hàn",
@@ -49,9 +53,14 @@ const tvShortcuts = [
     href: "/loc?country=nhat-ban",
   },
   {
-    label: "Phim bộ Trung",
-    desc: "Series Trung Quốc",
-    href: "/loc?type=phim-bo&country=trung-quoc",
+    label: "Vietsub",
+    desc: "Lọc bản phụ đề",
+    href: "/loc?sort_lang=vietsub",
+  },
+  {
+    label: "Thuyết minh",
+    desc: "Dễ xem trên TV",
+    href: "/loc?sort_lang=thuyet-minh",
   },
   {
     label: "Yêu thích",
@@ -70,7 +79,7 @@ const tvShortcuts = [
   },
   {
     label: "Cài đặt",
-    desc: "Tai lai app va TV mode",
+    desc: "Reload app và TV mode",
     href: "/cai-dat",
   },
 ];
@@ -87,6 +96,7 @@ function uniqueShortcutItems<T extends { href: string }>(items: T[]) {
     return true;
   });
 }
+
 function readFavorites(): FavoriteItem[] {
   try {
     const raw = localStorage.getItem(FAVORITES_KEY);
@@ -120,6 +130,7 @@ function TvMovieCard({
   badge,
   meta,
   large,
+  focusKey,
 }: {
   href: string;
   image?: string;
@@ -128,12 +139,15 @@ function TvMovieCard({
   badge?: string;
   meta?: string;
   large?: boolean;
+  focusKey?: string;
 }) {
   return (
     <Link
       href={href}
+      data-tv-focus-key={focusKey || href}
       className={[
-        "group block overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-3 transition duration-200 hover:-translate-y-1 hover:border-red-500/70 hover:bg-white/[0.08] focus-visible:-translate-y-1 focus-visible:scale-[1.03] focus-visible:border-yellow-300 focus-visible:bg-white/[0.08] md:p-4",
+        "group block overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-3 transition duration-200 hover:-translate-y-1 hover:border-red-500/70 hover:bg-white/[0.08] md:p-4",
+        TV_CARD_FOCUS_CLASS,
         large ? "md:p-4" : "",
       ].join(" ")}
     >
@@ -195,7 +209,11 @@ function SectionTitle({
       {href && (
         <Link
           href={href}
-          className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10"
+          data-tv-focus-key={`section-more:${href}`}
+          className={[
+            "rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10",
+            TV_CARD_FOCUS_CLASS,
+          ].join(" ")}
         >
           Xem thêm
         </Link>
@@ -208,15 +226,24 @@ function ShortcutCard({
   label,
   desc,
   href,
+  hot,
 }: {
   label: string;
   desc: string;
   href: string;
+  hot?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 transition hover:border-yellow-300/60 hover:bg-white/[0.08] focus-visible:border-yellow-300 focus-visible:bg-white/[0.08]"
+      data-tv-focus-key={`shortcut:${href}`}
+      className={[
+        "rounded-3xl border p-5 transition hover:border-yellow-300/60 hover:bg-white/[0.08]",
+        hot
+          ? "border-yellow-300/25 bg-yellow-300/[0.08]"
+          : "border-white/10 bg-white/[0.04]",
+        TV_CARD_FOCUS_CLASS,
+      ].join(" ")}
     >
       <h3 className="text-lg font-black md:text-xl">{label}</h3>
 
@@ -229,7 +256,11 @@ function ContinueHero({ item }: { item: WatchHistoryItem }) {
   return (
     <Link
       href={getHistoryHref(item)}
-      className="group block rounded-[2rem] border border-yellow-300/20 bg-yellow-300/10 p-4 transition hover:border-yellow-300/60 hover:bg-yellow-300/15 focus-visible:border-yellow-300"
+      data-tv-focus-key={`continue:${item.slug}`}
+      className={[
+        "group block rounded-[2rem] border border-yellow-300/20 bg-yellow-300/10 p-4 transition hover:border-yellow-300/60 hover:bg-yellow-300/15",
+        TV_CARD_FOCUS_CLASS,
+      ].join(" ")}
     >
       <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
         <div className="overflow-hidden rounded-3xl bg-white/5">
@@ -312,7 +343,10 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
 
   return (
     <div className="baoflix-tv-page space-y-10">
-      <section className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-5 md:p-8">
+      <section
+        data-tv-section="hero"
+        className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-5 md:p-8"
+      >
         <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-center">
           <div>
             <p className="mb-3 text-sm font-black uppercase tracking-[0.3em] text-red-300">
@@ -320,50 +354,68 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             </p>
 
             <h1 className="text-4xl font-black md:text-6xl">
-              Vào là xem, ít thao tác hơn
+              Mở TV là vào xem ngay
             </h1>
 
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-              TV Mode gom Xem tiếp, tìm kiếm, phim riêng, yêu thích và các lối
-              tắt hay dùng vào một màn hình lớn.
+              D-pad ưu tiên theo hàng như app TV: Xem tiếp, tìm nhanh, bộ lọc
+              và phim riêng đều nằm ở các cụm rõ để không lạc focus.
             </p>
 
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div data-tv-row data-tv-row-wrap="true" className="mt-6 flex flex-wrap gap-3">
               {firstContinue ? (
                 <Link
                   href={getHistoryHref(firstContinue)}
-                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200"
+                  data-tv-default
+                  data-tv-focus-key="hero:continue"
+                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
                 >
                   ▶ Xem tiếp
                 </Link>
               ) : (
                 <Link
-                  href="/tim-kiem"
-                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200"
+                  href="/loc"
+                  data-tv-default
+                  data-tv-focus-key="hero:filter"
+                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
                 >
-                  🔎 Tìm phim
+                  Lọc phim
                 </Link>
               )}
 
               <Link
                 href="/loc?type=phim-bo&country=trung-quoc"
-                className="rounded-2xl bg-red-600 px-6 py-4 text-base font-black text-white hover:bg-red-500"
+                data-tv-focus-key="hero:china-series"
+                className="rounded-2xl bg-red-600 px-6 py-4 text-base font-black text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
               >
                 Phim bộ Trung
               </Link>
 
               <Link
-                href="/"
-                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-black hover:bg-white/10"
+                href="/loc"
+                data-tv-focus-key="hero:all-filter"
+                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
               >
-                Trang chủ thường
+                Bộ lọc
+              </Link>
+
+              <Link
+                href="/"
+                data-tv-focus-key="hero:normal-home"
+                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+              >
+                Trang thường
               </Link>
             </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
             {firstContinue ? (
-              <Link href={getHistoryHref(firstContinue)} className="block">
+              <Link
+                href={getHistoryHref(firstContinue)}
+                data-tv-focus-key="hero:continue-card"
+                className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+              >
                 <div className="flex gap-4">
                   <div className="w-24 shrink-0 overflow-hidden rounded-2xl bg-white/5">
                     <img
@@ -409,7 +461,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
       <TvSearchBox />
 
       {firstContinue && (
-        <section>
+        <section data-tv-section="continue">
           <SectionTitle
             title="Đang xem dở"
             desc="Ưu tiên phim gần nhất để mở lên là xem tiếp ngay."
@@ -424,6 +476,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                 <TvMovieCard
                   key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
                   href={getHistoryHref(item)}
+                  focusKey={`continue:${item.slug}`}
                   image={item.poster_url || item.thumb_url}
                   title={item.name}
                   subtitle={item.episodeName || item.origin_name}
@@ -441,26 +494,27 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
         </section>
       )}
 
-      <section>
+      <section data-tv-section="shortcuts">
         <SectionTitle
           title="Lối tắt TV"
-          desc="Nút lớn, dễ bấm bằng remote hoặc trên iPhone."
+          desc="Các nút hay bấm được đưa lên trước, khỏi mò menu bằng remote."
         />
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {uniqueShortcutItems(tvShortcuts).map((item) => (
             <ShortcutCard
               key={item.href}
               label={item.label}
               desc={item.desc}
               href={item.href}
+              hot={item.hot}
             />
           ))}
         </div>
       </section>
 
       {chineseSeries.length > 0 && (
-        <section>
+        <section data-tv-section="china-series">
           <SectionTitle
             title="Phim bộ Trung Quốc"
             desc="Ưu tiên hiện trên TV Mode theo gu mới."
@@ -472,6 +526,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <TvMovieCard
                 key={movie.slug}
                 href={`/phim/${movie.slug}`}
+                focusKey={`china:${movie.slug}`}
                 image={movie.poster_url || movie.thumb_url}
                 title={movie.name}
                 subtitle={movie.origin_name}
@@ -485,7 +540,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
       )}
 
       {customMovies.length > 0 && (
-        <section>
+        <section data-tv-section="custom">
           <SectionTitle
             title="Phim riêng"
             desc="Các phim fen tự thêm bằng giao diện."
@@ -497,6 +552,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <TvMovieCard
                 key={item.movie.slug}
                 href={`/ca-nhan/${item.movie.slug}`}
+                focusKey={`custom:${item.movie.slug}`}
                 image={item.movie.poster_url || item.movie.thumb_url}
                 title={item.movie.name}
                 subtitle={item.movie.origin_name}
@@ -510,7 +566,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
       )}
 
       {favorites.length > 0 && (
-        <section>
+        <section data-tv-section="favorites">
           <SectionTitle
             title="Yêu thích"
             desc="Các phim đã lưu."
@@ -522,6 +578,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <TvMovieCard
                 key={item.slug}
                 href={`/phim/${item.slug}`}
+                focusKey={`favorite:${item.slug}`}
                 image={item.poster_url || item.thumb_url}
                 title={item.name}
                 subtitle={item.origin_name}

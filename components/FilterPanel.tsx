@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Taxonomy } from "@/lib/kkphim";
@@ -21,33 +22,35 @@ type Props = {
   current: CurrentFilters;
 };
 
+const TV_FOCUS_CLASS =
+  "focus-visible:scale-[1.035] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black";
+
 const priorityCountrySlugs = [
+  "trung-quoc",
   "han-quoc",
-  "thai-lan",
   "nhat-ban",
+  "thai-lan",
   "au-my",
   "hong-kong",
-  "trung-quoc",
   "anh",
   "an-do",
 ];
 
 const priorityCountryNames = [
+  "Trung Quốc",
   "Hàn Quốc",
-  "Thái Lan",
   "Nhật Bản",
+  "Thái Lan",
   "Âu Mỹ",
   "Hồng Kông",
-  "Trung Quốc",
   "Anh",
   "Ấn Độ",
 ];
 
 const priorityGenreSlugs = [
-  "chinh-kich",
-  "khoa-hoc",
-  "tinh-cam",
   "co-trang",
+  "tinh-cam",
+  "chinh-kich",
   "tam-ly",
   "bi-an",
   "hanh-dong",
@@ -56,15 +59,15 @@ const priorityGenreSlugs = [
   "phieu-luu",
   "gia-dinh",
   "kinh-di",
+  "khoa-hoc",
   "tai-lieu",
   "chieu-rap",
 ];
 
 const priorityGenreNames = [
-  "Chính Kịch",
-  "Khoa Học",
-  "Tình Cảm",
   "Cổ Trang",
+  "Tình Cảm",
+  "Chính Kịch",
   "Tâm Lý",
   "Bí Ẩn",
   "Hành Động",
@@ -73,8 +76,42 @@ const priorityGenreNames = [
   "Phiêu Lưu",
   "Gia Đình",
   "Kinh Dị",
+  "Khoa Học",
   "Tài Liệu",
   "Chiếu rạp",
+];
+
+const tvPresets = [
+  {
+    label: "Phim bộ Trung",
+    desc: "Series dài",
+    href: "/loc?type=phim-bo&country=trung-quoc",
+  },
+  {
+    label: "Hàn Quốc",
+    desc: "Drama Hàn",
+    href: "/loc?country=han-quoc",
+  },
+  {
+    label: "Nhật Bản",
+    desc: "J-drama/anime",
+    href: "/loc?country=nhat-ban",
+  },
+  {
+    label: "Cổ trang",
+    desc: "Cổ trang/kiếm hiệp",
+    href: "/loc?category=co-trang",
+  },
+  {
+    label: "Vietsub",
+    desc: "Phụ đề",
+    href: "/loc?sort_lang=vietsub",
+  },
+  {
+    label: "Thuyết minh",
+    desc: "Dễ xem TV",
+    href: "/loc?sort_lang=thuyet-minh",
+  },
 ];
 
 const movieTypes = [
@@ -99,9 +136,21 @@ const languageModes = [
 ];
 
 const quickModes = [
-  { label: "Phim Vietsub", value: "phim-vietsub" },
-  { label: "Phim thuyết minh", value: "phim-thuyet-minh" },
-  { label: "Phim lồng tiếng", value: "phim-long-tieng" },
+  {
+    label: "Vietsub nhanh",
+    value: "vietsub",
+    desc: "Chỉ bản phụ đề",
+  },
+  {
+    label: "Thuyết minh nhanh",
+    value: "thuyet-minh",
+    desc: "Ưu tiên bản nghe tiếng Việt",
+  },
+  {
+    label: "Lồng tiếng nhanh",
+    value: "long-tieng",
+    desc: "Phim có lồng tiếng",
+  },
 ];
 
 const sortOptions = [
@@ -231,6 +280,7 @@ function FilterRow({
   return (
     <div
       data-tv-row
+      data-tv-row-wrap="true"
       className="grid gap-3 border-b border-white/10 py-4 md:grid-cols-[150px_1fr]"
     >
       <div className="font-bold text-slate-100">{label}:</div>
@@ -244,23 +294,27 @@ function OptionButton({
   children,
   onClick,
   disabled,
+  focusKey,
 }: {
   active?: boolean;
   children: React.ReactNode;
   onClick?: () => void;
   disabled?: boolean;
+  focusKey?: string;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
+      data-tv-focus-key={focusKey}
       className={[
-        "rounded-xl border px-4 py-2 text-sm transition",
+        "rounded-2xl border px-4 py-3 text-sm font-black transition md:px-5",
         active
           ? "border-yellow-300 bg-yellow-300 text-black"
           : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
         disabled ? "cursor-not-allowed opacity-40" : "",
+        TV_FOCUS_CLASS,
       ].join(" ")}
     >
       {children}
@@ -272,16 +326,22 @@ function SelectBox({
   value,
   onChange,
   children,
+  focusKey,
 }: {
   value: string;
   onChange: (value: string) => void;
   children: React.ReactNode;
+  focusKey?: string;
 }) {
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="rounded-xl border border-white/10 bg-[#10131d] px-4 py-2 text-sm text-slate-200 outline-none hover:bg-white/10"
+      data-tv-focus-key={focusKey}
+      className={[
+        "rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-sm font-black text-slate-200 outline-none hover:bg-white/10",
+        TV_FOCUS_CLASS,
+      ].join(" ")}
     >
       {children}
     </select>
@@ -323,7 +383,10 @@ function SelectedSummary({
       <button
         type="button"
         onClick={onClear}
-        className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-bold text-white hover:bg-white/10"
+        className={[
+          "rounded-full border border-white/10 bg-black/30 px-3 py-1 text-xs font-bold text-white hover:bg-white/10",
+          TV_FOCUS_CLASS,
+        ].join(" ")}
       >
         Xóa nhóm này
       </button>
@@ -387,7 +450,15 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     categoryTags.includes(item.slug)
   );
 
-  function applyFilter() {
+  const selectedCount =
+    (type !== "tat-ca" ? 1 : 0) +
+    (subtype !== "tat-ca" ? 1 : 0) +
+    countryTags.length +
+    categoryTags.length +
+    (year !== "tat-ca" ? 1 : 0) +
+    (sortLang !== "tat-ca" ? 1 : 0);
+
+  function buildFilterHref() {
     const params = new URLSearchParams();
 
     if (type !== "tat-ca") params.set("type", type);
@@ -415,7 +486,11 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     }
 
     const query = params.toString();
-    router.push(query ? `/loc?${query}` : "/loc");
+    return query ? `/loc?${query}` : "/loc";
+  }
+
+  function applyFilter() {
+    router.push(buildFilterHref());
   }
 
   function clearFilter() {
@@ -429,32 +504,86 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     router.push("/loc");
   }
 
-  function applyQuickMode(value: string) {
-    const params = new URLSearchParams();
-    params.set("type", value);
-    router.push(`/loc?${params.toString()}`);
-  }
-
   return (
-    <section className="mb-8 rounded-3xl border border-white/10 bg-[#10131d]/95 p-5 shadow-2xl">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xl font-black">
-          <span className="text-yellow-300">▼</span>
-          Bộ lọc
+    <section
+      data-tv-filter-panel
+      className="mb-8 rounded-3xl border border-white/10 bg-[#10131d]/95 p-5 shadow-2xl"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xl font-black">
+            <span className="text-yellow-300">▼</span>
+            Bộ lọc TV
+          </div>
+          <p className="mt-1 text-sm text-slate-400">
+            Chọn chip bằng OK, xuống cuối bấm “Lọc kết quả”. Back sẽ về TV Home.
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-        >
-          {open ? "Ẩn bộ lọc" : "Hiện bộ lọc"}
-        </button>
+        <div data-tv-row data-tv-row-wrap="true" className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={applyFilter}
+            data-tv-default
+            data-tv-jump-results="true"
+            data-tv-focus-key="filter:apply-top"
+            className={[
+              "rounded-2xl bg-yellow-300 px-5 py-3 text-sm font-black text-black hover:bg-yellow-200",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            Lọc kết quả {selectedCount > 0 ? `(${selectedCount})` : ""}
+          </button>
+
+          <button
+            type="button"
+            onClick={clearFilter}
+            data-tv-focus-key="filter:clear-top"
+            className={[
+              "rounded-2xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-black text-white hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            Xóa lọc
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            data-tv-focus-key="filter:toggle"
+            className={[
+              "rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            {open ? "Ẩn" : "Hiện"}
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <p className="mb-3 text-sm font-black text-slate-200">Lối tắt giống tab TV</p>
+        <div data-tv-row data-tv-row-wrap="true" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {tvPresets.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              data-tv-focus-key={`filter:preset:${item.href}`}
+              className={[
+                "rounded-3xl border border-white/10 bg-white/[0.055] p-4 transition hover:border-yellow-300/60 hover:bg-white/[0.09]",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              <p className="text-sm font-black text-white">{item.label}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-400">{item.desc}</p>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {!open && (
         <p className="mt-3 text-sm text-slate-400">
-          Bộ lọc đang được ẩn. Bấm “Hiện bộ lọc” để mở lại.
+          Bộ lọc đang được ẩn. Bấm “Hiện” để mở lại.
         </p>
       )}
 
@@ -464,12 +593,9 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             {quickModes.map((item) => (
               <OptionButton
                 key={item.value}
-                active={type === item.value}
-                onClick={() => {
-                  setType(item.value);
-                  setSubtype("tat-ca");
-                  applyQuickMode(item.value);
-                }}
+                active={sortLang === item.value}
+                focusKey={`filter:quick:${item.value}`}
+                onClick={() => setSortLang(item.value)}
               >
                 {item.label}
               </OptionButton>
@@ -479,6 +605,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           <FilterRow label="Quốc gia">
             <OptionButton
               active={countryTags.length === 0}
+              focusKey="filter:country:all"
               onClick={() => setCountryTags([])}
             >
               Tất cả
@@ -488,6 +615,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.slug}
                 active={countryTags.includes(item.slug)}
+                focusKey={`filter:country:${item.slug}`}
                 onClick={() =>
                   setCountryTags((oldList) => toggleValue(oldList, item.slug))
                 }
@@ -501,6 +629,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.slug}
                 active
+                focusKey={`filter:country:${item.slug}`}
                 onClick={() =>
                   setCountryTags((oldList) => toggleValue(oldList, item.slug))
                 }
@@ -512,6 +641,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             {sortedCountries.otherItems.length > 0 && (
               <SelectBox
                 value="tat-ca"
+                focusKey="filter:country:select-other"
                 onChange={(value) =>
                   setCountryTags((oldList) => addValue(oldList, value))
                 }
@@ -539,6 +669,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.value}
                 active={type === item.value}
+                focusKey={`filter:type:${item.value}`}
                 onClick={() => {
                   setType(item.value);
 
@@ -558,6 +689,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
                 <OptionButton
                   key={item.value}
                   active={subtype === item.value}
+                  focusKey={`filter:subtype:${item.value}`}
                   onClick={() => setSubtype(item.value)}
                 >
                   {item.label}
@@ -571,6 +703,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.value}
                 active={sortLang === item.value}
+                focusKey={`filter:lang:${item.value}`}
                 onClick={() => setSortLang(item.value)}
               >
                 {item.label}
@@ -581,6 +714,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           <FilterRow label="Thể loại">
             <OptionButton
               active={categoryTags.length === 0}
+              focusKey="filter:genre:all"
               onClick={() => setCategoryTags([])}
             >
               Tất cả
@@ -590,6 +724,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.slug}
                 active={categoryTags.includes(item.slug)}
+                focusKey={`filter:genre:${item.slug}`}
                 onClick={() =>
                   setCategoryTags((oldList) => toggleValue(oldList, item.slug))
                 }
@@ -603,6 +738,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.slug}
                 active
+                focusKey={`filter:genre:${item.slug}`}
                 onClick={() =>
                   setCategoryTags((oldList) => toggleValue(oldList, item.slug))
                 }
@@ -614,6 +750,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             {sortedGenres.otherItems.length > 0 && (
               <SelectBox
                 value="tat-ca"
+                focusKey="filter:genre:select-other"
                 onChange={(value) =>
                   setCategoryTags((oldList) => addValue(oldList, value))
                 }
@@ -639,6 +776,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           <FilterRow label="Năm sản xuất">
             <OptionButton
               active={year === "tat-ca"}
+              focusKey="filter:year:all"
               onClick={() => setYear("tat-ca")}
             >
               Tất cả
@@ -648,6 +786,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item}
                 active={year === item}
+                focusKey={`filter:year:${item}`}
                 onClick={() => setYear(item)}
               >
                 {item}
@@ -660,6 +799,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               <OptionButton
                 key={item.value}
                 active={sort === item.value}
+                focusKey={`filter:sort:${item.value}`}
                 onClick={() => setSort(item.value)}
               >
                 {item.label}
@@ -670,11 +810,16 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             <OptionButton disabled>Lượt xem</OptionButton>
           </FilterRow>
 
-          <div data-tv-row className="mt-6 flex flex-wrap gap-3">
+          <div data-tv-row data-tv-row-wrap="true" className="mt-6 flex flex-wrap gap-3">
             <button
               type="button"
               onClick={applyFilter}
-              className="rounded-2xl bg-yellow-300 px-7 py-3 font-black text-black hover:bg-yellow-200"
+              data-tv-jump-results="true"
+              data-tv-focus-key="filter:apply-bottom"
+              className={[
+                "rounded-2xl bg-yellow-300 px-7 py-4 font-black text-black hover:bg-yellow-200",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
             >
               Lọc kết quả →
             </button>
@@ -682,7 +827,11 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             <button
               type="button"
               onClick={clearFilter}
-              className="rounded-2xl border border-white/15 bg-white/5 px-7 py-3 font-bold text-white hover:bg-white/10"
+              data-tv-focus-key="filter:clear-bottom"
+              className={[
+                "rounded-2xl border border-white/15 bg-white/5 px-7 py-4 font-bold text-white hover:bg-white/10",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
             >
               Xóa lọc
             </button>

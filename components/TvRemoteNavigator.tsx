@@ -113,6 +113,10 @@ function isPlayPauseKey(event: KeyboardEvent) {
   );
 }
 
+function isWatchPath(path: string) {
+  return /^\/xem\/[^/?#]+/.test(path) || /^\/ca-nhan\/[^/]+\/xem/.test(path);
+}
+
 function getHiddenWatchOverlay() {
   return document.querySelector<HTMLElement>(
     "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
@@ -312,14 +316,7 @@ function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect) {
   }, null)?.element || null;
 }
 
-function getLinearCandidate(
-  current: HTMLElement,
-  root: ParentNode,
-  elements: HTMLElement[],
-  direction: Direction
-) {
-  const rows = buildRows(root, elements);
-
+function findRowIndex(rows: FocusEntry[][], current: HTMLElement) {
   let rowIndex = -1;
   let itemIndex = -1;
 
@@ -335,6 +332,18 @@ function getLinearCandidate(
     return false;
   });
 
+  return { rowIndex, itemIndex };
+}
+
+function getLinearCandidate(
+  current: HTMLElement,
+  root: ParentNode,
+  elements: HTMLElement[],
+  direction: Direction
+) {
+  const rows = buildRows(root, elements);
+  const { rowIndex, itemIndex } = findRowIndex(rows, current);
+
   if (rowIndex < 0 || itemIndex < 0) {
     return elements[0] || null;
   }
@@ -343,13 +352,15 @@ function getLinearCandidate(
   const previousRow = rows[rowIndex - 1];
   const nextRow = rows[rowIndex + 1];
   const currentEntry = currentRow[itemIndex];
+  const rowContainer = current.closest<HTMLElement>("[data-tv-row]");
+  const shouldWrap = rowContainer?.dataset.tvRowWrap === "true";
 
   if (direction === "right") {
-    return currentRow[itemIndex + 1]?.element || current;
+    return currentRow[itemIndex + 1]?.element || (shouldWrap ? currentRow[0]?.element : current);
   }
 
   if (direction === "left") {
-    return currentRow[itemIndex - 1]?.element || current;
+    return currentRow[itemIndex - 1]?.element || (shouldWrap ? currentRow[currentRow.length - 1]?.element : current);
   }
 
   if (direction === "down") {
@@ -504,8 +515,7 @@ function closeModalIfNeeded(event: KeyboardEvent) {
   return true;
 }
 
-function getFallbackBackHref() {
-  const path = window.location.pathname;
+function getFallbackBackHref(path = window.location.pathname) {
   const normalWatchMatch = path.match(/^\/xem\/([^/?#]+)/);
   const customWatchMatch = path.match(/^\/ca-nhan\/([^/]+)\/xem/);
 
@@ -517,8 +527,8 @@ function getFallbackBackHref() {
     return `/ca-nhan/${customWatchMatch[1]}`;
   }
 
-  if (isTvRemoteEnabled() && path !== "/tv") {
-    return "/tv";
+  if (isTvRemoteEnabled()) {
+    return path === "/tv" ? "/" : "/tv";
   }
 
   if (path !== "/") {
@@ -532,12 +542,19 @@ function goBack(event: KeyboardEvent) {
   event.preventDefault();
   event.stopPropagation();
 
+  const path = window.location.pathname;
+
+  if (isTvRemoteEnabled()) {
+    window.location.href = getFallbackBackHref(path);
+    return;
+  }
+
   if (window.history.length > 1) {
     window.history.back();
     return;
   }
 
-  window.location.href = getFallbackBackHref();
+  window.location.href = getFallbackBackHref(path);
 }
 
 function handlePlaybackShortcut(event: KeyboardEvent, direction: Direction | null) {
@@ -558,6 +575,15 @@ function handlePlaybackShortcut(event: KeyboardEvent, direction: Direction | nul
 
   dispatchPlayerCommand("seek", wantsForward ? SEEK_SECONDS : -SEEK_SECONDS);
   dispatchOverlayCommand("peek", { focus: false });
+  return true;
+}
+
+function jumpToPageSection(selector: string, pathname: string) {
+  const target = document.querySelector<HTMLElement>(selector);
+
+  if (!target || !isVisibleElement(target)) return false;
+
+  focusElement(target, pathname);
   return true;
 }
 
@@ -722,6 +748,33 @@ export default function TvRemoteNavigator() {
         }
 
         return;
+      }
+
+      if (
+        pathname === "/tv" &&
+        direction === "up" &&
+        activeElement instanceof HTMLElement &&
+        activeElement.closest("[data-tv-section='shortcuts']")
+      ) {
+        if (jumpToPageSection("[data-tv-section='hero'] [data-tv-default], [data-tv-section='hero'] a[href]", pathname)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+      }
+
+      if (
+        pathname === "/loc" &&
+        direction === "down" &&
+        activeElement instanceof HTMLElement &&
+        activeElement.closest("[data-tv-filter-panel]") &&
+        activeElement.getAttribute("data-tv-jump-results") === "true"
+      ) {
+        if (jumpToPageSection("[data-tv-section='filter-results'] a[href], [data-tv-section='filter-results'] button:not([disabled])", pathname)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
       }
 
       const modalScope = getModalScope();

@@ -13,14 +13,15 @@ export default function MovieGrid({
 }) {
   if (!movies?.length) {
     return (
-      <section className="py-8">
+      <section data-tv-section="filter-results" className="py-8">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-2xl font-black">{title}</h2>
 
           {href && (
             <Link
               href={href}
-              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-slate-200 hover:bg-white/10"
+              data-tv-focus-key={`movie-grid-more:${href}`}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
             >
               Xem thêm →
             </Link>
@@ -35,14 +36,15 @@ export default function MovieGrid({
   }
 
   return (
-    <section className="py-8">
+    <section data-tv-section="filter-results" className="py-8">
       <div className="mb-5 flex items-center justify-between gap-3">
         <h2 className="text-2xl font-black">{title}</h2>
 
         {href && (
           <Link
             href={href}
-            className="shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-slate-200 hover:bg-white/10"
+            data-tv-focus-key={`movie-grid-more:${href}`}
+            className="shrink-0 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-black text-slate-200 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
           >
             Xem thêm →
           </Link>

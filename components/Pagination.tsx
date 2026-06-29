@@ -50,11 +50,12 @@ export default function Pagination({
   ).filter((page) => page >= 1 && page <= totalPages);
 
   return (
-    <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+    <div data-tv-row data-tv-row-wrap="true" className="mt-8 flex flex-wrap items-center justify-center gap-2">
       {safeCurrent > 1 && (
         <Link
           href={createHref(basePath, searchParams, safeCurrent - 1)}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+          data-tv-focus-key={`pagination:prev:${safeCurrent - 1}`}
+          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
         >
           ← Trang trước
         </Link>
@@ -70,8 +71,9 @@ export default function Pagination({
 
             <Link
               href={createHref(basePath, searchParams, page)}
+              data-tv-focus-key={`pagination:page:${page}`}
               className={[
-                "rounded-xl border px-4 py-2 text-sm",
+                "rounded-xl border px-4 py-3 text-sm font-black focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black",
                 page === safeCurrent
                   ? "border-red-500 bg-red-600 text-white"
                   : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
@@ -86,7 +88,8 @@ export default function Pagination({
       {safeCurrent < totalPages && (
         <Link
           href={createHref(basePath, searchParams, safeCurrent + 1)}
-          className="rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
+          data-tv-focus-key={`pagination:next:${safeCurrent + 1}`}
+          className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
         >
           Trang sau →
         </Link>

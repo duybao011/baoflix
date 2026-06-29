@@ -5,6 +5,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
+const TV_FOCUS_CLASS =
+  "focus-visible:scale-[1.035] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black";
 
 const quickKeywordGroups = [
   {
@@ -24,34 +26,42 @@ const quickKeywordGroups = [
 const quickFilters = [
   {
     label: "Phim bộ Trung",
+    desc: "Series dài, mở là lọc",
     href: "/loc?type=phim-bo&country=trung-quoc",
   },
   {
-    label: "Phim Hàn",
+    label: "Hàn Quốc",
+    desc: "Phim Hàn",
     href: "/loc?country=han-quoc",
   },
   {
-    label: "Phim Nhật",
+    label: "Nhật Bản",
+    desc: "Phim Nhật",
     href: "/loc?country=nhat-ban",
   },
   {
     label: "Anime",
+    desc: "Hoạt hình",
     href: "/danh-sach/hoat-hinh",
   },
   {
     label: "Vietsub",
+    desc: "Có phụ đề",
     href: "/loc?sort_lang=vietsub",
   },
   {
     label: "Thuyết minh",
+    desc: "Dễ xem TV",
     href: "/loc?sort_lang=thuyet-minh",
   },
   {
     label: "Lồng tiếng",
+    desc: "Nghe tiếng Việt",
     href: "/loc?sort_lang=long-tieng",
   },
   {
     label: "Phim lẻ",
+    desc: "Xem nhanh",
     href: "/danh-sach/phim-le",
   },
 ];
@@ -137,26 +147,57 @@ export default function TvSearchBox() {
   const showHistory = hydrated && history.length > 0;
 
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 md:p-6">
+    <section
+      data-tv-section="search"
+      className="rounded-[2rem] border border-white/10 bg-white/[0.04] p-5 md:p-6"
+    >
       <div className="mb-4">
         <h2 className="text-2xl font-black md:text-3xl">Tìm nhanh trên TV</h2>
 
         <p className="mt-1 text-sm text-slate-400">
-          Nhập bằng remote khá cực, nên BảoFlix ưu tiên chip tìm nhanh và bộ lọc lớn.
+          Ưu tiên chip và lối tắt trước, chỉ nhập chữ khi thật sự cần.
         </p>
       </div>
 
-      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-[1fr_auto]">
+      <div data-tv-row data-tv-row-wrap="true" className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {quickFilters.slice(0, 4).map((item, index) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            data-tv-focus-key={`tv-search-filter:${item.href}`}
+            className={[
+              "rounded-3xl border p-4 transition hover:border-yellow-300/70 hover:bg-white/[0.08]",
+              index === 0
+                ? "border-yellow-300/25 bg-yellow-300/[0.08]"
+                : "border-white/10 bg-black/20",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
+          >
+            <p className="text-base font-black text-white">{item.label}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-400">{item.desc}</p>
+          </Link>
+        ))}
+      </div>
+
+      <form onSubmit={submit} data-tv-row className="grid gap-3 sm:grid-cols-[1fr_auto]">
         <input
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="Nhập tên phim..."
-          className="h-16 rounded-3xl border border-white/10 bg-black/30 px-5 text-lg font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300 md:h-20 md:text-2xl"
+          placeholder="Nhập tên phim nếu chip chưa đủ..."
+          data-tv-focus-key="tv-search-input"
+          className={[
+            "h-14 rounded-3xl border border-white/10 bg-black/30 px-5 text-base font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300 md:h-16 md:text-xl",
+            TV_FOCUS_CLASS,
+          ].join(" ")}
         />
 
         <button
           type="submit"
-          className="h-16 rounded-3xl bg-yellow-300 px-8 text-lg font-black text-black hover:bg-yellow-200 md:h-20 md:text-2xl"
+          data-tv-focus-key="tv-search-submit"
+          className={[
+            "h-14 rounded-3xl bg-yellow-300 px-8 text-base font-black text-black hover:bg-yellow-200 md:h-16 md:text-xl",
+            TV_FOCUS_CLASS,
+          ].join(" ")}
         >
           Tìm
         </button>
@@ -170,19 +211,27 @@ export default function TvSearchBox() {
             <button
               type="button"
               onClick={clearHistory}
-              className="text-xs font-bold text-red-300 hover:text-red-200"
+              data-tv-focus-key="tv-search-clear-history"
+              className={[
+                "rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-xs font-bold text-red-200 hover:bg-red-300/20",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
             >
               Xóa hết
             </button>
           </div>
 
-          <div data-tv-row className="flex flex-wrap gap-2">
+          <div data-tv-row data-tv-row-wrap="true" className="flex flex-wrap gap-2">
             {history.slice(0, 10).map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => goSearch(item)}
-                className="max-w-[220px] truncate rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-red-600 hover:text-white"
+                data-tv-focus-key={`tv-search-history:${item}`}
+                className={[
+                  "max-w-[220px] truncate rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-red-600 hover:text-white",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
                 title={item}
               >
                 {item}
@@ -197,13 +246,17 @@ export default function TvSearchBox() {
           <div key={group.title}>
             <p className="mb-3 text-sm font-black text-slate-200">{group.title}</p>
 
-            <div data-tv-row className="flex flex-wrap gap-2">
+            <div data-tv-row data-tv-row-wrap="true" className="flex flex-wrap gap-2">
               {group.items.map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => goSearch(item)}
-                  className="rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-white/10"
+                  data-tv-focus-key={`tv-search-chip:${group.title}:${item}`}
+                  className={[
+                    "rounded-full border border-white/10 bg-white/5 px-5 py-3 text-base font-black text-slate-200 hover:bg-white/10",
+                    TV_FOCUS_CLASS,
+                  ].join(" ")}
                 >
                   {item}
                 </button>
@@ -213,12 +266,16 @@ export default function TvSearchBox() {
         ))}
       </div>
 
-      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+      <div data-tv-row data-tv-row-wrap="true" className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {quickFilters.map((item) => (
           <Link
             key={item.href}
             href={item.href}
-            className="rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-center text-sm font-black hover:border-yellow-300/60 hover:bg-white/10"
+            data-tv-focus-key={`tv-search-filter-bottom:${item.href}`}
+            className={[
+              "rounded-2xl border border-white/10 bg-black/20 px-4 py-5 text-center text-sm font-black hover:border-yellow-300/60 hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             {item.label}
           </Link>
