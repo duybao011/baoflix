@@ -29,18 +29,23 @@ type ShowOverlayDetail = {
   focus?: boolean;
 };
 
+type OverlayCommandDetail = {
+  action: "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "activity";
+  focus?: boolean;
+};
+
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+type OverlayMode = "hidden" | "peek" | "panel";
 type OverlayPanel = "episodes" | "sources" | null;
 
 const AUTO_HIDE_MS = 3400;
 const SEEK_SECONDS = 10;
 
-// Nhỏ hơn bản trước khoảng 45–55%, nhưng vẫn giữ focus đủ rõ cho TV.
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-[1.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_22px_rgba(250,204,21,0.36)]";
+  "focus-visible:scale-[1.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_18px_rgba(250,204,21,0.38)]";
 
 const SURFACE_BUTTON_CLASS =
-  "rounded-xl border border-white/[0.12] bg-black/[0.46] text-white shadow-xl shadow-black/25 backdrop-blur-md transition hover:bg-white/[0.13]";
+  "rounded-xl border border-white/[0.12] bg-black/[0.48] text-white shadow-xl shadow-black/30 backdrop-blur-md transition hover:bg-white/[0.14]";
 
 const PRIMARY_BUTTON_CLASS =
   "rounded-xl bg-yellow-300 text-black shadow-xl shadow-yellow-950/20 transition hover:bg-yellow-200";
@@ -69,24 +74,10 @@ function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
       detail: {
         action,
         seconds,
+        handled: false,
       },
     })
   );
-}
-
-function isBackKeyEvent(event: KeyboardEvent) {
-  const backKeys = new Set([
-    "Escape",
-    "Backspace",
-    "BrowserBack",
-    "GoBack",
-    "Back",
-    "Cancel",
-    "XF86Back",
-  ]);
-  const backCodes = new Set([4, 8, 27, 461, 10009]);
-
-  return backKeys.has(event.key) || backCodes.has(event.keyCode || event.which || 0);
 }
 
 function focusElement(selector: string) {
@@ -101,12 +92,12 @@ function focusElement(selector: string) {
       block: "nearest",
       inline: "center",
     });
-  }, 50);
+  }, 60);
 }
 
 function focusOverlayDefault() {
   focusElement(
-    "[data-tv-overlay='watch'] [data-tv-overlay-default], [data-tv-overlay='watch'] a[href], [data-tv-overlay='watch'] button:not([disabled])"
+    "[data-tv-overlay='watch'][data-tv-overlay-visible='true'] [data-tv-overlay-default], [data-tv-overlay='watch'][data-tv-overlay-visible='true'] a[href], [data-tv-overlay='watch'][data-tv-overlay-visible='true'] button:not([disabled])"
   );
 }
 
@@ -132,22 +123,21 @@ export default function TvWatchOverlay({
   sameEpisodeServerLinks,
   onOpenEpisodePanel,
 }: TvWatchOverlayProps) {
-  const [overlayVisible, setOverlayVisible] = useState(true);
-  const [overlayPinned, setOverlayPinnedState] = useState(false);
+  const [overlayMode, setOverlayModeState] = useState<OverlayMode>("peek");
   const [overlayPanel, setOverlayPanelState] = useState<OverlayPanel>(null);
   const [nativeHintVisible, setNativeHintVisible] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const nativeHintTimerRef = useRef<number | null>(null);
-  const overlayVisibleRef = useRef(true);
-  const overlayPinnedRef = useRef(false);
+  const overlayModeRef = useRef<OverlayMode>("peek");
   const overlayPanelRef = useRef<OverlayPanel>(null);
 
   const currentEpisodes = currentServer?.server_data ?? [];
   const hasMultipleServers = sameEpisodeServerLinks.length > 1;
   const serverName = normalizeServerName(currentServer?.server_name);
-  const panelOpen = overlayPanel !== null;
+  const panelOpen = overlayMode === "panel";
+  const overlayVisible = overlayMode !== "hidden";
 
   const episodeItems = useMemo(() => {
     return currentEpisodes.map((episode, episodeIndex) => ({
@@ -177,12 +167,12 @@ export default function TvWatchOverlay({
         };
   }, [overlayVisible]);
 
-  function setOverlayVisibleValue(value: boolean) {
-    overlayVisibleRef.current = value;
-    setOverlayVisible(value);
+  function setOverlayMode(value: OverlayMode) {
+    overlayModeRef.current = value;
+    setOverlayModeState(value);
   }
 
-  function setOverlayPanelValue(value: OverlayPanel) {
+  function setOverlayPanel(value: OverlayPanel) {
     overlayPanelRef.current = value;
     setOverlayPanelState(value);
   }
@@ -194,111 +184,80 @@ export default function TvWatchOverlay({
     }
   }
 
-  function setOverlayPinned(value: boolean) {
-    overlayPinnedRef.current = value;
-    setOverlayPinnedState(value);
-  }
-
   function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
     clearHideTimer();
-    setOverlayPinned(false);
-    setOverlayPanelValue(null);
-    setOverlayVisibleValue(false);
+    setOverlayPanel(null);
+    setOverlayMode("hidden");
 
     if (focusPlayer) {
       focusPlayerSurface();
     }
   }
 
-  function scheduleHide(delay = AUTO_HIDE_MS) {
+  function scheduleHide() {
     clearHideTimer();
 
-    if (overlayPinnedRef.current || overlayPanelRef.current) return;
-
     hideTimerRef.current = window.setTimeout(() => {
-      hideTimerRef.current = null;
-
-      if (overlayPinnedRef.current || overlayPanelRef.current) return;
+      if (overlayModeRef.current !== "peek" || overlayPanelRef.current) {
+        hideTimerRef.current = null;
+        return;
+      }
 
       hideOverlay({ focusPlayer: true });
-    }, delay);
+      hideTimerRef.current = null;
+    }, AUTO_HIDE_MS);
   }
 
-  function showOverlay({
-    pinned = false,
-    focus = false,
-    autoHide = true,
-  }: {
-    pinned?: boolean;
-    focus?: boolean;
-    autoHide?: boolean;
-  } = {}) {
-    setOverlayPinned(pinned);
-    setOverlayVisibleValue(true);
+  function showPeek({ focus = false }: { focus?: boolean } = {}) {
+    setOverlayPanel(null);
+    setOverlayMode("peek");
+    scheduleHide();
 
     if (focus) {
       focusOverlayDefault();
     }
-
-    if (pinned || !autoHide || overlayPanelRef.current) {
-      clearHideTimer();
-    } else {
-      scheduleHide();
-    }
-  }
-
-  function handleOverlayFocusIn() {
-    setOverlayVisibleValue(true);
-
-    // Không giữ overlay mãi chỉ vì focus đang nằm trên button.
-    // Đây là lỗi khiến overlay cũ không tự biến mất sau 3–4 giây.
-    if (!overlayPinnedRef.current && !overlayPanelRef.current) {
-      scheduleHide();
-    }
-  }
-
-  function handleOverlayFocusOut() {
-    if (!overlayPinnedRef.current && !overlayPanelRef.current) {
-      scheduleHide();
-    }
-  }
-
-  function handleOverlayKeyDown() {
-    if (!overlayPinnedRef.current && !overlayPanelRef.current) {
-      scheduleHide();
-    }
   }
 
   function openPanel(panel: Exclude<OverlayPanel, null>) {
-    setOverlayVisibleValue(true);
-    setOverlayPinned(true);
-    setOverlayPanelValue(panel);
     clearHideTimer();
+    setOverlayMode("panel");
+    setOverlayPanel(panel);
     focusPanelDefault(panel);
   }
 
   function closePanel({ keepOverlay = true }: { keepOverlay?: boolean } = {}) {
-    setOverlayPanelValue(null);
-    setOverlayPinned(false);
+    setOverlayPanel(null);
 
     if (keepOverlay) {
-      showOverlay({ pinned: false, focus: true, autoHide: true });
+      showPeek({ focus: true });
     } else {
       hideOverlay({ focusPlayer: true });
     }
   }
 
+  function resetPeekTimer() {
+    if (overlayModeRef.current === "peek") {
+      scheduleHide();
+    }
+  }
+
   function openEpisodePanelFromOverlay() {
-    showOverlay({ pinned: true, focus: false, autoHide: false });
+    clearHideTimer();
+    setOverlayMode("panel");
     window.setTimeout(onOpenEpisodePanel, 0);
   }
 
   function handleSeek(direction: "backward" | "forward") {
-    showOverlay({ pinned: false, focus: false, autoHide: true });
+    showPeek({ focus: false });
     dispatchPlayerCommand(
       "seek",
       direction === "forward" ? SEEK_SECONDS : -SEEK_SECONDS
     );
+  }
+
+  function handleTogglePlay() {
+    showPeek({ focus: false });
+    dispatchPlayerCommand("toggle-play");
   }
 
   function handleFocusPlayer() {
@@ -306,33 +265,60 @@ export default function TvWatchOverlay({
   }
 
   useEffect(() => {
-    showOverlay({ pinned: false, focus: false, autoHide: true });
+    showPeek({ focus: false });
 
-    function handleActivity() {
-      if (overlayPinnedRef.current || overlayPanelRef.current) return;
-      showOverlay({ pinned: false, focus: false, autoHide: true });
+    function handlePointerActivity() {
+      if (overlayModeRef.current === "panel") return;
+      showPeek({ focus: false });
     }
 
     function handleWakeOverlay(event: Event) {
       const detail = (event as CustomEvent<ShowOverlayDetail>).detail || {};
 
-      showOverlay({
-        pinned: Boolean(detail.pinned),
-        focus: detail.focus === true,
-        autoHide: !detail.pinned,
-      });
+      if (detail.pinned) {
+        openPanel("episodes");
+        return;
+      }
+
+      showPeek({ focus: detail.focus !== false });
+    }
+
+    function handleOverlayCommand(event: Event) {
+      const detail = (event as CustomEvent<OverlayCommandDetail>).detail;
+
+      if (!detail) return;
+
+      if (detail.action === "hide") {
+        hideOverlay({ focusPlayer: true });
+        return;
+      }
+
+      if (detail.action === "peek") {
+        showPeek({ focus: Boolean(detail.focus) });
+        return;
+      }
+
+      if (detail.action === "open-episodes") {
+        openPanel("episodes");
+        return;
+      }
+
+      if (detail.action === "open-sources") {
+        openPanel("sources");
+        return;
+      }
+
+      if (detail.action === "close-panel") {
+        closePanel({ keepOverlay: true });
+        return;
+      }
+
+      if (detail.action === "activity") {
+        resetPeekTimer();
+      }
     }
 
     function handleHideOverlay() {
-      hideOverlay({ focusPlayer: true });
-    }
-
-    function handleDocumentKeyDown(event: KeyboardEvent) {
-      if (!overlayVisibleRef.current && !overlayPanelRef.current) return;
-      if (!isBackKeyEvent(event)) return;
-
-      event.preventDefault();
-      event.stopPropagation();
       hideOverlay({ focusPlayer: true });
     }
 
@@ -346,37 +332,37 @@ export default function TvWatchOverlay({
       nativeHintTimerRef.current = window.setTimeout(() => {
         setNativeHintVisible(false);
         nativeHintTimerRef.current = null;
-      }, 1700);
+      }, 1800);
     }
 
-    document.addEventListener("keydown", handleDocumentKeyDown, true);
-    window.addEventListener("mousemove", handleActivity);
-    window.addEventListener("mousedown", handleActivity);
-    window.addEventListener("touchstart", handleActivity);
+    window.addEventListener("mousemove", handlePointerActivity);
+    window.addEventListener("mousedown", handlePointerActivity);
+    window.addEventListener("touchstart", handlePointerActivity);
     window.addEventListener("baoflix-show-tv-overlay", handleWakeOverlay as EventListener);
     window.addEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
+    window.addEventListener("baoflix-tv-overlay-command", handleOverlayCommand as EventListener);
     window.addEventListener("baoflix-tv-native-missing", handleNativeMissing);
 
     return () => {
       clearHideTimer();
-      document.removeEventListener("keydown", handleDocumentKeyDown, true);
 
       if (nativeHintTimerRef.current) {
         window.clearTimeout(nativeHintTimerRef.current);
       }
 
-      window.removeEventListener("mousemove", handleActivity);
-      window.removeEventListener("mousedown", handleActivity);
-      window.removeEventListener("touchstart", handleActivity);
+      window.removeEventListener("mousemove", handlePointerActivity);
+      window.removeEventListener("mousedown", handlePointerActivity);
+      window.removeEventListener("touchstart", handlePointerActivity);
       window.removeEventListener("baoflix-show-tv-overlay", handleWakeOverlay as EventListener);
       window.removeEventListener("baoflix-hide-tv-overlay", handleHideOverlay);
+      window.removeEventListener("baoflix-tv-overlay-command", handleOverlayCommand as EventListener);
       window.removeEventListener("baoflix-tv-native-missing", handleNativeMissing);
     };
   }, []);
 
   useEffect(() => {
-    setOverlayPanelValue(null);
-    showOverlay({ pinned: false, focus: false, autoHide: true });
+    setOverlayPanel(null);
+    showPeek({ focus: false });
   }, [safeEpisodeIndex, currentServer?.server_name]);
 
   return (
@@ -384,37 +370,34 @@ export default function TvWatchOverlay({
       ref={overlayRef}
       data-tv-overlay="watch"
       data-tv-overlay-visible={overlayVisible ? "true" : "false"}
-      data-tv-overlay-pinned={overlayPinned ? "true" : "false"}
+      data-tv-overlay-mode={overlayMode}
       data-tv-overlay-panel={overlayPanel || ""}
-      onFocus={handleOverlayFocusIn}
-      onBlur={handleOverlayFocusOut}
-      onKeyDown={handleOverlayKeyDown}
       className={[
         "pointer-events-none absolute inset-0 z-30 flex flex-col justify-between transition-opacity duration-200",
         overlayVisible ? "opacity-100" : "opacity-0",
       ].join(" ")}
     >
-      <div className="pointer-events-none bg-gradient-to-b from-black/58 via-black/20 to-transparent px-[3vw] pb-7 pt-[2.4vh]">
+      <div className="pointer-events-none bg-gradient-to-b from-black/58 via-black/18 to-transparent px-[4vw] pb-8 pt-[3vh]">
         <div className="max-w-[52vw]">
-          <h1 className="line-clamp-1 text-[18px] font-black leading-tight text-white drop-shadow-xl">
+          <h1 className="line-clamp-1 text-[18px] font-black leading-tight text-white drop-shadow-xl min-[1280px]:text-[21px]">
             {movie.name}
           </h1>
 
-          <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/[0.74] drop-shadow">
+          <p className="mt-1 line-clamp-1 text-[11px] font-semibold text-white/[0.72] drop-shadow min-[1280px]:text-[12px]">
             {compactMeta}
           </p>
         </div>
       </div>
 
-      <div className="pointer-events-none bg-gradient-to-t from-black/[0.76] via-black/[0.36] to-transparent px-[3vw] pb-[3vh] pt-12">
+      <div className="pointer-events-none bg-gradient-to-t from-black/[0.74] via-black/[0.30] to-transparent px-[4vw] pb-[3.4vh] pt-12">
         {nativeHintVisible && (
-          <div className="pointer-events-none mx-auto mb-2 w-fit rounded-xl border border-yellow-300/[0.3] bg-black/[0.72] px-3 py-2 text-center text-[11px] font-bold text-yellow-100 shadow-xl backdrop-blur-md">
-            Chưa có native bridge tua, đã thử chuyển quyền vào player.
+          <div className="pointer-events-none mx-auto mb-2 w-fit rounded-xl border border-yellow-300/[0.30] bg-black/[0.68] px-3 py-2 text-center text-[11px] font-bold text-yellow-100 shadow-xl backdrop-blur">
+            Nguồn này là iframe, remote đã chuyển focus vào player.
           </div>
         )}
 
         {!panelOpen && (
-          <div className="mx-auto max-w-[460px]">
+          <div className="mx-auto max-w-[440px] min-[1280px]:max-w-[500px]">
             <div
               data-tv-row
               className={[
@@ -428,7 +411,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={() => handleSeek("backward")}
                 className={[
-                  "flex min-h-[38px] items-center justify-center px-3 text-[13px] font-black",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -440,14 +423,14 @@ export default function TvWatchOverlay({
                 type="button"
                 data-tv-overlay-default
                 {...hiddenFocusProps}
-                onClick={handleFocusPlayer}
+                onClick={handleTogglePlay}
                 className={[
-                  "flex min-h-[38px] items-center justify-center px-3 text-[13px] font-black",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   PRIMARY_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
-                Player
+                ▶ / Ⅱ
               </button>
 
               <button
@@ -456,7 +439,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={() => handleSeek("forward")}
                 className={[
-                  "flex min-h-[38px] items-center justify-center px-3 text-[13px] font-black",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -468,7 +451,7 @@ export default function TvWatchOverlay({
             <div
               data-tv-row
               className={[
-                "mt-2 grid grid-cols-2 gap-2",
+                "mt-2 grid grid-cols-3 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
@@ -478,7 +461,7 @@ export default function TvWatchOverlay({
                 onClick={() => openPanel("episodes")}
                 disabled={!currentEpisodes.length}
                 className={[
-                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   !currentEpisodes.length ? "opacity-40" : "",
                   TV_FOCUS_CLASS,
@@ -493,13 +476,26 @@ export default function TvWatchOverlay({
                 onClick={() => openPanel("sources")}
                 disabled={!hasMultipleServers}
                 className={[
-                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   !hasMultipleServers ? "opacity-40" : "",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
                 Nguồn
+              </button>
+
+              <button
+                type="button"
+                {...hiddenFocusProps}
+                onClick={handleFocusPlayer}
+                className={[
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
+                  SURFACE_BUTTON_CLASS,
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Player
               </button>
             </div>
           </div>
@@ -508,7 +504,7 @@ export default function TvWatchOverlay({
         {panelOpen && (
           <div
             data-tv-panel={overlayPanel || undefined}
-            className="pointer-events-auto mx-auto max-h-[48vh] w-full max-w-[760px] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#090d16]/[0.93] p-3 shadow-[0_24px_70px_rgba(0,0,0,0.64)] backdrop-blur-xl"
+            className="pointer-events-auto mx-auto max-h-[48vh] w-full max-w-[760px] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#070b12]/[0.92] p-3 shadow-[0_18px_56px_rgba(0,0,0,0.62)] backdrop-blur-xl min-[1280px]:max-w-[840px]"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -516,7 +512,7 @@ export default function TvWatchOverlay({
                   {overlayPanel === "episodes" ? "Chọn tập" : "Đổi nguồn"}
                 </p>
 
-                <h2 className="mt-0.5 line-clamp-1 text-[14px] font-black text-white">
+                <h2 className="mt-0.5 line-clamp-1 text-[13px] font-black text-white min-[1280px]:text-[15px]">
                   {episodeName || `Tập ${safeEpisodeIndex + 1}`} • {serverName}
                 </h2>
               </div>
@@ -526,7 +522,7 @@ export default function TvWatchOverlay({
                   type="button"
                   onClick={() => openPanel("episodes")}
                   className={[
-                    "rounded-xl px-3 py-2 text-[11px] font-black transition",
+                    "rounded-xl px-3 py-2 text-[10px] font-black transition min-[1280px]:text-[11px]",
                     overlayPanel === "episodes"
                       ? "bg-yellow-300 text-black"
                       : "bg-white/10 text-white hover:bg-white/[0.16]",
@@ -541,7 +537,7 @@ export default function TvWatchOverlay({
                   onClick={() => openPanel("sources")}
                   disabled={!hasMultipleServers}
                   className={[
-                    "rounded-xl px-3 py-2 text-[11px] font-black transition",
+                    "rounded-xl px-3 py-2 text-[10px] font-black transition min-[1280px]:text-[11px]",
                     overlayPanel === "sources"
                       ? "bg-yellow-300 text-black"
                       : "bg-white/10 text-white hover:bg-white/[0.16]",
@@ -556,7 +552,7 @@ export default function TvWatchOverlay({
                   type="button"
                   onClick={() => closePanel({ keepOverlay: true })}
                   className={[
-                    "rounded-xl bg-white/10 px-3 py-2 text-[11px] font-black text-white transition hover:bg-white/[0.16]",
+                    "rounded-xl bg-white/10 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/[0.16] min-[1280px]:text-[11px]",
                     TV_FOCUS_CLASS,
                   ].join(" ")}
                 >
@@ -577,14 +573,14 @@ export default function TvWatchOverlay({
                           TV_FOCUS_CLASS,
                         ].join(" ")}
                       >
-                        ← Trước
+                        ← Tập trước
                       </Link>
                     ) : (
                       <button
                         disabled
                         className="flex min-h-[34px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-center text-[11px] font-black text-white opacity-35"
                       >
-                        ← Trước
+                        ← Tập trước
                       </button>
                     )}
 
@@ -596,21 +592,21 @@ export default function TvWatchOverlay({
                           TV_FOCUS_CLASS,
                         ].join(" ")}
                       >
-                        Sau →
+                        Tập sau →
                       </Link>
                     ) : (
                       <button
                         disabled
                         className="flex min-h-[34px] items-center justify-center rounded-xl bg-red-600 px-3 text-center text-[11px] font-black text-white opacity-35"
                       >
-                        Sau →
+                        Tập sau →
                       </button>
                     )}
                   </div>
                 )}
 
-                <div data-tv-row className="max-h-[32vh] overflow-y-auto pr-1">
-                  <div className="grid grid-cols-8 gap-2">
+                <div data-tv-row className="max-h-[33vh] overflow-y-auto pr-1">
+                  <div className="grid grid-cols-6 gap-2 min-[1280px]:grid-cols-8">
                     {episodeItems.map((item) => {
                       const active = item.episodeIndex === safeEpisodeIndex;
                       const watched = watchedEpisodes.includes(
@@ -623,7 +619,7 @@ export default function TvWatchOverlay({
                           href={item.href}
                           data-tv-panel-default={active ? "episodes" : undefined}
                           className={[
-                            "relative flex min-h-[34px] items-center justify-center rounded-xl border px-1.5 text-center text-[10px] font-black transition",
+                            "relative flex min-h-[32px] items-center justify-center rounded-xl border px-1.5 text-center text-[10px] font-black transition min-[1280px]:min-h-[36px] min-[1280px]:text-[11px]",
                             active
                               ? "border-yellow-300 bg-yellow-300 text-black"
                               : watched
@@ -650,7 +646,7 @@ export default function TvWatchOverlay({
             {overlayPanel === "sources" && (
               <div data-tv-panel="sources">
                 {hasMultipleServers ? (
-                  <div data-tv-row className="grid grid-cols-3 gap-2">
+                  <div data-tv-row className="grid grid-cols-2 gap-2 min-[1280px]:grid-cols-3">
                     {sameEpisodeServerLinks.map((item) => {
                       const active = item.serverIndex === safeServerIndex;
                       const label = normalizeServerName(item.server.server_name);
@@ -663,14 +659,14 @@ export default function TvWatchOverlay({
                           href={item.href}
                           data-tv-panel-default={active ? "sources" : undefined}
                           className={[
-                            "flex min-h-[48px] flex-col justify-center rounded-xl border px-3 transition",
+                            "flex min-h-[44px] flex-col justify-center rounded-xl border px-3 transition",
                             active
                               ? "border-yellow-300 bg-yellow-300 text-black"
                               : "border-white/10 bg-white/[0.055] text-white hover:bg-white/15",
                             TV_FOCUS_CLASS,
                           ].join(" ")}
                         >
-                          <span className="text-[12px] font-black">{label}</span>
+                          <span className="text-[12px] font-black min-[1280px]:text-[13px]">{label}</span>
                           <span className={["mt-0.5 text-[10px]", active ? "text-black/70" : "text-white/[0.52]"].join(" ")}>
                             {targetEpisode || "Nguồn phát"}
                           </span>

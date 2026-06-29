@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import EpisodePickerModal from "@/components/EpisodePickerModal";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
+import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import TvWatchOverlay from "@/components/TvWatchOverlay";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
 import {
@@ -50,14 +51,18 @@ function isBaoflixTvShell() {
   );
 }
 
+function isTvUserAgent() {
+  return /android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(
+    getUserAgent()
+  );
+}
+
 function isMobileDevice() {
   const userAgent = getUserAgent();
 
   if (!userAgent) return false;
   if (isBaoflixTvShell()) return false;
-  if (/android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(userAgent)) {
-    return false;
-  }
+  if (isTvUserAgent()) return false;
 
   return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
 }
@@ -69,7 +74,7 @@ function detectTvOverlayEnabled() {
     const forceNormal = searchParams.get("tv") === "0";
 
     if (forceNormal) return false;
-    if (forceTv || isBaoflixTvShell()) return true;
+    if (forceTv || isBaoflixTvShell() || isTvUserAgent()) return true;
 
     if (isMobileDevice()) {
       sessionStorage.removeItem("baoflix_tv_mode");
@@ -243,6 +248,9 @@ export default function WatchClient({
     }[];
   }, [servers, safeEpisodeIndex, movie.slug]);
 
+  const posterUrl = movie.thumb_url || movie.poster_url;
+  const nativeVideoUrl = episode?.link_m3u8;
+
   return (
     <div
       data-tv-scope="watch-page"
@@ -275,6 +283,12 @@ export default function WatchClient({
             <span className="rounded-full bg-white/10 px-3 py-1">
               {normalizeServerName(currentServer?.server_name)}
             </span>
+
+            {nativeVideoUrl && (
+              <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-black">
+                Native HLS
+              </span>
+            )}
 
             {sameEpisodeServerLinks.length > 1 && (
               <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-black">
@@ -337,7 +351,14 @@ export default function WatchClient({
       <div className="baoflix-player-fill mt-5">
         <FullscreenPlayerBox tvImmersive={tvOverlayEnabled}>
           <div className="relative h-full w-full overflow-hidden bg-black">
-            {episode?.link_embed ? (
+            {nativeVideoUrl ? (
+              <NativeVideoPlayer
+                src={nativeVideoUrl}
+                title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
+                subtitle={normalizeServerName(currentServer?.server_name)}
+                poster={posterUrl}
+              />
+            ) : episode?.link_embed ? (
               <iframe
                 src={episode.link_embed}
                 tabIndex={0}

@@ -18,6 +18,14 @@ type PlayerHudDetail = {
   duration?: number;
 };
 
+type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+
+type PlayerCommandDetail = {
+  action: PlayerCommandAction;
+  seconds?: number;
+  handled?: boolean;
+};
+
 type FullscreenPlayerBoxProps = {
   children: ReactNode;
   tvImmersive?: boolean;
@@ -38,6 +46,18 @@ function formatTime(value?: number) {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function emitNativeMissing() {
+  window.dispatchEvent(new Event("baoflix-tv-native-missing"));
+}
+
+function emitHud(detail: PlayerHudDetail) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-player-hud", {
+      detail,
+    })
+  );
+}
+
 export default function FullscreenPlayerBox({
   children,
   tvImmersive = false,
@@ -51,14 +71,26 @@ export default function FullscreenPlayerBox({
 
   const expanded = tvImmersive || cinemaMode || isFullscreen;
 
-  function focusPlayerSurface() {
+  function getPreferredPlayerElement() {
     const box = boxRef.current;
 
-    if (!box) return;
+    if (!box) return null;
+
+    return (
+      box.querySelector<HTMLElement>("[data-tv-player-native='true']") ||
+      box.querySelector<HTMLElement>("[data-tv-player='iframe']") ||
+      box
+    );
+  }
+
+  function focusPlayerSurface() {
+    const target = getPreferredPlayerElement();
+
+    if (!target) return;
 
     window.setTimeout(() => {
       try {
-        box.focus({ preventScroll: true });
+        target.focus({ preventScroll: true });
       } catch {
         // Ignore focus errors in WebView.
       }
@@ -126,8 +158,6 @@ export default function FullscreenPlayerBox({
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.overscrollBehavior = "none";
 
-    // TV WebPlayer mode không tự focus iframe ở đây.
-    // Focus iframe chỉ xảy ra khi user bấm “Focus player” hoặc APK native bridge gọi.
     focusPlayerSurface();
 
     return () => {
@@ -192,15 +222,40 @@ export default function FullscreenPlayerBox({
       hudTimerRef.current = window.setTimeout(() => {
         setPlayerHud(null);
         hudTimerRef.current = null;
-      }, 850);
+      }, 760);
     }
 
     function handleFocusPlayer() {
       focusPlayerSurface();
     }
 
+    function handlePlayerCommand(event: Event) {
+      const detail = (event as CustomEvent<PlayerCommandDetail>).detail;
+
+      if (!detail) return;
+
+      window.setTimeout(() => {
+        if (detail.handled) return;
+
+        detail.handled = true;
+        focusPlayerSurface();
+
+        if (detail.action !== "focus-player") {
+          emitNativeMissing();
+
+          if (detail.action === "seek") {
+            emitHud({
+              type: "seek",
+              delta: detail.seconds || 0,
+            });
+          }
+        }
+      }, 0);
+    }
+
     window.addEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
     window.addEventListener("baoflix-focus-tv-player", handleFocusPlayer);
+    window.addEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
 
     return () => {
       if (hudTimerRef.current) {
@@ -209,6 +264,7 @@ export default function FullscreenPlayerBox({
 
       window.removeEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
       window.removeEventListener("baoflix-focus-tv-player", handleFocusPlayer);
+      window.removeEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
     };
   }, []);
 
@@ -241,8 +297,8 @@ export default function FullscreenPlayerBox({
       </div>
 
       {tvImmersive && playerHud && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-black/75 px-7 py-5 text-center text-white shadow-2xl backdrop-blur">
-          <div className="text-3xl font-black">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-black/72 px-5 py-3 text-center text-white shadow-2xl backdrop-blur">
+          <div className="text-2xl font-black">
             {playerHud.type === "seek"
               ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta || 0}s`
               : playerHud.type === "play"
@@ -251,7 +307,7 @@ export default function FullscreenPlayerBox({
           </div>
 
           {playerHud.type === "seek" && (
-            <p className="mt-1 text-sm text-slate-300">
+            <p className="mt-1 text-xs text-slate-300">
               {formatTime(playerHud.currentTime)}
               {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
             </p>
