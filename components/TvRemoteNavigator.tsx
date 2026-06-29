@@ -26,6 +26,17 @@ const ROW_THRESHOLD = 22;
 const TV_SESSION_KEY = "baoflix_tv_mode";
 const SEEK_SECONDS = 10;
 
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
+  return navigator.userAgent.toLowerCase();
+}
+
+function isBaoflixTvShell() {
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview|android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(
+    getUserAgent()
+  );
+}
+
 function isTvRemoteEnabled() {
   if (typeof window === "undefined") return false;
 
@@ -34,6 +45,7 @@ function isTvRemoteEnabled() {
 
     if (searchParams.get("tv") === "0") return false;
     if (searchParams.get("tv") === "1") return true;
+    if (isBaoflixTvShell()) return true;
 
     return sessionStorage.getItem(TV_SESSION_KEY) === "1";
   } catch {
@@ -42,10 +54,10 @@ function isTvRemoteEnabled() {
 }
 
 function getDirectionFromKey(key: string): Direction | null {
-  if (key === "ArrowUp") return "up";
-  if (key === "ArrowDown") return "down";
-  if (key === "ArrowLeft") return "left";
-  if (key === "ArrowRight") return "right";
+  if (key === "ArrowUp" || key === "Up") return "up";
+  if (key === "ArrowDown" || key === "Down") return "down";
+  if (key === "ArrowLeft" || key === "Left") return "left";
+  if (key === "ArrowRight" || key === "Right") return "right";
 
   return null;
 }
@@ -57,24 +69,42 @@ function isActivationKey(key: string) {
     key === " " ||
     key === "Spacebar" ||
     key === "OK" ||
-    key === "Accept"
+    key === "Accept" ||
+    key === "Select"
   );
 }
 
-function isBackKey(key: string) {
-  return key === "Escape" || key === "Backspace" || key === "BrowserBack";
+function isBackKey(event: KeyboardEvent) {
+  const backKeys = new Set([
+    "Escape",
+    "Backspace",
+    "BrowserBack",
+    "GoBack",
+    "Back",
+    "Cancel",
+    "XF86Back",
+  ]);
+  const backCodes = new Set([4, 8, 27, 461, 10009]);
+
+  return backKeys.has(event.key) || backCodes.has(event.keyCode || event.which || 0);
 }
 
 function isSeekBackwardKey(key: string) {
-  return key === "ArrowLeft" || key === "MediaRewind";
+  return key === "ArrowLeft" || key === "Left" || key === "MediaRewind";
 }
 
 function isSeekForwardKey(key: string) {
-  return key === "ArrowRight" || key === "MediaFastForward";
+  return key === "ArrowRight" || key === "Right" || key === "MediaFastForward";
 }
 
 function isPlayPauseKey(key: string) {
-  return key === "MediaPlayPause" || key === "Play" || key === "Pause";
+  return (
+    key === "MediaPlayPause" ||
+    key === "Play" ||
+    key === "Pause" ||
+    key === "MediaPlay" ||
+    key === "MediaPause"
+  );
 }
 
 function shouldWakeHiddenWatchOverlay(key: string) {
@@ -95,19 +125,20 @@ function getVisibleWatchOverlay() {
   );
 }
 
+function overlayHasPanel(overlay: HTMLElement | null) {
+  return Boolean(overlay?.getAttribute("data-tv-overlay-panel"));
+}
+
 function isTextInput(element: Element | null) {
   if (!(element instanceof HTMLElement)) return false;
 
   const tagName = element.tagName.toLowerCase();
 
-  return (
-    tagName === "input" || tagName === "textarea" || element.isContentEditable
-  );
+  return tagName === "input" || tagName === "textarea" || element.isContentEditable;
 }
 
 function shouldLetInputHandleKey(element: Element | null, key: string) {
   if (!isTextInput(element)) return false;
-
   return key === "ArrowLeft" || key === "ArrowRight";
 }
 
@@ -133,7 +164,6 @@ function getFocusableElements(root: ParentNode = document) {
 
 function getActiveScope(element: Element | null) {
   if (!(element instanceof HTMLElement)) return null;
-
   return element.closest<HTMLElement>("[data-tv-scope]");
 }
 
@@ -169,10 +199,7 @@ function getOverlayDefaultFocusable(overlay: HTMLElement) {
   );
 }
 
-function getOverlaySeekFocusable(
-  overlay: HTMLElement,
-  direction: SeekDirection
-) {
+function getOverlaySeekFocusable(overlay: HTMLElement, direction: SeekDirection) {
   return (
     overlay.querySelector<HTMLElement>(`[data-tv-seek='${direction}']`) ||
     getOverlayDefaultFocusable(overlay)
@@ -271,8 +298,7 @@ function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect) {
     const bestCenter = best.rect.left + best.rect.width / 2;
     const entryCenter = entry.rect.left + entry.rect.width / 2;
 
-    return Math.abs(entryCenter - currentCenter) <
-      Math.abs(bestCenter - currentCenter)
+    return Math.abs(entryCenter - currentCenter) < Math.abs(bestCenter - currentCenter)
       ? entry
       : best;
   }, null)?.element || null;
@@ -323,18 +349,14 @@ function getLinearCandidate(
   }
 
   if (direction === "up") {
-    return previousRow
-      ? getClosestByHorizontalCenter(previousRow, currentEntry.rect)
-      : current;
+    return previousRow ? getClosestByHorizontalCenter(previousRow, currentEntry.rect) : current;
   }
 
   return null;
 }
 
 function focusElement(element: HTMLElement) {
-  element.focus({
-    preventScroll: true,
-  });
+  element.focus({ preventScroll: true });
 
   element.scrollIntoView({
     behavior: "smooth",
@@ -354,7 +376,7 @@ function focusOverlaySeekButton(direction: SeekDirection) {
     if (!target) return;
 
     focusElement(target);
-  }, 80);
+  }, 60);
 }
 
 function clickActiveElement(event: KeyboardEvent) {
@@ -425,7 +447,7 @@ function dispatchShowOverlay(options?: { pinned?: boolean; focus?: boolean }) {
     new CustomEvent("baoflix-show-tv-overlay", {
       detail: {
         pinned: Boolean(options?.pinned),
-        focus: options?.focus ?? true,
+        focus: options?.focus ?? false,
       },
     })
   );
@@ -446,7 +468,7 @@ function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
   );
 }
 
-function handleHiddenWatchOverlayKey(event: KeyboardEvent) {
+function handlePlayerKey(event: KeyboardEvent) {
   const isBackward = isSeekBackwardKey(event.key);
   const isForward = isSeekForwardKey(event.key);
   const wantsPlayPause = isPlayPauseKey(event.key);
@@ -462,6 +484,7 @@ function handleHiddenWatchOverlayKey(event: KeyboardEvent) {
   }
 
   dispatchPlayerCommand("seek", isForward ? SEEK_SECONDS : -SEEK_SECONDS);
+  dispatchShowOverlay({ pinned: false, focus: false });
   return true;
 }
 
@@ -505,8 +528,10 @@ export default function TvRemoteNavigator() {
         visibleOverlay &&
         activeElement instanceof HTMLElement &&
         visibleOverlay.contains(activeElement);
+      const direction = getDirectionFromKey(event.key);
+      const visibleOverlayPanelOpen = overlayHasPanel(visibleOverlay || null);
 
-      if (isBackKey(event.key) && !isTextInput(activeElement)) {
+      if (isBackKey(event) && !isTextInput(activeElement)) {
         if (closeModalIfNeeded(event)) return;
 
         if (visibleOverlay) {
@@ -520,44 +545,37 @@ export default function TvRemoteNavigator() {
         return;
       }
 
-      if (
-        !openModalScope &&
-        !isTextInput(activeElement) &&
-        (event.key === "MediaRewind" ||
-          event.key === "MediaFastForward" ||
-          isPlayPauseKey(event.key))
-      ) {
-        handleHiddenWatchOverlayKey(event);
-        return;
-      }
-
       if (!openModalScope && !isTextInput(activeElement) && hiddenOverlay) {
-        if (handleHiddenWatchOverlayKey(event)) {
-          return;
-        }
+        if (handlePlayerKey(event)) return;
 
         if (shouldWakeHiddenWatchOverlay(event.key)) {
           event.preventDefault();
           event.stopPropagation();
-          dispatchShowOverlay({ pinned: false, focus: true });
+          dispatchShowOverlay({ pinned: false, focus: isActivationKey(event.key) });
           return;
         }
       }
 
-      const direction = getDirectionFromKey(event.key);
-
       if (
-        visibleOverlay &&
-        !activeIsInsideVisibleOverlay &&
         !openModalScope &&
         !isTextInput(activeElement) &&
-        (direction || isActivationKey(event.key))
+        !visibleOverlayPanelOpen &&
+        visibleOverlay &&
+        !activeIsInsideVisibleOverlay &&
+        (direction || isActivationKey(event.key) || isPlayPauseKey(event.key))
       ) {
         event.preventDefault();
         event.stopPropagation();
 
         if (direction === "left" || direction === "right") {
-          focusOverlaySeekButton(direction === "left" ? "backward" : "forward");
+          dispatchPlayerCommand("seek", direction === "right" ? SEEK_SECONDS : -SEEK_SECONDS);
+          dispatchShowOverlay({ pinned: false, focus: false });
+          return;
+        }
+
+        if (isPlayPauseKey(event.key)) {
+          dispatchPlayerCommand("toggle-play");
+          dispatchShowOverlay({ pinned: false, focus: false });
           return;
         }
 
@@ -570,13 +588,24 @@ export default function TvRemoteNavigator() {
         return;
       }
 
+      if (
+        !openModalScope &&
+        !isTextInput(activeElement) &&
+        !visibleOverlayPanelOpen &&
+        visibleOverlay &&
+        activeIsInsideVisibleOverlay &&
+        (event.key === "MediaRewind" || event.key === "MediaFastForward" || isPlayPauseKey(event.key))
+      ) {
+        handlePlayerKey(event);
+        return;
+      }
+
       if (isActivationKey(event.key) && !isTextInput(activeElement)) {
         clickActiveElement(event);
         return;
       }
 
       if (!direction) return;
-
       if (shouldLetInputHandleKey(activeElement, event.key)) return;
 
       if (
@@ -622,12 +651,7 @@ export default function TvRemoteNavigator() {
         return;
       }
 
-      const nextElement = getLinearCandidate(
-        current,
-        root,
-        focusableElements,
-        direction
-      );
+      const nextElement = getLinearCandidate(current, root, focusableElements, direction);
 
       if (!nextElement || nextElement === current) {
         if (
