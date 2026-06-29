@@ -11,7 +11,7 @@ type PageProps = {
   }>;
 };
 
-function getFirstPlayableServerIndex(servers: { server_data?: unknown[] }[]) {
+function getFirstPlayableServerIndex(servers: Awaited<ReturnType<typeof getMovieDetail>>["episodes"]) {
   return servers.findIndex((server) => (server.server_data ?? []).length > 0);
 }
 
@@ -21,27 +21,20 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
   const data = await getMovieDetail(slug);
   const servers = data.episodes ?? [];
+  const firstPlayableServerIndex = getFirstPlayableServerIndex(servers);
 
   const rawServerIndex = Number(query.server || 0);
   const rawEpisodeIndex = Number(query.tap || 0);
-  const firstPlayableServerIndex = getFirstPlayableServerIndex(servers);
 
-  const requestedServerIndex =
-    Number.isNaN(rawServerIndex) ||
-    rawServerIndex < 0 ||
-    rawServerIndex >= servers.length
-      ? firstPlayableServerIndex
-      : rawServerIndex;
+  const requestedServerIsPlayable =
+    !Number.isNaN(rawServerIndex) &&
+    rawServerIndex >= 0 &&
+    rawServerIndex < servers.length &&
+    (servers[rawServerIndex]?.server_data ?? []).length > 0;
 
-  const requestedServer = servers[requestedServerIndex];
-  const requestedEpisodes = requestedServer?.server_data ?? [];
-
-  const safeServerIndex =
-    requestedEpisodes.length > 0
-      ? requestedServerIndex
-      : firstPlayableServerIndex >= 0
-        ? firstPlayableServerIndex
-        : 0;
+  const safeServerIndex = requestedServerIsPlayable
+    ? rawServerIndex
+    : Math.max(firstPlayableServerIndex, 0);
 
   const currentServer = servers[safeServerIndex];
   const episodes = currentServer?.server_data ?? [];
@@ -53,7 +46,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       ? 0
       : rawEpisodeIndex;
 
-  if (!episodes.length) {
+  if (!servers.length || firstPlayableServerIndex < 0) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
         <LocalCustomMovieRouteSync

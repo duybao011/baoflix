@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import EpisodePickerModal from "@/components/EpisodePickerModal";
-import HlsPlayer from "@/components/HlsPlayer";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 import TvWatchOverlay from "@/components/TvWatchOverlay";
-import type { Episode, EpisodeServer, MovieDetail } from "@/lib/kkphim";
+import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
 import {
   getNormalWatchedKey,
   readWatchedEpisodes,
@@ -19,16 +18,6 @@ type WatchClientProps = {
   servers: EpisodeServer[];
   currentServerIndex: number;
   currentEpisodeIndex: number;
-};
-
-type PlayerMode = "embed" | "hls" | "none";
-
-type SameEpisodeServerLink = {
-  server: EpisodeServer;
-  serverIndex: number;
-  episode: Episode;
-  episodeIndex: number;
-  href: string;
 };
 
 function getEpisodeUrl(
@@ -94,24 +83,6 @@ function detectTvOverlayEnabled() {
   }
 }
 
-function getFirstPlayableServerIndex(servers: EpisodeServer[]) {
-  return servers.findIndex((server) => (server.server_data ?? []).length > 0);
-}
-
-function getInitialPlayerMode(episode?: Episode): PlayerMode {
-  // Ưu tiên xem được trước: KKPhim thường xem ổn nhất qua link_embed/web player.
-  // HLS chỉ dùng khi không có iframe hoặc khi user tự đổi sang HLS để tua bằng app.
-  if (episode?.link_embed) return "embed";
-  if (episode?.link_m3u8) return "hls";
-  return "none";
-}
-
-function getPlayerModeLabel(playerMode: PlayerMode, canUseEmbed: boolean) {
-  if (playerMode === "hls") return "HLS • tua bằng app";
-  if (canUseEmbed) return "Web player • ổn định";
-  return "Nguồn phát";
-}
-
 export default function WatchClient({
   movie,
   servers,
@@ -121,49 +92,6 @@ export default function WatchClient({
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [tvOverlayEnabled, setTvOverlayEnabled] = useState(false);
-
-  const firstPlayableServerIndex = useMemo(
-    () => getFirstPlayableServerIndex(servers),
-    [servers]
-  );
-
-  const requestedServerIndex =
-    Number.isNaN(currentServerIndex) ||
-    currentServerIndex < 0 ||
-    currentServerIndex >= servers.length
-      ? firstPlayableServerIndex
-      : currentServerIndex;
-
-  const requestedEpisodes = servers[requestedServerIndex]?.server_data ?? [];
-
-  const safeServerIndex =
-    requestedEpisodes.length > 0
-      ? requestedServerIndex
-      : firstPlayableServerIndex >= 0
-        ? firstPlayableServerIndex
-        : 0;
-
-  const currentServer = servers[safeServerIndex];
-  const episodes = currentServer?.server_data ?? [];
-
-  const safeEpisodeIndex =
-    Number.isNaN(currentEpisodeIndex) ||
-    currentEpisodeIndex < 0 ||
-    currentEpisodeIndex >= episodes.length
-      ? 0
-      : currentEpisodeIndex;
-
-  const episode = episodes[safeEpisodeIndex];
-  const canUseEmbed = Boolean(episode?.link_embed);
-  const canUseHls = Boolean(episode?.link_m3u8);
-
-  const [playerMode, setPlayerMode] = useState<PlayerMode>(() =>
-    getInitialPlayerMode(episode)
-  );
-
-  useEffect(() => {
-    setPlayerMode(getInitialPlayerMode(episode));
-  }, [episode?.link_embed, episode?.link_m3u8]);
 
   useEffect(() => {
     function refreshTvOverlay() {
@@ -203,6 +131,29 @@ export default function WatchClient({
     };
   }, []);
 
+  const safeServerIndex =
+    Number.isNaN(currentServerIndex) ||
+    currentServerIndex < 0 ||
+    currentServerIndex >= servers.length ||
+    !(servers[currentServerIndex]?.server_data ?? []).length
+      ? Math.max(
+          servers.findIndex((server) => (server.server_data ?? []).length > 0),
+          0
+        )
+      : currentServerIndex;
+
+  const currentServer = servers[safeServerIndex];
+  const episodes = currentServer?.server_data ?? [];
+
+  const safeEpisodeIndex =
+    Number.isNaN(currentEpisodeIndex) ||
+    currentEpisodeIndex < 0 ||
+    currentEpisodeIndex >= episodes.length
+      ? 0
+      : currentEpisodeIndex;
+
+  const episode = episodes[safeEpisodeIndex];
+
   const currentWatchedKey = getNormalWatchedKey(
     movie.slug,
     safeServerIndex,
@@ -210,8 +161,6 @@ export default function WatchClient({
   );
 
   useEffect(() => {
-    if (!episode) return;
-
     const next = saveWatchedEpisode(currentWatchedKey);
     setWatchedEpisodes(next);
 
@@ -220,7 +169,7 @@ export default function WatchClient({
       serverIndex: safeServerIndex,
       episodeIndex: safeEpisodeIndex,
       serverName: currentServer?.server_name,
-      episodeName: episode.name,
+      episodeName: episode?.name,
     });
   }, [
     currentWatchedKey,
@@ -228,7 +177,7 @@ export default function WatchClient({
     safeServerIndex,
     safeEpisodeIndex,
     currentServer?.server_name,
-    episode,
+    episode?.name,
   ]);
 
   useEffect(() => {
@@ -262,8 +211,6 @@ export default function WatchClient({
       ? getEpisodeUrl(movie.slug, safeServerIndex, safeEpisodeIndex + 1)
       : "";
 
-  const watchTimeKey = `baoflix_watch_time_${movie.slug}_server_${safeServerIndex}_episode_${safeEpisodeIndex}`;
-
   const sameEpisodeServerLinks = useMemo(() => {
     return servers
       .map((server, index) => {
@@ -287,68 +234,14 @@ export default function WatchClient({
           href: getEpisodeUrl(movie.slug, index, targetEpisodeIndex),
         };
       })
-      .filter(Boolean) as SameEpisodeServerLink[];
+      .filter(Boolean) as {
+      server: EpisodeServer;
+      serverIndex: number;
+      episode: NonNullable<typeof episode>;
+      episodeIndex: number;
+      href: string;
+    }[];
   }, [servers, safeEpisodeIndex, movie.slug]);
-
-  function switchPlayerMode(nextMode: "embed" | "hls") {
-    if (nextMode === "embed" && !canUseEmbed) return;
-    if (nextMode === "hls" && !canUseHls) return;
-
-    setPlayerMode(nextMode);
-
-    window.dispatchEvent(
-      new CustomEvent("baoflix-show-tv-overlay", {
-        detail: {
-          pinned: true,
-          focus: false,
-        },
-      })
-    );
-  }
-
-  function renderPlayer() {
-    if (playerMode === "hls" && episode?.link_m3u8) {
-      return (
-        <HlsPlayer
-          src={episode.link_m3u8}
-          storageKey={watchTimeKey}
-          autoResume
-        />
-      );
-    }
-
-    if ((playerMode === "embed" || playerMode === "none") && episode?.link_embed) {
-      return (
-        <iframe
-          src={episode.link_embed}
-          tabIndex={0}
-          data-tv-player="iframe"
-          data-tv-skip
-          allowFullScreen
-          referrerPolicy="no-referrer-when-downgrade"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-          className="h-full w-full bg-black outline-none"
-          title={`${movie.name} - ${episode.name}`}
-        />
-      );
-    }
-
-    if (episode?.link_m3u8) {
-      return (
-        <HlsPlayer
-          src={episode.link_m3u8}
-          storageKey={watchTimeKey}
-          autoResume
-        />
-      );
-    }
-
-    return (
-      <div className="flex h-full w-full items-center justify-center text-slate-400">
-        Tập này chưa có link phát. Bấm “Tập / nguồn” để đổi server.
-      </div>
-    );
-  }
 
   return (
     <div
@@ -383,10 +276,6 @@ export default function WatchClient({
               {normalizeServerName(currentServer?.server_name)}
             </span>
 
-            <span className="rounded-full bg-white/10 px-3 py-1">
-              {getPlayerModeLabel(playerMode, canUseEmbed)}
-            </span>
-
             {sameEpisodeServerLinks.length > 1 && (
               <span className="rounded-full bg-yellow-300 px-3 py-1 font-black text-black">
                 {sameEpisodeServerLinks.length} phiên bản
@@ -416,36 +305,6 @@ export default function WatchClient({
           Tập / nguồn
         </button>
       </div>
-
-      {canUseEmbed && canUseHls && (
-        <div data-tv-row className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => switchPlayerMode("embed")}
-            className={[
-              "rounded-xl border px-4 py-2 text-sm font-black",
-              playerMode === "embed"
-                ? "border-yellow-300 bg-yellow-300 text-black"
-                : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-            ].join(" ")}
-          >
-            Web player ổn định
-          </button>
-
-          <button
-            type="button"
-            onClick={() => switchPlayerMode("hls")}
-            className={[
-              "rounded-xl border px-4 py-2 text-sm font-black",
-              playerMode === "hls"
-                ? "border-yellow-300 bg-yellow-300 text-black"
-                : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
-            ].join(" ")}
-          >
-            HLS tua bằng app
-          </button>
-        </div>
-      )}
 
       {sameEpisodeServerLinks.length > 1 && (
         <section className="mt-5 rounded-3xl border border-white/10 bg-white/[0.03] p-4">
@@ -478,7 +337,24 @@ export default function WatchClient({
       <div className="baoflix-player-fill mt-5">
         <FullscreenPlayerBox tvImmersive={tvOverlayEnabled}>
           <div className="relative h-full w-full overflow-hidden bg-black">
-            {renderPlayer()}
+            {episode?.link_embed ? (
+              <iframe
+                src={episode.link_embed}
+                tabIndex={0}
+                data-tv-player="iframe"
+                allowFullScreen
+                allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+                className="h-full w-full bg-black outline-none"
+                title={`${movie.name} - ${episode.name}`}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-center text-slate-400">
+                <div>
+                  <p className="text-lg font-black text-white">Tập này chưa có Web player.</p>
+                  <p className="mt-2 text-sm">Bấm “Tập / nguồn” để đổi server khác.</p>
+                </div>
+              </div>
+            )}
 
             {tvOverlayEnabled && (
               <TvWatchOverlay
@@ -494,11 +370,8 @@ export default function WatchClient({
                   server: item.server,
                   serverIndex: item.serverIndex,
                   href: item.href,
+                  episodeIndex: item.episodeIndex,
                 }))}
-                playerMode={playerMode}
-                canUseEmbed={canUseEmbed}
-                canUseHls={canUseHls}
-                onSwitchPlayerMode={switchPlayerMode}
                 onOpenEpisodePanel={() => setEpisodePanelOpen(true)}
               />
             )}

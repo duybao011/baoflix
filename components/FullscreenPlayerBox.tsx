@@ -56,17 +56,8 @@ export default function FullscreenPlayerBox({
 
     if (!box) return;
 
-    const video = box.querySelector<HTMLElement>("video[data-tv-player='video'], video");
-
     window.setTimeout(() => {
       try {
-        // HLS/video là same-document nên có thể focus video mà app vẫn bắt được keydown.
-        // Iframe cross-origin thì không focus mặc định, vì focus iframe sẽ làm app mất remote handler.
-        if (video) {
-          video.focus({ preventScroll: true });
-          return;
-        }
-
         box.focus({ preventScroll: true });
       } catch {
         // Ignore focus errors in WebView.
@@ -135,6 +126,8 @@ export default function FullscreenPlayerBox({
     document.documentElement.style.overflow = "hidden";
     document.documentElement.style.overscrollBehavior = "none";
 
+    // TV WebPlayer mode không tự focus iframe ở đây.
+    // Focus iframe chỉ xảy ra khi user bấm “Focus player” hoặc APK native bridge gọi.
     focusPlayerSurface();
 
     return () => {
@@ -251,31 +244,29 @@ export default function FullscreenPlayerBox({
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-black/75 px-7 py-5 text-center text-white shadow-2xl backdrop-blur">
           <div className="text-3xl font-black">
             {playerHud.type === "seek"
-              ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta}s`
+              ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta || 0}s`
               : playerHud.type === "play"
                 ? "▶"
                 : "Ⅱ"}
           </div>
 
           {playerHud.type === "seek" && (
-            <div className="mt-1 text-sm font-bold text-slate-200">
+            <p className="mt-1 text-sm text-slate-300">
               {formatTime(playerHud.currentTime)}
               {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
-            </div>
+            </p>
           )}
         </div>
       )}
 
       {!tvImmersive && (
-        <div className="absolute bottom-3 right-3 flex gap-2">
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="rounded-xl bg-black/70 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-black"
-          >
-            {expanded ? "Thu nhỏ" : "Phóng to"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={toggleFullscreen}
+          className="absolute bottom-3 right-3 rounded-full border border-white/15 bg-black/70 px-3 py-2 text-xs font-bold text-white backdrop-blur hover:bg-white/15"
+        >
+          {expanded ? "Thoát rộng" : "Mở rộng"}
+        </button>
       )}
     </div>
   );
