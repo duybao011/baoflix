@@ -13,11 +13,14 @@ const FOCUSABLE_SELECTOR = [
 ].join(",");
 
 type Direction = "up" | "down" | "left" | "right";
+type SeekDirection = "backward" | "forward";
 
 type FocusEntry = {
   element: HTMLElement;
   rect: DOMRect;
 };
+
+type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
 
 const ROW_THRESHOLD = 22;
 const TV_SESSION_KEY = "baoflix_tv_mode";
@@ -77,10 +80,9 @@ function isPlayPauseKey(key: string) {
 function shouldWakeHiddenWatchOverlay(key: string) {
   const direction = getDirectionFromKey(key);
 
-  // TV player logic:
-  // - Up/Down/OK gọi overlay.
-  // - Left/Right và media keys ưu tiên player.
-  // - Back khi overlay ẩn thì quay lại detail hoặc TV hub.
+  // Khi overlay ẩn:
+  // - Left/Right được xử lý riêng: HLS tua trực tiếp, iframe thì bật nút tua kiểu bắc cầu.
+  // - Up/Down/OK gọi overlay giống TV player.
   return direction === "up" || direction === "down" || isActivationKey(key);
 }
 
@@ -167,6 +169,16 @@ function getOverlayDefaultFocusable(overlay: HTMLElement) {
   return (
     overlay.querySelector<HTMLElement>("[data-tv-overlay-default]") ||
     overlay.querySelector<HTMLElement>("a[href], button:not([disabled])")
+  );
+}
+
+function getOverlaySeekFocusable(
+  overlay: HTMLElement,
+  direction: SeekDirection
+) {
+  return (
+    overlay.querySelector<HTMLElement>(`[data-tv-seek='${direction}']`) ||
+    getOverlayDefaultFocusable(overlay)
   );
 }
 
@@ -337,6 +349,20 @@ function focusElement(element: HTMLElement) {
   });
 }
 
+function focusOverlaySeekButton(direction: SeekDirection) {
+  window.setTimeout(() => {
+    const overlay = getVisibleWatchOverlay();
+
+    if (!overlay) return;
+
+    const target = getOverlaySeekFocusable(overlay, direction);
+
+    if (!target) return;
+
+    focusElement(target);
+  }, 80);
+}
+
 function clickActiveElement(event: KeyboardEvent) {
   const active = document.activeElement;
 
@@ -359,6 +385,7 @@ function closeModalIfNeeded(event: KeyboardEvent) {
   if (!closeButton) return false;
 
   event.preventDefault();
+  event.stopPropagation();
   closeButton.click();
   return true;
 }
@@ -389,6 +416,7 @@ function getFallbackBackHref() {
 
 function goBack(event: KeyboardEvent) {
   event.preventDefault();
+  event.stopPropagation();
 
   if (window.history.length > 1) {
     window.history.back();
@@ -411,6 +439,17 @@ function dispatchShowOverlay(options?: { pinned?: boolean; focus?: boolean }) {
 
 function dispatchHideOverlay() {
   window.dispatchEvent(new Event("baoflix-hide-tv-overlay"));
+}
+
+function dispatchPlayerCommand(action: PlayerCommandAction, seconds?: number) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-player-command", {
+      detail: {
+        action,
+        seconds,
+      },
+    })
+  );
 }
 
 function focusPlayer() {
@@ -522,7 +561,7 @@ function handlePlayPauseVideo(video: HTMLVideoElement, key: string) {
   }
 }
 
-function handleHiddenPlayerKey(event: KeyboardEvent) {
+function handleHiddenWatchOverlayKey(event: KeyboardEvent) {
   const isBackward = isSeekBackwardKey(event.key);
   const isForward = isSeekForwardKey(event.key);
   const wantsPlayPause = isPlayPauseKey(event.key);
@@ -533,6 +572,7 @@ function handleHiddenPlayerKey(event: KeyboardEvent) {
 
   if (video) {
     event.preventDefault();
+    event.stopPropagation();
 
     if (wantsPlayPause) {
       handlePlayPauseVideo(video, event.key);
@@ -543,14 +583,22 @@ function handleHiddenPlayerKey(event: KeyboardEvent) {
     return true;
   }
 
-  // Embed iframe thường cross-origin nên app web không tua/play trực tiếp được.
-  // Ở nhánh này chỉ focus iframe và dừng navigator, không preventDefault.
-  // Lần bấm tiếp theo remote sẽ đi thẳng vào player embed nếu player hỗ trợ.
-  if (focusIframePlayer()) {
+  if (wantsPlayPause) {
+    event.preventDefault();
+    event.stopPropagation();
+    dispatchPlayerCommand("toggle-play");
     return true;
   }
 
-  return false;
+  // Iframe server ngoài không tua/play trực tiếp chắc chắn được.
+  // Thay vì thả focus vào iframe, bật overlay và trỏ đúng nút tua 10s để user OK kiểu bắc cầu.
+  event.preventDefault();
+  event.stopPropagation();
+
+  dispatchShowOverlay({ pinned: true, focus: false });
+  focusOverlaySeekButton(isForward ? "forward" : "backward");
+
+  return true;
 }
 
 export default function TvRemoteNavigator() {
@@ -599,6 +647,7 @@ export default function TvRemoteNavigator() {
 
         if (visibleOverlay) {
           event.preventDefault();
+          event.stopPropagation();
           dispatchHideOverlay();
           return;
         }
@@ -607,8 +656,8 @@ export default function TvRemoteNavigator() {
         return;
       }
 
-      // Media key riêng của một số remote: xử lý HLS video kể cả khi overlay đang hiện.
-      // Với iframe thì chỉ focus iframe, không cố điều khiển cross-origin player.
+      // Media key riêng của một số remote: xử lý HLS video trực tiếp.
+      // Nếu là iframe, gửi lệnh fallback sang bridge.
       if (
         !openModalScope &&
         !isTextInput(activeElement) &&
@@ -616,10 +665,15 @@ export default function TvRemoteNavigator() {
           event.key === "MediaFastForward" ||
           isPlayPauseKey(event.key))
       ) {
+        if (hiddenOverlay && handleHiddenWatchOverlayKey(event)) {
+          return;
+        }
+
         const video = getVisibleVideo();
 
         if (video) {
           event.preventDefault();
+          event.stopPropagation();
 
           if (isPlayPauseKey(event.key)) {
             handlePlayPauseVideo(video, event.key);
@@ -633,30 +687,44 @@ export default function TvRemoteNavigator() {
           return;
         }
 
+        if (isPlayPauseKey(event.key) || event.key === "MediaRewind" || event.key === "MediaFastForward") {
+          event.preventDefault();
+          event.stopPropagation();
+
+          dispatchPlayerCommand(
+            isPlayPauseKey(event.key) ? "toggle-play" : "seek",
+            event.key === "MediaRewind" ? -SEEK_SECONDS : SEEK_SECONDS
+          );
+
+          return;
+        }
+
         if (focusIframePlayer()) {
           return;
         }
       }
 
       // Khi đang xem TV immersive và overlay đang ẩn:
-      // - Left/Right ưu tiên HLS seek hoặc focus iframe.
-      // - Up/Down/OK mới gọi overlay.
+      // - Left/Right: HLS seek trực tiếp, iframe thì bật overlay và focus nút tua.
+      // - Up/Down/OK: gọi overlay.
       if (!openModalScope && !isTextInput(activeElement) && hiddenOverlay) {
-        if (handleHiddenPlayerKey(event)) {
+        if (handleHiddenWatchOverlayKey(event)) {
           return;
         }
 
         if (shouldWakeHiddenWatchOverlay(event.key)) {
           event.preventDefault();
+          event.stopPropagation();
           dispatchShowOverlay({ pinned: false, focus: true });
           return;
         }
       }
 
-      // Nếu overlay đang hiện nhưng focus đang nằm ở player surface, phím D-pad/OK đầu tiên
-      // sẽ đưa focus vào overlay để điều hướng rõ ràng như TV app.
       const direction = getDirectionFromKey(event.key);
 
+      // Overlay đang hiện nhưng focus còn nằm ngoài overlay:
+      // - Left/Right nhảy thẳng vào nút tua tương ứng.
+      // - Up/Down/OK nhảy vào nút mặc định.
       if (
         visibleOverlay &&
         !activeIsInsideVisibleOverlay &&
@@ -664,13 +732,21 @@ export default function TvRemoteNavigator() {
         !isTextInput(activeElement) &&
         (direction || isActivationKey(event.key))
       ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (direction === "left" || direction === "right") {
+          focusOverlaySeekButton(direction === "left" ? "backward" : "forward");
+          return;
+        }
+
         const target = getOverlayDefaultFocusable(visibleOverlay);
 
         if (target) {
-          event.preventDefault();
           focusElement(target);
-          return;
         }
+
+        return;
       }
 
       if (isActivationKey(event.key) && !isTextInput(activeElement)) {
@@ -692,6 +768,7 @@ export default function TvRemoteNavigator() {
 
         if (firstMainElement) {
           event.preventDefault();
+          event.stopPropagation();
           focusElement(firstMainElement);
         }
 
@@ -714,6 +791,7 @@ export default function TvRemoteNavigator() {
 
       if (!current) {
         event.preventDefault();
+        event.stopPropagation();
 
         const defaultElement = getDefaultFocusable(root);
 
@@ -737,19 +815,21 @@ export default function TvRemoteNavigator() {
           (root.dataset.tvLock === "true" || root.dataset.tvModal)
         ) {
           event.preventDefault();
+          event.stopPropagation();
         }
 
         return;
       }
 
       event.preventDefault();
+      event.stopPropagation();
       focusElement(nextElement);
     }
 
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [enabled, pathname]);
 

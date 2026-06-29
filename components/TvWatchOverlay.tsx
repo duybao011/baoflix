@@ -322,7 +322,7 @@ export default function TvWatchOverlay({
           </div>
 
           <div className="hidden rounded-full border border-white/10 bg-black/40 px-3 py-2 text-xs font-bold text-slate-200/85 backdrop-blur-md md:block">
-            OK: chọn • Back: ẩn • Trái/Phải: mở nút tua
+            OK: chọn • Back: ẩn • Trái/Phải: nút tua
           </div>
         </div>
       </div>
@@ -338,6 +338,7 @@ export default function TvWatchOverlay({
           <button
             type="button"
             data-tv-seek="backward"
+            aria-label="Tua lại 10 giây"
             {...hiddenFocusProps}
             onClick={() => dispatchPlayerCommand("seek", -SEEK_SECONDS)}
             className={[
@@ -351,6 +352,7 @@ export default function TvWatchOverlay({
           <button
             type="button"
             data-tv-overlay-default
+            aria-label="Phát hoặc tạm dừng"
             {...hiddenFocusProps}
             onClick={() => dispatchPlayerCommand("toggle-play")}
             className={[
@@ -364,6 +366,7 @@ export default function TvWatchOverlay({
           <button
             type="button"
             data-tv-seek="forward"
+            aria-label="Tua tới 10 giây"
             {...hiddenFocusProps}
             onClick={() => dispatchPlayerCommand("seek", SEEK_SECONDS)}
             className={[
@@ -465,7 +468,7 @@ export default function TvWatchOverlay({
         <p className="mt-3 text-center text-xs font-semibold text-white/60">
           {overlayPinned
             ? "Overlay đang ghim • OK để bấm nút • Back để ẩn"
-            : "Trái/Phải gọi nút tua 10s • Tập/nguồn để đổi server và tập"}
+            : "Trái/Phải: HLS tua ngay, iframe mở nút tua • Tập/nguồn để đổi server"}
         </p>
       </div>
     </div>

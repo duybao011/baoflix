@@ -27,10 +27,6 @@ const quickFilters = [
     href: "/loc?type=phim-bo&country=trung-quoc",
   },
   {
-    label: "Phim bộ Trung LT mới",
-    href: "/loc?type=phim-bo&country=trung-quoc&sort_lang=long-tieng&sort_field=year&sort_type=desc",
-  },
-  {
     label: "Phim Hàn",
     href: "/loc?country=han-quoc",
   },
@@ -96,10 +92,8 @@ export default function TvSearchBox() {
   const router = useRouter();
 
   const [keyword, setKeyword] = useState("");
-  // Đừng đọc localStorage trong initial render. Server render không có localStorage,
-  // còn client có thể có lịch sử tìm kiếm, khiến cây HTML lệch và báo hydration mismatch.
-  const [history, setHistory] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
 
   useEffect(() => {
     function refresh() {
@@ -219,7 +213,7 @@ export default function TvSearchBox() {
         ))}
       </div>
 
-      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-9">
+      <div data-tv-row className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {quickFilters.map((item) => (
           <Link
             key={item.href}

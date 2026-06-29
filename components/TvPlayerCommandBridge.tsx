@@ -44,7 +44,16 @@ function focusPlayerSurface() {
   window.dispatchEvent(new Event("baoflix-focus-tv-player"));
 }
 
-function focusIframePlayer({ hideOverlay = true }: { hideOverlay?: boolean } = {}) {
+function showPlayerHud(detail: {
+  type: "seek" | "play" | "pause";
+  delta?: number;
+  currentTime?: number;
+  duration?: number;
+}) {
+  window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail }));
+}
+
+function focusIframePlayer({ hideOverlay = false }: { hideOverlay?: boolean } = {}) {
   const iframe = getVisiblePlayerIframe();
 
   if (!iframe) return false;
@@ -62,45 +71,63 @@ function focusIframePlayer({ hideOverlay = true }: { hideOverlay?: boolean } = {
   return true;
 }
 
+function keyForCommand(command: PlayerCommand) {
+  if (command.action === "seek") {
+    return Number(command.seconds || 0) < 0 ? "ArrowLeft" : "ArrowRight";
+  }
+
+  if (
+    command.action === "play" ||
+    command.action === "pause" ||
+    command.action === "toggle-play"
+  ) {
+    return " ";
+  }
+
+  return "Enter";
+}
+
+function dispatchIframeKeyboardEvent(target: EventTarget, key: string) {
+  const keyboardEvent = new KeyboardEvent("keydown", {
+    key,
+    code: key === " " ? "Space" : key,
+    bubbles: true,
+    cancelable: true,
+  });
+
+  target.dispatchEvent(keyboardEvent);
+}
+
 function sendIframeRemoteKey(command: PlayerCommand) {
   const iframe = getVisiblePlayerIframe();
 
   if (!iframe) return false;
 
-  const key =
-    command.action === "seek"
-      ? Number(command.seconds || 0) < 0
-        ? "ArrowLeft"
-        : "ArrowRight"
-      : command.action === "play" || command.action === "pause" || command.action === "toggle-play"
-        ? " "
-        : "Enter";
+  const key = keyForCommand(command);
 
   try {
     iframe.focus({ preventScroll: true });
-
-    const keyboardEvent = new KeyboardEvent("keydown", {
-      key,
-      code: key === " " ? "Space" : key,
-      bubbles: true,
-      cancelable: true,
-    });
-
-    iframe.dispatchEvent(keyboardEvent);
+    dispatchIframeKeyboardEvent(iframe, key);
   } catch {
     return focusIframePlayer({ hideOverlay: false });
   }
 
-  return true;
-}
+  // Nếu iframe cùng origin hoặc WebView cho phép, thử gửi thêm vào contentWindow.
+  // Với cross-origin player, trình duyệt có thể chặn phần này; khi đó app vẫn giữ overlay để user điều khiển thủ công.
+  try {
+    iframe.contentWindow?.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key,
+        code: key === " " ? "Space" : key,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+  } catch {
+    // Cross-origin iframe không cho điều khiển trực tiếp.
+  }
 
-function showPlayerHud(detail: {
-  type: "seek" | "play" | "pause";
-  delta?: number;
-  currentTime?: number;
-  duration?: number;
-}) {
-  window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail }));
+  return true;
 }
 
 function seekVideo(video: HTMLVideoElement, delta: number) {
@@ -192,15 +219,20 @@ export default function TvPlayerCommandBridge() {
         return;
       }
 
-      // Iframe server ngoài thường cross-origin nên web không tua/play trực tiếp chắc 100%.
-      // Fallback này giữ overlay, focus iframe và bắn phím tương ứng để player nào hỗ trợ phím thì nhận được.
-      if (command.action === "seek" || command.action === "toggle-play" || command.action === "play" || command.action === "pause") {
+      // Iframe server ngoài thường cross-origin nên không đảm bảo tua/play trực tiếp.
+      // Fallback tốt nhất: focus iframe và thử gửi phím, overlay vẫn được giữ để user thấy nút đang bấm.
+      if (
+        command.action === "seek" ||
+        command.action === "toggle-play" ||
+        command.action === "play" ||
+        command.action === "pause"
+      ) {
         if (sendIframeRemoteKey(command)) {
           return;
         }
       }
 
-      focusIframePlayer();
+      focusIframePlayer({ hideOverlay: false });
     }
 
     window.addEventListener("baoflix-tv-player-command", handleCommand);
