@@ -27,12 +27,12 @@ type TvDashboardProps = {
 
 const FAVORITES_KEY = "baoflix_favorites";
 const TV_CARD_FOCUS_CLASS =
-  "focus-visible:-translate-y-1 focus-visible:scale-[1.035] focus-visible:border-yellow-300 focus-visible:bg-white/[0.09] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black";
+  "focus-visible:-translate-y-0.5 focus-visible:scale-[1.025] focus-visible:border-yellow-300 focus-visible:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const tvShortcuts = [
   {
-    label: "Bộ lọc nhanh",
-    desc: "Chọn quốc gia, thể loại, ngôn ngữ",
+    label: "Bộ lọc",
+    desc: "Quốc gia, thể loại, ngôn ngữ",
     href: "/loc",
     hot: true,
   },
@@ -54,7 +54,7 @@ const tvShortcuts = [
   },
   {
     label: "Vietsub",
-    desc: "Lọc bản phụ đề",
+    desc: "Bản phụ đề",
     href: "/loc?sort_lang=vietsub",
   },
   {
@@ -64,12 +64,12 @@ const tvShortcuts = [
   },
   {
     label: "Yêu thích",
-    desc: "Danh sách đã lưu",
+    desc: "Phim đã lưu",
     href: "/yeu-thich",
   },
   {
     label: "Lịch sử",
-    desc: "Các phim đang xem",
+    desc: "Đang xem dở",
     href: "/lich-su",
   },
   {
@@ -79,7 +79,7 @@ const tvShortcuts = [
   },
   {
     label: "Cài đặt",
-    desc: "Reload app và TV mode",
+    desc: "Reload, TV mode",
     href: "/cai-dat",
   },
 ];
@@ -88,10 +88,7 @@ function uniqueShortcutItems<T extends { href: string }>(items: T[]) {
   const seen = new Set<string>();
 
   return items.filter((item) => {
-    if (seen.has(item.href)) {
-      return false;
-    }
-
+    if (seen.has(item.href)) return false;
     seen.add(item.href);
     return true;
   });
@@ -129,7 +126,6 @@ function TvMovieCard({
   subtitle,
   badge,
   meta,
-  large,
   focusKey,
 }: {
   href: string;
@@ -146,12 +142,11 @@ function TvMovieCard({
       href={href}
       data-tv-focus-key={focusKey || href}
       className={[
-        "group block overflow-hidden rounded-[1.7rem] border border-white/10 bg-white/[0.04] p-3 transition duration-200 hover:-translate-y-1 hover:border-red-500/70 hover:bg-white/[0.08] md:p-4",
+        "group block overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] p-2 transition duration-200 hover:-translate-y-0.5 hover:border-red-500/70 hover:bg-white/[0.07]",
         TV_CARD_FOCUS_CLASS,
-        large ? "md:p-4" : "",
       ].join(" ")}
     >
-      <div className="relative overflow-hidden rounded-2xl bg-white/5">
+      <div className="relative overflow-hidden rounded-xl bg-white/5">
         <img
           src={getImageUrl(image)}
           alt={title}
@@ -159,30 +154,25 @@ function TvMovieCard({
         />
 
         {badge && (
-          <span className="absolute left-2 top-2 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-black text-white shadow-lg">
+          <span className="absolute left-1.5 top-1.5 max-w-[82%] truncate rounded-full bg-red-600 px-2 py-0.5 text-[9px] font-black text-white shadow-lg">
             {badge}
           </span>
         )}
       </div>
 
-      <div className="mt-3">
-        <h3
-          className={[
-            "line-clamp-2 font-black leading-tight text-white",
-            large ? "text-base md:text-lg" : "text-sm md:text-base",
-          ].join(" ")}
-        >
+      <div className="mt-2 min-h-[52px]">
+        <h3 className="line-clamp-2 text-[12px] font-black leading-tight text-white min-[1280px]:text-[13px]">
           {title}
         </h3>
 
         {subtitle && (
-          <p className="mt-1 line-clamp-1 text-xs font-bold text-yellow-300 md:text-sm">
+          <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-yellow-300 min-[1280px]:text-[11px]">
             {subtitle}
           </p>
         )}
 
         {meta && (
-          <p className="mt-1 line-clamp-1 text-xs text-slate-400">{meta}</p>
+          <p className="mt-0.5 line-clamp-1 text-[10px] text-slate-400">{meta}</p>
         )}
       </div>
     </Link>
@@ -199,11 +189,10 @@ function SectionTitle({
   href?: string;
 }) {
   return (
-    <div className="mb-4 flex items-end justify-between gap-3">
+    <div className="mb-3 flex items-end justify-between gap-3">
       <div>
-        <h2 className="text-2xl font-black md:text-3xl">{title}</h2>
-
-        {desc && <p className="mt-1 text-sm text-slate-400">{desc}</p>}
+        <h2 className="text-xl font-black min-[1280px]:text-2xl">{title}</h2>
+        {desc && <p className="mt-0.5 text-xs text-slate-400">{desc}</p>}
       </div>
 
       {href && (
@@ -211,7 +200,7 @@ function SectionTitle({
           href={href}
           data-tv-focus-key={`section-more:${href}`}
           className={[
-            "rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10",
+            "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-black hover:bg-white/10",
             TV_CARD_FOCUS_CLASS,
           ].join(" ")}
         >
@@ -238,16 +227,13 @@ function ShortcutCard({
       href={href}
       data-tv-focus-key={`shortcut:${href}`}
       className={[
-        "rounded-3xl border p-5 transition hover:border-yellow-300/60 hover:bg-white/[0.08]",
-        hot
-          ? "border-yellow-300/25 bg-yellow-300/[0.08]"
-          : "border-white/10 bg-white/[0.04]",
+        "rounded-2xl border p-3 transition hover:border-yellow-300/60 hover:bg-white/[0.08]",
+        hot ? "border-yellow-300/25 bg-yellow-300/[0.08]" : "border-white/10 bg-white/[0.035]",
         TV_CARD_FOCUS_CLASS,
       ].join(" ")}
     >
-      <h3 className="text-lg font-black md:text-xl">{label}</h3>
-
-      <p className="mt-2 text-sm text-slate-400">{desc}</p>
+      <h3 className="text-sm font-black min-[1280px]:text-base">{label}</h3>
+      <p className="mt-1 line-clamp-1 text-[11px] text-slate-400">{desc}</p>
     </Link>
   );
 }
@@ -258,12 +244,12 @@ function ContinueHero({ item }: { item: WatchHistoryItem }) {
       href={getHistoryHref(item)}
       data-tv-focus-key={`continue:${item.slug}`}
       className={[
-        "group block rounded-[2rem] border border-yellow-300/20 bg-yellow-300/10 p-4 transition hover:border-yellow-300/60 hover:bg-yellow-300/15",
+        "group block rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-3 transition hover:border-yellow-300/60 hover:bg-yellow-300/15",
         TV_CARD_FOCUS_CLASS,
       ].join(" ")}
     >
-      <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
-        <div className="overflow-hidden rounded-3xl bg-white/5">
+      <div className="grid gap-3 sm:grid-cols-[92px_1fr] min-[1280px]:grid-cols-[108px_1fr]">
+        <div className="overflow-hidden rounded-xl bg-white/5">
           <img
             src={getImageUrl(item.poster_url || item.thumb_url)}
             alt={item.name}
@@ -272,43 +258,37 @@ function ContinueHero({ item }: { item: WatchHistoryItem }) {
         </div>
 
         <div className="flex min-w-0 flex-col justify-center">
-          <p className="text-xs font-black uppercase tracking-[0.22em] text-yellow-300">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-300">
             Xem tiếp
           </p>
 
-          <h2 className="mt-3 line-clamp-2 text-2xl font-black md:text-4xl">
+          <h2 className="mt-2 line-clamp-2 text-lg font-black min-[1280px]:text-2xl">
             {item.name}
           </h2>
 
           {item.origin_name && (
-            <p className="mt-2 line-clamp-1 text-sm font-bold text-slate-400">
+            <p className="mt-1 line-clamp-1 text-xs font-bold text-slate-400">
               {item.origin_name}
             </p>
           )}
 
-          <div className="mt-4 flex flex-wrap gap-2 text-sm">
-            <span className="rounded-full bg-red-600 px-3 py-1 font-black text-white">
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+            <span className="rounded-full bg-red-600 px-2.5 py-1 font-black text-white">
               {item.episodeName || "Tập đang xem"}
             </span>
-
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-bold text-slate-200">
-              {item.isCustom
-                ? item.seasonName || "Phim riêng"
-                : item.serverName || "Nguồn phát"}
+            <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-slate-200">
+              {item.isCustom ? item.seasonName || "Phim riêng" : item.serverName || "Nguồn phát"}
             </span>
-
             {item.quality && (
-              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-bold text-slate-200">
+              <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 font-bold text-slate-200">
                 {item.quality}
               </span>
             )}
           </div>
 
-          <div className="mt-5">
-            <span className="inline-flex rounded-2xl bg-yellow-300 px-5 py-3 font-black text-black">
-              ▶ Vào xem tiếp
-            </span>
-          </div>
+          <span className="mt-3 inline-flex w-fit rounded-xl bg-yellow-300 px-4 py-2 text-xs font-black text-black">
+            ▶ Vào xem tiếp
+          </span>
         </div>
       </div>
     </Link>
@@ -328,7 +308,6 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
     }
 
     refresh();
-
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
 
@@ -342,33 +321,32 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
   const otherHistory = history.slice(1, 7);
 
   return (
-    <div className="baoflix-tv-page space-y-10">
+    <div className="baoflix-tv-page space-y-6">
       <section
         data-tv-section="hero"
-        className="rounded-[2rem] border border-white/10 bg-gradient-to-br from-red-600/20 via-white/[0.04] to-yellow-300/10 p-5 md:p-8"
+        className="rounded-2xl border border-white/10 bg-gradient-to-br from-red-600/18 via-white/[0.035] to-yellow-300/10 p-4 min-[1280px]:p-5"
       >
-        <div className="grid gap-6 lg:grid-cols-[1fr_360px] lg:items-center">
+        <div className="grid gap-4 lg:grid-cols-[1fr_280px] lg:items-center min-[1280px]:lg:grid-cols-[1fr_320px]">
           <div>
-            <p className="mb-3 text-sm font-black uppercase tracking-[0.3em] text-red-300">
+            <p className="mb-2 text-[11px] font-black uppercase tracking-[0.24em] text-red-300">
               BảoFlix TV
             </p>
 
-            <h1 className="text-4xl font-black md:text-6xl">
+            <h1 className="text-3xl font-black leading-tight min-[1280px]:text-4xl">
               Mở TV là vào xem ngay
             </h1>
 
-            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-              D-pad ưu tiên theo hàng như app TV: Xem tiếp, tìm nhanh, bộ lọc
-              và phim riêng đều nằm ở các cụm rõ để không lạc focus.
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+              Giao diện đã nén lại để thấy nhiều phim hơn, bấm ít hơn và đỡ bị chữ/poster chiếm màn hình.
             </p>
 
-            <div data-tv-row data-tv-row-wrap="true" className="mt-6 flex flex-wrap gap-3">
+            <div data-tv-row data-tv-row-wrap="true" className="mt-4 flex flex-wrap gap-2">
               {firstContinue ? (
                 <Link
                   href={getHistoryHref(firstContinue)}
                   data-tv-default
                   data-tv-focus-key="hero:continue"
-                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                  className="rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 >
                   ▶ Xem tiếp
                 </Link>
@@ -377,7 +355,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                   href="/loc"
                   data-tv-default
                   data-tv-focus-key="hero:filter"
-                  className="rounded-2xl bg-yellow-300 px-6 py-4 text-base font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                  className="rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black hover:bg-yellow-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
                 >
                   Lọc phim
                 </Link>
@@ -386,7 +364,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <Link
                 href="/loc?type=phim-bo&country=trung-quoc"
                 data-tv-focus-key="hero:china-series"
-                className="rounded-2xl bg-red-600 px-6 py-4 text-base font-black text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                className="rounded-xl bg-red-600 px-4 py-3 text-sm font-black text-white hover:bg-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >
                 Phim bộ Trung
               </Link>
@@ -394,7 +372,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <Link
                 href="/loc"
                 data-tv-focus-key="hero:all-filter"
-                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >
                 Bộ lọc
               </Link>
@@ -402,56 +380,48 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
               <Link
                 href="/"
                 data-tv-focus-key="hero:normal-home"
-                className="rounded-2xl border border-white/10 bg-white/5 px-6 py-4 text-base font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >
                 Trang thường
               </Link>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+          <div className="rounded-2xl border border-white/10 bg-black/20 p-3">
             {firstContinue ? (
               <Link
                 href={getHistoryHref(firstContinue)}
                 data-tv-focus-key="hero:continue-card"
-                className="block rounded-2xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+                className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               >
-                <div className="flex gap-4">
-                  <div className="w-24 shrink-0 overflow-hidden rounded-2xl bg-white/5">
+                <div className="flex gap-3">
+                  <div className="w-20 shrink-0 overflow-hidden rounded-xl bg-white/5 min-[1280px]:w-24">
                     <img
-                      src={getImageUrl(
-                        firstContinue.poster_url || firstContinue.thumb_url
-                      )}
+                      src={getImageUrl(firstContinue.poster_url || firstContinue.thumb_url)}
                       alt={firstContinue.name}
                       className="aspect-[2/3] w-full object-cover"
                     />
                   </div>
 
-                  <div className="min-w-0 py-1">
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-yellow-300">
+                  <div className="min-w-0 py-0.5">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-300">
                       Đang xem
                     </p>
-
-                    <h2 className="mt-2 line-clamp-2 text-xl font-black">
+                    <h2 className="mt-1.5 line-clamp-2 text-base font-black min-[1280px]:text-lg">
                       {firstContinue.name}
                     </h2>
-
-                    <p className="mt-2 text-sm text-slate-400">
-                      {firstContinue.isCustom
-                        ? firstContinue.seasonName || "Phim riêng"
-                        : firstContinue.serverName || "Nguồn phát"}
+                    <p className="mt-1 line-clamp-1 text-xs text-slate-400">
+                      {firstContinue.isCustom ? firstContinue.seasonName || "Phim riêng" : firstContinue.serverName || "Nguồn phát"}
                     </p>
-
-                    <p className="mt-1 text-sm font-bold text-red-300">
+                    <p className="mt-0.5 line-clamp-1 text-xs font-bold text-red-300">
                       {firstContinue.episodeName || "Tập đang xem"}
                     </p>
                   </div>
                 </div>
               </Link>
             ) : (
-              <div className="p-3 text-slate-400">
-                Chưa có lịch sử xem. Mở một phim rồi quay lại đây sẽ có nút xem
-                tiếp.
+              <div className="p-2 text-sm text-slate-400">
+                Chưa có lịch sử xem. Mở một phim rồi quay lại đây sẽ có nút xem tiếp.
               </div>
             )}
           </div>
@@ -462,16 +432,11 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
 
       {firstContinue && (
         <section data-tv-section="continue">
-          <SectionTitle
-            title="Đang xem dở"
-            desc="Ưu tiên phim gần nhất để mở lên là xem tiếp ngay."
-            href="/lich-su"
-          />
-
+          <SectionTitle title="Đang xem dở" desc="Phim gần nhất để mở lên là xem tiếp ngay." href="/lich-su" />
           <ContinueHero item={firstContinue} />
 
           {otherHistory.length > 0 && (
-            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
               {otherHistory.map((item) => (
                 <TvMovieCard
                   key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
@@ -480,13 +445,8 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                   image={item.poster_url || item.thumb_url}
                   title={item.name}
                   subtitle={item.episodeName || item.origin_name}
-                  meta={
-                    item.isCustom
-                      ? item.seasonName || "Phim riêng"
-                      : item.serverName || item.lang
-                  }
+                  meta={item.isCustom ? item.seasonName || "Phim riêng" : item.serverName || item.lang}
                   badge="Xem tiếp"
-                  large
                 />
               ))}
             </div>
@@ -495,20 +455,10 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
       )}
 
       <section data-tv-section="shortcuts">
-        <SectionTitle
-          title="Lối tắt TV"
-          desc="Các nút hay bấm được đưa lên trước, khỏi mò menu bằng remote."
-        />
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <SectionTitle title="Lối tắt TV" desc="Nút thường dùng, gọn hơn để remote đi nhanh." />
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
           {uniqueShortcutItems(tvShortcuts).map((item) => (
-            <ShortcutCard
-              key={item.href}
-              label={item.label}
-              desc={item.desc}
-              href={item.href}
-              hot={item.hot}
-            />
+            <ShortcutCard key={item.href} label={item.label} desc={item.desc} href={item.href} hot={item.hot} />
           ))}
         </div>
       </section>
@@ -521,8 +471,8 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             href="/loc?type=phim-bo&country=trung-quoc"
           />
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-            {chineseSeries.slice(0, 14).map((movie) => (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            {chineseSeries.slice(0, 16).map((movie) => (
               <TvMovieCard
                 key={movie.slug}
                 href={`/phim/${movie.slug}`}
@@ -532,7 +482,6 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                 subtitle={movie.origin_name}
                 meta={movie.lang || movie.quality}
                 badge={movie.episode_current || "Phim bộ"}
-                large
               />
             ))}
           </div>
@@ -541,14 +490,9 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
 
       {customMovies.length > 0 && (
         <section data-tv-section="custom">
-          <SectionTitle
-            title="Phim riêng"
-            desc="Các phim fen tự thêm bằng giao diện."
-            href="/ca-nhan"
-          />
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
-            {customMovies.slice(0, 7).map((item) => (
+          <SectionTitle title="Phim riêng" desc="Các phim tự thêm bằng giao diện." href="/ca-nhan" />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            {customMovies.slice(0, 8).map((item) => (
               <TvMovieCard
                 key={item.movie.slug}
                 href={`/ca-nhan/${item.movie.slug}`}
@@ -558,7 +502,6 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                 subtitle={item.movie.origin_name}
                 meta={item.movie.lang || item.movie.quality}
                 badge="Riêng"
-                large
               />
             ))}
           </div>
@@ -567,14 +510,9 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
 
       {favorites.length > 0 && (
         <section data-tv-section="favorites">
-          <SectionTitle
-            title="Yêu thích"
-            desc="Các phim đã lưu."
-            href="/yeu-thich"
-          />
-
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
-            {favorites.slice(0, 7).map((item) => (
+          <SectionTitle title="Yêu thích" desc="Các phim đã lưu." href="/yeu-thich" />
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            {favorites.slice(0, 8).map((item) => (
               <TvMovieCard
                 key={item.slug}
                 href={`/phim/${item.slug}`}
@@ -584,7 +522,6 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
                 subtitle={item.origin_name}
                 meta={item.lang || item.quality}
                 badge="Đã lưu"
-                large
               />
             ))}
           </div>
