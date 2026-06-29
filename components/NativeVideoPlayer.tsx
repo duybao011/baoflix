@@ -16,6 +16,11 @@ type NativeVideoPlayerProps = {
   title: string;
   subtitle?: string;
   poster?: string;
+  /**
+   * true: TV remote overlay điều khiển video, không hiện browser controls.
+   * false: desktop/mobile dùng browser controls bình thường.
+   */
+  tvMode?: boolean;
 };
 
 const DEFAULT_SEEK_SECONDS = 10;
@@ -57,6 +62,7 @@ export default function NativeVideoPlayer({
   title,
   subtitle,
   poster,
+  tvMode = false,
 }: NativeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const userPausedRef = useRef(false);
@@ -73,7 +79,7 @@ export default function NativeVideoPlayer({
     } = {}) => {
       const video = videoRef.current;
 
-      if (!video) return false;
+      if (!video || !tvMode) return false;
 
       if (userPausedRef.current && !forced) {
         focusRemoteSurface();
@@ -97,7 +103,7 @@ export default function NativeVideoPlayer({
         return false;
       }
     },
-    []
+    [tvMode]
   );
 
   const playVideo = useCallback(
@@ -114,18 +120,18 @@ export default function NativeVideoPlayer({
   const pauseVideo = useCallback(() => {
     const video = videoRef.current;
 
-    if (!video) return;
+    if (!video || !tvMode) return;
 
     userPausedRef.current = true;
     video.pause();
     focusRemoteSurface();
     emitHud({ type: "pause" });
-  }, []);
+  }, [tvMode]);
 
   const seekVideo = useCallback((seconds: number) => {
     const video = videoRef.current;
 
-    if (!video) return;
+    if (!video || !tvMode) return;
 
     const duration = Number.isFinite(video.duration) ? video.duration : 0;
     const maxTime = duration > 0 ? duration : Number.MAX_SAFE_INTEGER;
@@ -140,10 +146,12 @@ export default function NativeVideoPlayer({
       currentTime: nextTime,
       duration,
     });
-  }, []);
+  }, [tvMode]);
 
   const handleCommand = useCallback(
     (detail: PlayerCommandDetail) => {
+      if (!tvMode) return;
+
       detail.handled = true;
 
       if (detail.action === "focus-player") {
@@ -180,7 +188,7 @@ export default function NativeVideoPlayer({
         pauseVideo();
       }
     },
-    [pauseVideo, playVideo, seekVideo]
+    [pauseVideo, playVideo, seekVideo, tvMode]
   );
 
   useEffect(() => {
@@ -191,12 +199,19 @@ export default function NativeVideoPlayer({
     setError("");
     userPausedRef.current = false;
     autoplayDoneRef.current = false;
-    video.removeAttribute("controls");
-    video.controls = false;
-    video.autoplay = true;
-    video.preload = "auto";
+
+    video.controls = !tvMode;
+    video.autoplay = tvMode;
+    video.preload = tvMode ? "auto" : "metadata";
+
+    if (tvMode) {
+      video.removeAttribute("controls");
+    } else {
+      video.setAttribute("controls", "");
+    }
 
     function autoplayQuietly() {
+      if (!tvMode) return;
       if (userPausedRef.current || autoplayDoneRef.current) return;
 
       void attemptPlay({ showError: false, forced: false });
@@ -241,9 +256,11 @@ export default function NativeVideoPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [attemptPlay, src]);
+  }, [attemptPlay, src, tvMode]);
 
   useEffect(() => {
+    if (!tvMode) return;
+
     function onPlayerCommand(event: Event) {
       const detail = (event as CustomEvent<PlayerCommandDetail>).detail;
 
@@ -257,12 +274,12 @@ export default function NativeVideoPlayer({
     return () => {
       window.removeEventListener("baoflix-tv-player-command", onPlayerCommand as EventListener);
     };
-  }, [handleCommand]);
+  }, [handleCommand, tvMode]);
 
   useEffect(() => {
     const video = videoRef.current;
 
-    if (!video || !("mediaSession" in navigator)) return;
+    if (!tvMode || !video || !("mediaSession" in navigator)) return;
 
     try {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -306,12 +323,12 @@ export default function NativeVideoPlayer({
       safeSetMediaSessionHandler("seekforward", null);
       safeSetMediaSessionHandler("seekto", null);
     };
-  }, [pauseVideo, playVideo, poster, seekVideo, subtitle, title]);
+  }, [pauseVideo, playVideo, poster, seekVideo, subtitle, title, tvMode]);
 
   useEffect(() => {
     const video = videoRef.current;
 
-    if (!video || !("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
+    if (!tvMode || !video || !("mediaSession" in navigator) || !navigator.mediaSession.setPositionState) return;
 
     function updatePositionState() {
       const currentVideo = videoRef.current;
@@ -336,28 +353,34 @@ export default function NativeVideoPlayer({
       video.removeEventListener("timeupdate", updatePositionState);
       video.removeEventListener("loadedmetadata", updatePositionState);
     };
-  }, []);
+  }, [tvMode]);
 
   return (
     <div className="relative h-full w-full bg-black">
       <video
         ref={videoRef}
-        data-tv-player="native-video"
-        data-tv-player-native="true"
-        data-tv-skip
-        tabIndex={-1}
-        autoPlay
+        data-tv-player={tvMode ? "native-video" : undefined}
+        data-tv-player-native={tvMode ? "true" : undefined}
+        data-tv-skip={tvMode ? true : undefined}
+        tabIndex={tvMode ? -1 : 0}
+        autoPlay={tvMode}
         playsInline
-        preload="auto"
+        preload={tvMode ? "auto" : "metadata"}
         poster={poster}
-        controlsList="nodownload nofullscreen noremoteplayback"
-        className="pointer-events-none h-full w-full bg-black object-contain outline-none"
+        controls={!tvMode}
+        controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload"}
+        className={[
+          tvMode ? "pointer-events-none" : "",
+          "h-full w-full bg-black object-contain outline-none",
+        ].join(" ")}
         onPlay={() => {
+          if (!tvMode) return;
           userPausedRef.current = false;
           autoplayDoneRef.current = true;
           setError("");
         }}
         onPause={() => {
+          if (!tvMode) return;
           userPausedRef.current = true;
         }}
       />

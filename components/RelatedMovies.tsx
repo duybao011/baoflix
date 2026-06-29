@@ -5,6 +5,7 @@ import {
   getMoviesByYear,
   MovieDetail,
   MovieItem,
+  MovieListResult,
 } from "@/lib/kkphim";
 
 function addUniqueMovies(
@@ -24,6 +25,18 @@ function addUniqueMovies(
   });
 }
 
+async function safeRelatedResult(
+  label: string,
+  loader: () => Promise<MovieListResult>
+) {
+  try {
+    return await loader();
+  } catch (error) {
+    console.warn("Lỗi lấy phim liên quan:", label, error);
+    return null;
+  }
+}
+
 export default async function RelatedMovies({ movie }: { movie: MovieDetail }) {
   const countrySlug = movie.country?.[0]?.slug;
   const categorySlug = movie.category?.[0]?.slug;
@@ -33,20 +46,26 @@ export default async function RelatedMovies({ movie }: { movie: MovieDetail }) {
 
   // Ưu tiên 1: cùng quốc gia
   if (countrySlug) {
-    const countryResult = await getMoviesByCountry(countrySlug, 1, 24);
-    addUniqueMovies(relatedMovies, countryResult.items || [], movie.slug);
+    const countryResult = await safeRelatedResult(countrySlug, () =>
+      getMoviesByCountry(countrySlug, 1, 24)
+    );
+    addUniqueMovies(relatedMovies, countryResult?.items || [], movie.slug);
   }
 
   // Ưu tiên 2: cùng thể loại
   if (categorySlug && relatedMovies.length < 18) {
-    const categoryResult = await getMoviesByGenre(categorySlug, 1, 24);
-    addUniqueMovies(relatedMovies, categoryResult.items || [], movie.slug);
+    const categoryResult = await safeRelatedResult(categorySlug, () =>
+      getMoviesByGenre(categorySlug, 1, 24)
+    );
+    addUniqueMovies(relatedMovies, categoryResult?.items || [], movie.slug);
   }
 
   // Ưu tiên 3: cùng năm, chỉ để bù thêm nếu chưa đủ
   if (year && relatedMovies.length < 18) {
-    const yearResult = await getMoviesByYear(year, 1, 24);
-    addUniqueMovies(relatedMovies, yearResult.items || [], movie.slug);
+    const yearResult = await safeRelatedResult(year, () =>
+      getMoviesByYear(year, 1, 24)
+    );
+    addUniqueMovies(relatedMovies, yearResult?.items || [], movie.slug);
   }
 
   const movies = relatedMovies.slice(0, 18);

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import FilterPanel from "@/components/FilterPanel";
 import MovieGrid from "@/components/MovieGrid";
 import Pagination from "@/components/Pagination";

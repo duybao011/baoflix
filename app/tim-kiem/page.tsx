@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import LocalCustomSearchResults from "@/components/LocalCustomSearchResults";
 import MovieGrid from "@/components/MovieGrid";

@@ -1,9 +1,8 @@
 @echo off
 setlocal
-if not exist package.json (
-  echo Run this script from the BaoFlix project root.
+node scripts\apply_mode_isolation_resilience.cjs
+if errorlevel 1 (
+  echo Patch failed.
   exit /b 1
 )
-if not exist components mkdir components
-copy /Y "%~dp0components\TvSearchBox.tsx" "components\TvSearchBox.tsx" >nul
-echo Applied TV search keyboard patch.
+echo Patch applied.

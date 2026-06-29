@@ -1,4 +1,5 @@
 "use client";
+import { isTvModeActive } from "@/lib/tvMode";
 
 import { useEffect } from "react";
 
@@ -211,15 +212,24 @@ function handleIframeOnlyCommand(command: PlayerCommand) {
 export default function TvPlayerCommandBridge() {
   useEffect(() => {
     function handleCommand(event: Event) {
+      if (!isTvModeActive({ allowSessionOnDesktop: false })) return;
+
       const command = (event as CustomEvent<PlayerCommand>).detail || {};
 
       handleIframeOnlyCommand(command);
     }
 
-    window.__baoflixFocusWebPlayer = focusIframePlayer;
+    window.__baoflixFocusWebPlayer = () => {
+      if (!isTvModeActive({ allowSessionOnDesktop: false })) return false;
+      return focusIframePlayer();
+    };
     window.BaoFlixTVWeb = {
-      focusPlayer: focusIframePlayer,
+      focusPlayer() {
+        if (!isTvModeActive({ allowSessionOnDesktop: false })) return false;
+        return focusIframePlayer();
+      },
       onNativeSeekKey(direction) {
+        if (!isTvModeActive({ allowSessionOnDesktop: false })) return;
         handleIframeOnlyCommand({
           action: "seek",
           seconds: direction === "forward" ? 10 : -10,

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import MovieGrid from "@/components/MovieGrid";
 import Pagination from "@/components/Pagination";
 import { getMoviesByCountry } from "@/lib/kkphim";

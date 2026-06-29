@@ -1,4 +1,5 @@
 "use client";
+import { isTvModeActive } from "@/lib/tvMode";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -39,53 +40,8 @@ function normalizeServerName(name?: string) {
   return name || "Server";
 }
 
-function getUserAgent() {
-  if (typeof navigator === "undefined") return "";
-
-  return navigator.userAgent.toLowerCase();
-}
-
-function isBaoflixTvShell() {
-  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview/.test(
-    getUserAgent()
-  );
-}
-
-function isTvUserAgent() {
-  return /android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(
-    getUserAgent()
-  );
-}
-
-function isMobileDevice() {
-  const userAgent = getUserAgent();
-
-  if (!userAgent) return false;
-  if (isBaoflixTvShell()) return false;
-  if (isTvUserAgent()) return false;
-
-  return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
-}
-
 function detectTvOverlayEnabled() {
-  try {
-    const searchParams = new URLSearchParams(window.location.search);
-    const forceTv = searchParams.get("tv") === "1";
-    const forceNormal = searchParams.get("tv") === "0";
-
-    if (forceNormal) return false;
-    if (forceTv || isBaoflixTvShell() || isTvUserAgent()) return true;
-
-    if (isMobileDevice()) {
-      sessionStorage.removeItem("baoflix_tv_mode");
-      localStorage.removeItem("baoflix_tv_mode");
-      return false;
-    }
-
-    return sessionStorage.getItem("baoflix_tv_mode") === "1";
-  } catch {
-    return false;
-  }
+  return isTvModeActive({ allowSessionOnDesktop: false });
 }
 
 export default function WatchClient({
@@ -250,6 +206,25 @@ export default function WatchClient({
 
   const posterUrl = movie.thumb_url || movie.poster_url;
   const nativeVideoUrl = episode?.link_m3u8;
+  const useTvNativePlayer = tvOverlayEnabled && Boolean(nativeVideoUrl);
+  const useNormalNativePlayer =
+    !tvOverlayEnabled && Boolean(nativeVideoUrl) && !episode?.link_embed;
+
+  const playerIframeSrc = useMemo(() => {
+    if (!episode?.link_embed) return "";
+    if (!tvOverlayEnabled) return episode.link_embed;
+
+    try {
+      const url = new URL(episode.link_embed, window.location.origin);
+      url.searchParams.set("autoplay", "1");
+      url.searchParams.set("autoPlay", "1");
+      url.searchParams.set("muted", "0");
+      url.searchParams.set("playsinline", "1");
+      return url.toString();
+    } catch {
+      return episode.link_embed;
+    }
+  }, [episode?.link_embed, tvOverlayEnabled]);
 
   return (
     <div
@@ -351,22 +326,34 @@ export default function WatchClient({
       <div className="baoflix-player-fill mt-5">
         <FullscreenPlayerBox tvImmersive={tvOverlayEnabled}>
           <div className="relative h-full w-full overflow-hidden bg-black">
-            {nativeVideoUrl ? (
+            {useTvNativePlayer && nativeVideoUrl ? (
               <NativeVideoPlayer
                 src={nativeVideoUrl}
                 title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
                 subtitle={normalizeServerName(currentServer?.server_name)}
                 poster={posterUrl}
+                tvMode
               />
             ) : episode?.link_embed ? (
               <iframe
-                src={episode.link_embed}
-                tabIndex={0}
+                src={playerIframeSrc}
+                tabIndex={tvOverlayEnabled ? -1 : 0}
                 data-tv-player="iframe"
+                data-tv-skip={tvOverlayEnabled ? true : undefined}
                 allowFullScreen
                 allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-                className="h-full w-full bg-black outline-none"
+                className={[
+                  "h-full w-full bg-black outline-none",
+                  tvOverlayEnabled ? "pointer-events-none" : "",
+                ].join(" ")}
                 title={`${movie.name} - ${episode.name}`}
+              />
+            ) : useNormalNativePlayer && nativeVideoUrl ? (
+              <NativeVideoPlayer
+                src={nativeVideoUrl}
+                title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
+                subtitle={normalizeServerName(currentServer?.server_name)}
+                poster={posterUrl}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-center text-slate-400">

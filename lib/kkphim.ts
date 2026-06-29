@@ -3,6 +3,7 @@ import { getCustomMovieBySlug } from "@/data/custom-movies";
 const API_BASE = "https://phimapi.com";
 const IMAGE_BASE = "https://phimimg.com";
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
+const KKPHIM_FETCH_TIMEOUT_MS = 8000;
 
 export type Taxonomy = {
   name: string;
