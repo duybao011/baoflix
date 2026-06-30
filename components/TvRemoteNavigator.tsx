@@ -109,6 +109,23 @@ function isPlayPauseKey(event: KeyboardEvent) {
   );
 }
 
+function isMenuKey(event: KeyboardEvent) {
+  return (
+    event.key === "Menu" ||
+    event.key === "ContextMenu" ||
+    event.key === "Apps" ||
+    event.keyCode === 82
+  );
+}
+
+function isSearchKey(event: KeyboardEvent) {
+  return (
+    event.key === "Search" ||
+    event.key === "Find" ||
+    event.keyCode === 84
+  );
+}
+
 function getHiddenWatchOverlay() {
   return document.querySelector<HTMLElement>(
     "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
@@ -241,6 +258,43 @@ function getFirstMainFocusableElement() {
   const scope = getMainScope();
   const main = document.querySelector("main");
   return getDefaultFocusable(scope || main || document);
+}
+
+function focusHeaderSearch(pathname: string) {
+  const target =
+    document.querySelector<HTMLElement>("[data-tv-header-search-input]") ||
+    document.querySelector<HTMLElement>("[data-tv-header-search-toggle]") ||
+    document.querySelector<HTMLElement>("header input");
+
+  if (!target || !isVisibleElement(target)) return false;
+  focusElement(target, pathname);
+  return true;
+}
+
+function focusHeaderMenu(pathname: string) {
+  const menuButton = document.querySelector<HTMLElement>("[data-tv-header-menu-button]");
+  if (menuButton && isVisibleElement(menuButton)) {
+    focusElement(menuButton, pathname);
+    return true;
+  }
+
+  const settingsLink =
+    document.querySelector<HTMLElement>("[data-tv-focus-key='nav:/cai-dat:Cài đặt']") ||
+    document.querySelector<HTMLElement>("header a[href='/cai-dat']");
+
+  if (!settingsLink || !isVisibleElement(settingsLink)) return false;
+  focusElement(settingsLink, pathname);
+  return true;
+}
+
+function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
+  if (!(activeElement instanceof HTMLElement)) return false;
+
+  const focusableElements = getFocusableElements(root);
+  const rows = buildRows(root, focusableElements);
+  const { rowIndex } = findRowIndex(rows, activeElement);
+
+  return rowIndex <= 0;
 }
 
 function toFocusEntry(element: HTMLElement): FocusEntry {
@@ -662,6 +716,27 @@ export default function TvRemoteNavigator() {
 
       if (visibleOverlay && !isTextInput(activeElement)) dispatchOverlayActivity();
 
+      if (isMenuKey(event) && !isTextInput(activeElement) && !openModalScope && !visibleOverlay) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (focusHeaderMenu(pathname)) {
+          const target = document.activeElement;
+          if (target instanceof HTMLButtonElement && target.hasAttribute("data-tv-header-menu-button")) {
+            target.click();
+          }
+        }
+
+        return;
+      }
+
+      if (isSearchKey(event) && !isTextInput(activeElement) && !openModalScope && !visibleOverlay) {
+        event.preventDefault();
+        event.stopPropagation();
+        focusHeaderSearch(pathname);
+        return;
+      }
+
       if (isBackKey(event) && !isTextInput(activeElement)) {
         if (closeModalIfNeeded(event)) return;
 
@@ -736,6 +811,21 @@ export default function TvRemoteNavigator() {
       }
 
       if (!direction) return;
+
+      if (
+        direction === "up" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
+        !isInsideTvRail(activeElement) &&
+        activeElement instanceof HTMLElement
+      ) {
+        const rootForHeaderJump = getActiveScope(activeElement) || getMainScope() || document;
+        if (isFirstRowInScope(activeElement, rootForHeaderJump) && focusHeaderSearch(pathname)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+      }
 
       if (
         direction === "left" &&
@@ -845,6 +935,17 @@ export default function TvRemoteNavigator() {
       const nextElement = getLinearCandidate(current, root, focusableElements, direction);
 
       if (!nextElement || nextElement === current) {
+        if (
+          direction === "up" &&
+          !openModalScope &&
+          !activeIsInsideVisibleOverlay &&
+          focusHeaderSearch(pathname)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
         if (
           root instanceof HTMLElement &&
           (root.dataset.tvLock === "true" || root.dataset.tvModal || root.dataset.tvOverlay === "watch")

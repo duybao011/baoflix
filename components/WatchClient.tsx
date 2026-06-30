@@ -332,6 +332,7 @@ export default function WatchClient({
                 title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
                 subtitle={normalizeServerName(currentServer?.server_name)}
                 poster={posterUrl}
+                progressKey={currentWatchedKey}
                 tvMode
               />
             ) : episode?.link_embed ? (
@@ -354,6 +355,7 @@ export default function WatchClient({
                 title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
                 subtitle={normalizeServerName(currentServer?.server_name)}
                 poster={posterUrl}
+                progressKey={currentWatchedKey}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-center text-slate-400">

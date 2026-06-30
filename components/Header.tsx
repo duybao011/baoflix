@@ -292,7 +292,7 @@ function SearchForm({
       onBlur={handleSearchBlur}
       className={["relative w-full", compact ? "" : "max-w-[560px]"].join(" ")}
     >
-      <form onSubmit={submit} className="flex w-full items-center gap-2">
+      <form onSubmit={submit} data-tv-row className="flex w-full items-center gap-2">
         <input
           value={keyword}
           autoFocus={autoFocus}
@@ -565,7 +565,13 @@ const isWatchPage =
       </header>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden">
+        <div
+          data-tv-modal
+          data-tv-scope="header-menu"
+          data-tv-lock="true"
+          data-tv-autofocus="true"
+          className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden"
+        >
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#070b14]">
             <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4">
               <Link
@@ -604,7 +610,7 @@ const isWatchPage =
                   Điều hướng
                 </h2>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {mobileMainItems.map((item) => (
                     <NavButton
                       key={`${item.href}-${item.label}`}
@@ -620,7 +626,7 @@ const isWatchPage =
                   Xem nhanh
                 </h2>
 
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {mobileQuickItems.map((item) => (
                     <NavButton
                       key={`${item.href}-${item.label}`}

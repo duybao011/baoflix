@@ -16,12 +16,51 @@ type NativeVideoPlayerProps = {
   title: string;
   subtitle?: string;
   poster?: string;
+  progressKey?: string;
   /**
    * true: TV remote overlay điều khiển video, không hiện browser controls.
    * false: desktop/mobile dùng browser controls bình thường.
    */
   tvMode?: boolean;
 };
+
+const VIDEO_PROGRESS_KEY = "baoflix_video_progress_v1";
+
+type StoredVideoProgress = {
+  currentTime: number;
+  duration: number;
+  updatedAt: string;
+  title?: string;
+  subtitle?: string;
+};
+
+function readProgressMap() {
+  try {
+    const raw = localStorage.getItem(VIDEO_PROGRESS_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    return data && typeof data === "object" ? data as Record<string, StoredVideoProgress> : {};
+  } catch {
+    return {};
+  }
+}
+
+function readVideoProgress(progressKey?: string) {
+  if (!progressKey) return null;
+  return readProgressMap()[progressKey] || null;
+}
+
+function saveVideoProgress(progressKey: string | undefined, progress: StoredVideoProgress) {
+  if (!progressKey) return;
+  if (!Number.isFinite(progress.currentTime) || progress.currentTime < 1) return;
+
+  try {
+    const map = readProgressMap();
+    map[progressKey] = progress;
+    localStorage.setItem(VIDEO_PROGRESS_KEY, JSON.stringify(map));
+  } catch {
+    // Ignore storage errors in restricted TV WebViews.
+  }
+}
 
 const DEFAULT_SEEK_SECONDS = 10;
 
@@ -62,11 +101,14 @@ export default function NativeVideoPlayer({
   title,
   subtitle,
   poster,
+  progressKey,
   tvMode = false,
 }: NativeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const userPausedRef = useRef(false);
   const autoplayDoneRef = useRef(false);
+  const restoreDoneRef = useRef(false);
+  const lastProgressSaveRef = useRef(0);
   const [error, setError] = useState<string>("");
 
   const attemptPlay = useCallback(
@@ -199,6 +241,8 @@ export default function NativeVideoPlayer({
     setError("");
     userPausedRef.current = false;
     autoplayDoneRef.current = false;
+    restoreDoneRef.current = false;
+    lastProgressSaveRef.current = 0;
 
     video.controls = !tvMode;
     video.autoplay = tvMode;
@@ -210,6 +254,60 @@ export default function NativeVideoPlayer({
       video.setAttribute("controls", "");
     }
 
+    function restoreProgressIfNeeded() {
+      const currentVideo = videoRef.current;
+
+      if (!currentVideo) return;
+      if (restoreDoneRef.current) return;
+
+      restoreDoneRef.current = true;
+
+      const saved = readVideoProgress(progressKey);
+      const duration = Number.isFinite(currentVideo.duration)
+        ? currentVideo.duration
+        : 0;
+      const savedTime = Number(saved?.currentTime || 0);
+
+      if (savedTime > 8 && (!duration || savedTime < duration - 8)) {
+        try {
+          currentVideo.currentTime = savedTime;
+        } catch {
+          // Some streams reject seek before enough data is buffered.
+        }
+      }
+    }
+
+    function saveProgressNow() {
+      const currentVideo = videoRef.current;
+
+      if (!progressKey || !currentVideo) return;
+
+      const currentTime = currentVideo.currentTime || 0;
+      const duration = Number.isFinite(currentVideo.duration)
+        ? currentVideo.duration
+        : 0;
+
+      saveVideoProgress(progressKey, {
+        currentTime,
+        duration,
+        updatedAt: new Date().toISOString(),
+        title,
+        subtitle,
+      });
+    }
+
+    function saveProgressThrottled() {
+      const now = Date.now();
+      if (now - lastProgressSaveRef.current < 3000) return;
+      lastProgressSaveRef.current = now;
+      saveProgressNow();
+    }
+
+    function handleLoadedMetadata() {
+      restoreProgressIfNeeded();
+      autoplayQuietly();
+    }
+
     function autoplayQuietly() {
       if (!tvMode) return;
       if (userPausedRef.current || autoplayDoneRef.current) return;
@@ -217,7 +315,10 @@ export default function NativeVideoPlayer({
       void attemptPlay({ showError: false, forced: false });
     }
 
-    video.addEventListener("loadedmetadata", autoplayQuietly);
+    video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    video.addEventListener("timeupdate", saveProgressThrottled);
+    video.addEventListener("pause", saveProgressNow);
+    video.addEventListener("ended", saveProgressNow);
     video.addEventListener("canplay", autoplayQuietly, { once: true });
 
     if (Hls.isSupported()) {
@@ -240,7 +341,11 @@ export default function NativeVideoPlayer({
       });
 
       return () => {
-        video.removeEventListener("loadedmetadata", autoplayQuietly);
+        saveProgressNow();
+        video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+        video.removeEventListener("timeupdate", saveProgressThrottled);
+        video.removeEventListener("pause", saveProgressNow);
+        video.removeEventListener("ended", saveProgressNow);
         video.removeEventListener("canplay", autoplayQuietly);
         hls.destroy();
       };
@@ -251,12 +356,16 @@ export default function NativeVideoPlayer({
     autoplayQuietly();
 
     return () => {
-      video.removeEventListener("loadedmetadata", autoplayQuietly);
+      saveProgressNow();
+      video.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      video.removeEventListener("timeupdate", saveProgressThrottled);
+      video.removeEventListener("pause", saveProgressNow);
+      video.removeEventListener("ended", saveProgressNow);
       video.removeEventListener("canplay", autoplayQuietly);
       video.removeAttribute("src");
       video.load();
     };
-  }, [attemptPlay, src, tvMode]);
+  }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
 
   useEffect(() => {
     if (!tvMode) return;
