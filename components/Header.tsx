@@ -351,7 +351,7 @@ function SearchForm({
       </form>
 
       {showDropdown && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-[70] max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0f19] shadow-2xl">
+        <div data-tv-row data-tv-row-wrap="true" className="absolute left-0 right-0 top-[calc(100%+8px)] z-[70] max-h-[70dvh] overflow-y-auto rounded-3xl border border-white/10 bg-[#0b0f19] shadow-2xl">
           {keyword.trim().length > 0 && (
             <button
               type="button"
