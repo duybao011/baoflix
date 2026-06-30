@@ -25,6 +25,33 @@ type SearchSuggestion = {
 };
 
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
+const TV_SESSION_KEY = "baoflix_tv_mode";
+
+const TV_KEYBOARD_ROWS = [
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+  ["z", "x", "c", "v", "b", "n", "m"],
+  ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+] as const;
+
+function isTvSearchKeyboardEnabled() {
+  if (typeof window === "undefined") return false;
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tv") === "0") return false;
+    if (params.get("tv") === "1") return true;
+
+    const ua = navigator.userAgent.toLowerCase();
+    if (/baoflixtv|baoflix tv|baoflixwebview|baoflix-webview|android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(ua)) {
+      return true;
+    }
+
+    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 const mainNavItems: NavItem[] = [
   { label: "Chủ đề", href: "/chu-de" },
@@ -580,7 +607,7 @@ const isWatchPage =
           data-tv-scope="header-menu"
           data-tv-lock="true"
           data-tv-autofocus="true"
-          className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm"
         >
           <div className="flex h-[100dvh] max-h-[100dvh] flex-col overflow-hidden bg-[#070b14]">
             <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4">

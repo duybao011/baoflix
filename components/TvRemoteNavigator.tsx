@@ -275,8 +275,12 @@ function focusHeaderSearch(pathname: string) {
 }
 
 function focusHeaderMenu(pathname: string) {
-  const menuButton = document.querySelector<HTMLElement>("[data-tv-header-menu-button]");
-  if (menuButton && isVisibleElement(menuButton)) {
+  const menuCandidates = Array.from(
+    document.querySelectorAll<HTMLElement>("[data-tv-header-menu-button]")
+  );
+  const menuButton = menuCandidates.find(isVisibleElement);
+
+  if (menuButton) {
     focusElement(menuButton, pathname);
     return true;
   }
@@ -878,6 +882,16 @@ export default function TvRemoteNavigator() {
         activeElement instanceof HTMLElement &&
         activeElement.closest("header")
       ) {
+        const keyboard = document.querySelector<HTMLElement>("[data-tv-search-keyboard]");
+        const keyboardTarget = keyboard ? getFocusableElements(keyboard)[0] : null;
+
+        if (keyboardTarget) {
+          event.preventDefault();
+          event.stopPropagation();
+          focusElement(keyboardTarget, pathname);
+          return;
+        }
+
         const firstMainElement = getFirstMainFocusableElement();
         if (firstMainElement) {
           event.preventDefault();
@@ -928,7 +942,9 @@ export default function TvRemoteNavigator() {
 
       const modalScope = getModalScope();
       const activeScope = getActiveScope(activeElement);
-      const root = modalScope || activeScope || visibleOverlay || getMainScope() || document;
+      const activeHeader =
+        activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("header") : null;
+      const root = modalScope || activeScope || activeHeader || visibleOverlay || getMainScope() || document;
       const focusableElements = getFocusableElements(root);
 
       if (!focusableElements.length) return;
