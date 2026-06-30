@@ -63,7 +63,10 @@ function CustomMovieMiniCard({
           href={`${href}/quan-ly`}
           prefetch={false}
           data-tv-focus-key={`custom-manage:${href}`}
-          className={["rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+          className={[
+            "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10",
+            TV_FOCUS_CLASS,
+          ].join(" ")}
         >
           Quản lý mùa / tập
         </Link>
@@ -72,7 +75,10 @@ function CustomMovieMiniCard({
           href={`${href}/sua`}
           prefetch={false}
           data-tv-focus-key={`custom-edit:${href}`}
-          className={["rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+          className={[
+            "rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-bold hover:bg-white/10",
+            TV_FOCUS_CLASS,
+          ].join(" ")}
         >
           Sửa thông tin
         </Link>
@@ -158,7 +164,12 @@ export default function CustomMoviesPage() {
   }
 
   return (
-    <div data-tv-scope="custom-page" data-tv-lock="true" data-tv-autofocus="true" className="baoflix-tv-page">
+    <div
+      data-tv-scope="custom-page"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+      className="baoflix-tv-page"
+    >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Phim riêng</h1>
@@ -173,7 +184,10 @@ export default function CustomMoviesPage() {
             prefetch={false}
             data-tv-default
             data-tv-focus-key="custom:add"
-            className={["rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500", TV_FOCUS_CLASS].join(" ")}
+            className={[
+              "rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             + Thêm phim
           </Link>
@@ -183,7 +197,10 @@ export default function CustomMoviesPage() {
             onClick={downloadBackup}
             disabled={localMovies.length === 0}
             data-tv-focus-key="custom:backup"
-            className={["rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40", TV_FOCUS_CLASS].join(" ")}
+            className={[
+              "rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             Backup JSON
           </button>
@@ -192,7 +209,10 @@ export default function CustomMoviesPage() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             data-tv-focus-key="custom:import"
-            className={["rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+            className={[
+              "rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             Import JSON
           </button>
@@ -229,7 +249,10 @@ export default function CustomMoviesPage() {
               href="/ca-nhan/them"
               prefetch={false}
               data-tv-focus-key="custom:add-more"
-              className={["rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+              className={[
+                "rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold hover:bg-white/10",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
             >
               Thêm phim khác
             </Link>
@@ -239,7 +262,6 @@ export default function CustomMoviesPage() {
         {localMovies.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
             <h3 className="text-xl font-black">Chưa có phim riêng nào</h3>
-
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
               Bấm <b>+ Thêm phim</b> để tạo phim mới bằng giao diện. Nếu đã có
               backup JSON từ máy khác hoặc từ bản cũ, dùng <b>Import JSON</b> để
@@ -251,7 +273,10 @@ export default function CustomMoviesPage() {
                 href="/ca-nhan/them"
                 prefetch={false}
                 data-tv-focus-key="custom:first-add"
-                className={["rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500", TV_FOCUS_CLASS].join(" ")}
+                className={[
+                  "rounded-2xl bg-red-600 px-5 py-3 font-black hover:bg-red-500",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
               >
                 + Thêm phim đầu tiên
               </Link>
@@ -260,14 +285,21 @@ export default function CustomMoviesPage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 data-tv-focus-key="custom:first-import"
-                className={["rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+                className={[
+                  "rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-bold hover:bg-white/10",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
               >
                 Import JSON
               </button>
             </div>
           </div>
         ) : (
-          <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <div
+            data-tv-row
+            data-tv-row-wrap="true"
+            className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
+          >
             {localMovies.map((item) => (
               <CustomMovieMiniCard
                 key={item.movie.slug}

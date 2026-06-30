@@ -48,7 +48,6 @@ function matchLang(movieLang: string | undefined, selected: string) {
   if (selected === "tat-ca") return true;
 
   const lang = normalize(movieLang);
-
   if (selected === "vietsub") return lang.includes("vietsub");
   if (selected === "thuyet-minh") return lang.includes("thuyet minh");
   if (selected === "long-tieng") return lang.includes("long tieng");
@@ -60,7 +59,6 @@ function formatWatchedTime(value?: string) {
   if (!value) return "";
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) return "";
 
   return date.toLocaleDateString("vi-VN", {
@@ -71,9 +69,7 @@ function formatWatchedTime(value?: string) {
 }
 
 function getHistoryHref(item: HistoryItem) {
-  if (item.href) {
-    return item.href;
-  }
+  if (item.href) return item.href;
 
   if (item.isCustom) {
     return `/ca-nhan/${item.slug}/xem?season=${item.seasonIndex ?? 0}&tap=${
@@ -87,10 +83,7 @@ function getHistoryHref(item: HistoryItem) {
 }
 
 function getSourceLabel(item: HistoryItem) {
-  if (item.isCustom) {
-    return item.seasonName || "Phim riêng";
-  }
-
+  if (item.isCustom) return item.seasonName || "Phim riêng";
   return item.serverName || "Server";
 }
 
@@ -147,9 +140,9 @@ export default function HistoryPage() {
   }, []);
 
   const years = useMemo(() => {
-    return Array.from(
-      new Set(items.map((item) => item.year).filter(Boolean))
-    ).sort((a, b) => Number(b) - Number(a));
+    return Array.from(new Set(items.map((item) => item.year).filter(Boolean))).sort(
+      (a, b) => Number(b) - Number(a)
+    );
   }, [items]);
 
   const servers = useMemo(() => {
@@ -167,10 +160,7 @@ export default function HistoryPage() {
       });
     });
 
-    return Array.from(map.entries()).map(([slug, name]) => ({
-      slug,
-      name,
-    }));
+    return Array.from(map.entries()).map(([slug, name]) => ({ slug, name }));
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -186,11 +176,9 @@ export default function HistoryPage() {
       const matchType = type === "tat-ca" || item.type === type;
       const matchYear = year === "tat-ca" || String(item.year) === year;
       const matchServer = server === "tat-ca" || sourceLabel === server;
-
       const matchCountry =
         country === "tat-ca" ||
         item.country?.some((countryItem) => countryItem.slug === country);
-
       const matchLanguage = matchLang(item.lang, lang);
 
       return (
@@ -251,13 +239,17 @@ export default function HistoryPage() {
   }
 
   return (
-    <div data-tv-scope="history-page" data-tv-lock="true" data-tv-autofocus="true" className="baoflix-tv-page">
+    <div
+      data-tv-scope="history-page"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+      className="baoflix-tv-page"
+    >
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Lịch sử xem</h1>
-
           <p className="mt-1 text-slate-400">
-            Remote TV sẽ ưu tiên lọc nhanh rồi xuống danh sách phim.
+            Remote TV ưu tiên cụm lọc rồi xuống danh sách phim.
           </p>
         </div>
 
@@ -267,7 +259,10 @@ export default function HistoryPage() {
             onClick={clearFilters}
             data-tv-default
             data-tv-focus-key="history:clear-filters-top"
-            className={["rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+            className={[
+              "rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             Xóa lọc
           </button>
@@ -277,7 +272,10 @@ export default function HistoryPage() {
               type="button"
               onClick={clearHistory}
               data-tv-focus-key="history:clear-history"
-              className={["rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-red-600", TV_FOCUS_CLASS].join(" ")}
+              className={[
+                "rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-red-600",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
             >
               Xóa lịch sử
             </button>
@@ -289,7 +287,11 @@ export default function HistoryPage() {
         data-tv-section="history-filters"
         className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4"
       >
-        <div data-tv-row data-tv-row-wrap="true" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div
+          data-tv-row
+          data-tv-row-wrap="true"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
@@ -354,7 +356,10 @@ export default function HistoryPage() {
             type="button"
             onClick={clearFilters}
             data-tv-focus-key="history:clear-filters"
-            className={["rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10", TV_FOCUS_CLASS].join(" ")}
+            className={[
+              "rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10",
+              TV_FOCUS_CLASS,
+            ].join(" ")}
           >
             Xóa lọc
           </button>

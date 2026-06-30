@@ -28,14 +28,8 @@ const TV_CARD_FOCUS_CLASS =
   "focus-visible:scale-[1.035] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 function getBadgeClass(tone: BadgeTone) {
-  if (tone === "yellow") {
-    return "bg-yellow-300 text-black";
-  }
-
-  if (tone === "dark") {
-    return "bg-black/75 text-white";
-  }
-
+  if (tone === "yellow") return "bg-yellow-300 text-black";
+  if (tone === "dark") return "bg-black/75 text-white";
   return "bg-red-600 text-white";
 }
 

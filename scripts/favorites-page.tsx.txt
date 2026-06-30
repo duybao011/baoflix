@@ -51,7 +51,6 @@ function matchLang(movieLang: string | undefined, selected: string) {
   if (selected === "tat-ca") return true;
 
   const lang = normalize(movieLang);
-
   if (selected === "vietsub") return lang.includes("vietsub");
   if (selected === "thuyet-minh") return lang.includes("thuyet minh");
   if (selected === "long-tieng") return lang.includes("long tieng");
@@ -170,20 +169,12 @@ export default function FavoritesPage() {
       );
     });
 
-    if (sort === "az") {
-      result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-    }
-
+    if (sort === "az") result = [...result].sort((a, b) => a.name.localeCompare(b.name));
     if (sort === "year-desc") {
-      result = [...result].sort(
-        (a, b) => Number(b.year || 0) - Number(a.year || 0)
-      );
+      result = [...result].sort((a, b) => Number(b.year || 0) - Number(a.year || 0));
     }
-
     if (sort === "year-asc") {
-      result = [...result].sort(
-        (a, b) => Number(a.year || 0) - Number(b.year || 0)
-      );
+      result = [...result].sort((a, b) => Number(a.year || 0) - Number(b.year || 0));
     }
 
     return result;
@@ -201,19 +192,22 @@ export default function FavoritesPage() {
 
   function removeFavorite(slug: string) {
     const next = movies.filter((movie) => movie.slug !== slug);
-
     setMovies(next);
     localStorage.setItem(KEY, JSON.stringify(next));
   }
 
   return (
-    <div data-tv-scope="favorites-page" data-tv-lock="true" data-tv-autofocus="true" className="baoflix-tv-page">
+    <div
+      data-tv-scope="favorites-page"
+      data-tv-lock="true"
+      data-tv-autofocus="true"
+      className="baoflix-tv-page"
+    >
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Phim yêu thích</h1>
-
           <p className="mt-1 text-slate-400">
-            Remote TV sẽ đi theo cụm lọc rồi xuống danh sách phim.
+            Remote TV đi qua filter rồi xuống danh sách phim đã lưu.
           </p>
         </div>
 
@@ -238,7 +232,11 @@ export default function FavoritesPage() {
       </div>
 
       <section className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-        <div data-tv-row data-tv-row-wrap="true" className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div
+          data-tv-row
+          data-tv-row-wrap="true"
+          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+        >
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}

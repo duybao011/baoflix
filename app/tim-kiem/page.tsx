@@ -70,7 +70,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const year = params.year || "tat-ca";
 
   if (!q) {
-    return <SearchEmptyState />;
+    return <div data-tv-scope="search-page-empty" data-tv-lock="true" data-tv-autofocus="true" className="baoflix-tv-page"><SearchEmptyState /></div>;
   }
 
   const countries = await getCountries();
@@ -93,7 +93,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const currentPage = Number(result.pagination?.currentPage || page);
 
   return (
-    <div>
+    <div data-tv-scope="search-page" data-tv-lock="true" data-tv-autofocus="true" className="baoflix-tv-page">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">Tìm kiếm: {q}</h1>
@@ -106,6 +106,8 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
         <Link
           href="/tim-kiem"
+          data-tv-default
+          data-tv-focus-key="search:new-keyword"
           className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-bold hover:bg-white/10"
         >
           Tìm từ khóa khác
@@ -119,7 +121,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
           <div>
             <p className="mb-3 text-sm font-bold text-slate-200">Quốc gia</p>
 
-            <div className="flex flex-wrap gap-2">
+            <div data-tv-row data-tv-row-wrap="true" className="flex flex-wrap gap-2">
               <Link
                 href={buildSearchHref({
                   q,
@@ -128,6 +130,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
                   category,
                   year,
                 })}
+                data-tv-focus-key={`search-filter:${country}:${sortLang}:${category}:${year}`}
                 className={[
                   "rounded-xl border px-4 py-2 text-sm font-bold",
                   country === "tat-ca"
@@ -177,7 +180,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
           <div>
             <p className="mb-3 text-sm font-bold text-slate-200">Ngôn ngữ</p>
 
-            <div className="flex flex-wrap gap-2">
+            <div data-tv-row data-tv-row-wrap="true" className="flex flex-wrap gap-2">
               {[
                 { label: "Tất cả", value: "tat-ca" },
                 { label: "Vietsub", value: "vietsub" },
