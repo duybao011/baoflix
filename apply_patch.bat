@@ -1,6 +1,6 @@
 @echo off
 setlocal
-node scripts\apply_tv_search_keyboard_fix.cjs
+node scripts\apply_tv_back_remote_logic_fix.cjs
 if errorlevel 1 (
   echo Patch failed.
   exit /b 1
