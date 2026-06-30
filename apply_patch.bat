@@ -1,6 +1,6 @@
 @echo off
 setlocal
-node scripts\apply_tv_ui_v3_lean_remote.cjs
+node scripts\apply_tv_v4_typefix_country_category.cjs
 if errorlevel 1 (
   echo Patch failed.
   exit /b 1

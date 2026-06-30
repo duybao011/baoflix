@@ -38,8 +38,9 @@ type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-pl
 type OverlayMode = "hidden" | "peek" | "panel";
 type OverlayPanel = "episodes" | "sources" | null;
 
-const AUTO_HIDE_MS = 3400;
+const AUTO_HIDE_MS = 2300;
 const SEEK_SECONDS = 10;
+const CHUNK_SIZE = 24;
 
 const TV_FOCUS_CLASS =
   "focus-visible:scale-[1.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_18px_rgba(250,204,21,0.38)]";
@@ -126,6 +127,7 @@ export default function TvWatchOverlay({
   const [overlayMode, setOverlayModeState] = useState<OverlayMode>("peek");
   const [overlayPanel, setOverlayPanelState] = useState<OverlayPanel>(null);
   const [nativeHintVisible, setNativeHintVisible] = useState(false);
+  const [activeChunkIndex, setActiveChunkIndex] = useState(0);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -139,13 +141,35 @@ export default function TvWatchOverlay({
   const panelOpen = overlayMode === "panel";
   const overlayVisible = overlayMode !== "hidden";
 
+  const episodeChunks = useMemo(() => {
+    const chunks: { start: number; end: number; label: string }[] = [];
+
+    for (let start = 0; start < currentEpisodes.length; start += CHUNK_SIZE) {
+      const end = Math.min(start + CHUNK_SIZE - 1, currentEpisodes.length - 1);
+      chunks.push({ start, end, label: `${start + 1}-${end + 1}` });
+    }
+
+    return chunks;
+  }, [currentEpisodes.length]);
+
+  const safeChunkIndex = activeChunkIndex >= episodeChunks.length ? 0 : activeChunkIndex;
+  const activeChunk = episodeChunks[safeChunkIndex];
+
   const episodeItems = useMemo(() => {
-    return currentEpisodes.map((episode, episodeIndex) => ({
-      episode,
-      episodeIndex,
-      href: getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
-    }));
-  }, [currentEpisodes, movie.slug, safeServerIndex]);
+    if (!activeChunk) return [];
+
+    return currentEpisodes
+      .slice(activeChunk.start, activeChunk.end + 1)
+      .map((episode, index) => {
+        const episodeIndex = activeChunk.start + index;
+
+        return {
+          episode,
+          episodeIndex,
+          href: getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
+        };
+      });
+  }, [activeChunk, currentEpisodes, movie.slug, safeServerIndex]);
 
   const compactMeta = useMemo(() => {
     const parts = [
@@ -362,6 +386,7 @@ export default function TvWatchOverlay({
 
   useEffect(() => {
     setOverlayPanel(null);
+    setActiveChunkIndex(Math.max(0, Math.floor(safeEpisodeIndex / CHUNK_SIZE)));
     showPeek({ focus: false });
   }, [safeEpisodeIndex, currentServer?.server_name]);
 
@@ -605,7 +630,29 @@ export default function TvWatchOverlay({
                   </div>
                 )}
 
-                <div data-tv-row className="max-h-[33vh] overflow-y-auto pr-1">
+                {episodeChunks.length > 1 && (
+                  <div data-tv-row data-tv-row-wrap="true" className="mb-2 flex flex-wrap gap-1.5">
+                    {episodeChunks.map((chunk, index) => (
+                      <button
+                        key={chunk.label}
+                        type="button"
+                        onClick={() => setActiveChunkIndex(index)}
+                        data-tv-panel-default={index === safeChunkIndex ? "episodes" : undefined}
+                        className={[
+                          "rounded-lg border px-2.5 py-1.5 text-[10px] font-black transition",
+                          index === safeChunkIndex
+                            ? "border-yellow-300 bg-yellow-300 text-black"
+                            : "border-white/10 bg-white/5 text-slate-200 hover:bg-white/10",
+                          TV_FOCUS_CLASS,
+                        ].join(" ")}
+                      >
+                        {chunk.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div data-tv-row data-tv-row-wrap="true" className="max-h-[34vh] overflow-y-auto pr-1">
                   <div className="grid grid-cols-6 gap-2 min-[1280px]:grid-cols-8">
                     {episodeItems.map((item) => {
                       const active = item.episodeIndex === safeEpisodeIndex;
@@ -631,7 +678,6 @@ export default function TvWatchOverlay({
                           <span className="line-clamp-1">
                             {item.episode.name || `Tập ${item.episodeIndex + 1}`}
                           </span>
-
                           {watched && !active && (
                             <span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-yellow-300" />
                           )}
