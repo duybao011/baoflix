@@ -261,12 +261,15 @@ function getFirstMainFocusableElement() {
 }
 
 function focusHeaderSearch(pathname: string) {
-  const target =
-    document.querySelector<HTMLElement>("[data-tv-header-search-input]") ||
-    document.querySelector<HTMLElement>("[data-tv-header-search-toggle]") ||
-    document.querySelector<HTMLElement>("header input");
+  const candidates = [
+    document.querySelector<HTMLElement>("[data-tv-header-search-input]"),
+    document.querySelector<HTMLElement>("[data-tv-header-search-toggle]"),
+    document.querySelector<HTMLElement>("header input"),
+  ].filter(Boolean) as HTMLElement[];
 
-  if (!target || !isVisibleElement(target)) return false;
+  const target = candidates.find(isVisibleElement);
+  if (!target) return false;
+
   focusElement(target, pathname);
   return true;
 }
@@ -278,11 +281,14 @@ function focusHeaderMenu(pathname: string) {
     return true;
   }
 
-  const settingsLink =
-    document.querySelector<HTMLElement>("[data-tv-focus-key='nav:/cai-dat:Cài đặt']") ||
-    document.querySelector<HTMLElement>("header a[href='/cai-dat']");
+  const settingsCandidates = [
+    document.querySelector<HTMLElement>("[data-tv-focus-key='nav:/cai-dat:Cài đặt']"),
+    document.querySelector<HTMLElement>("header a[href='/cai-dat']"),
+  ].filter(Boolean) as HTMLElement[];
 
-  if (!settingsLink || !isVisibleElement(settingsLink)) return false;
+  const settingsLink = settingsCandidates.find(isVisibleElement);
+  if (!settingsLink) return false;
+
   focusElement(settingsLink, pathname);
   return true;
 }
