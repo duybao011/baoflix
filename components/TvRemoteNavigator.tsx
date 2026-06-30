@@ -161,7 +161,48 @@ function getActiveScope(element: Element | null) {
 }
 
 function getMainScope() {
-  return document.querySelector<HTMLElement>("main [data-tv-scope]");
+  return (
+    document.querySelector<HTMLElement>("main [data-tv-scope]") ||
+    document.querySelector<HTMLElement>("main")
+  );
+}
+
+function getTvRail() {
+  return document.querySelector<HTMLElement>("[data-tv-rail='true']");
+}
+
+function getFirstFocusableInside(selector: string) {
+  const root = document.querySelector<HTMLElement>(selector);
+  if (!root || !isVisibleElement(root)) return null;
+  return getDefaultFocusable(root) || getFocusableElements(root)[0] || null;
+}
+
+function isInsideTvRail(element: Element | null) {
+  return element instanceof HTMLElement && Boolean(element.closest("[data-tv-rail='true']"));
+}
+
+function focusRailFromContent(pathname: string) {
+  const rail = getTvRail();
+  if (!rail || !isVisibleElement(rail)) return false;
+
+  const target =
+    rail.querySelector<HTMLElement>("[data-tv-focus-key='rail:home']") ||
+    getDefaultFocusable(rail) ||
+    getFocusableElements(rail)[0];
+
+  if (!target) return false;
+  focusElement(target, pathname);
+  return true;
+}
+
+function focusContentFromRail(pathname: string) {
+  const target =
+    getFirstFocusableInside("main [data-tv-scope]") ||
+    getFirstFocusableInside("main");
+
+  if (!target) return false;
+  focusElement(target, pathname);
+  return true;
 }
 
 function getModalScope() {
@@ -695,6 +736,36 @@ export default function TvRemoteNavigator() {
       }
 
       if (!direction) return;
+
+      if (
+        direction === "left" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
+        !isInsideTvRail(activeElement) &&
+        activeElement instanceof HTMLElement
+      ) {
+        const currentRow = activeElement.closest<HTMLElement>("[data-tv-row]");
+        const rowFocusables = currentRow ? getFocusableElements(currentRow) : [];
+        const firstInRow = rowFocusables[0];
+
+        if (firstInRow === activeElement && focusRailFromContent(pathname)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+      }
+
+      if (
+        direction === "right" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
+        isInsideTvRail(activeElement) &&
+        focusContentFromRail(pathname)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (shouldLetInputHandleKey(activeElement, event)) return;
 
       if (
