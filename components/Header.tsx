@@ -294,6 +294,9 @@ function SearchForm({
     >
       <form onSubmit={submit} data-tv-row className="flex w-full items-center gap-2">
         <input
+          type="search"
+          data-tv-header-search-input
+          data-tv-focus-key="header:search-input"
           value={keyword}
           autoFocus={autoFocus}
           onFocus={() => setFocused(true)}
@@ -310,6 +313,7 @@ function SearchForm({
 
         <button
           type="submit"
+          data-tv-focus-key="header:search-submit"
           className={[
             "shrink-0 rounded-2xl bg-red-600 font-black text-white hover:bg-red-500",
             compact ? "h-12 px-5 text-base" : "h-11 px-5 text-sm",
@@ -434,6 +438,8 @@ function NavButton({ item, onClick }: { item: NavItem; onClick?: () => void }) {
     <Link
       href={item.href}
       onClick={onClick}
+      prefetch={false}
+      data-tv-focus-key={`nav:${item.href}:${item.label}`}
       className={[
         "rounded-2xl border px-4 py-2.5 text-sm font-bold transition",
         item.highlight
@@ -510,6 +516,8 @@ const isWatchPage =
               {!isSearchPage && (
                 <button
                   type="button"
+                  data-tv-header-search-toggle
+                  data-tv-focus-key="header:search-toggle"
                   onClick={() => {
                     setSearchOpen((value) => !value);
                     setMenuOpen(false);
@@ -522,6 +530,8 @@ const isWatchPage =
 
               <button
                 type="button"
+                data-tv-header-menu-button
+                data-tv-focus-key="header:menu"
                 onClick={() => {
                   setMenuOpen((value) => !value);
                   setSearchOpen(false);
@@ -584,6 +594,9 @@ const isWatchPage =
 
               <button
                 type="button"
+                data-tv-close
+                data-tv-default
+                data-tv-focus-key="header-menu:close"
                 onClick={closePanels}
                 className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white"
               >

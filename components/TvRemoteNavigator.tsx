@@ -490,7 +490,15 @@ function restoreFocus(pathname: string) {
       target = document.querySelector<HTMLElement>(`[data-tv-focus-key="${cssEscape(key)}"]`);
     }
 
-    if (!target || !isVisibleElement(target)) return false;
+    if (
+      !target ||
+      !isVisibleElement(target) ||
+      target.tabIndex === -1 ||
+      target.hasAttribute("data-tv-skip")
+    ) {
+      return false;
+    }
+
     focusElement(target, pathname);
     return true;
   } catch {
