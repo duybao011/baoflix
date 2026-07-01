@@ -67,8 +67,8 @@ function focusIframePlayer() {
   try {
     iframe.focus({ preventScroll: true });
     iframe.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
+      behavior: "auto",
+      block: "nearest",
       inline: "center",
     });
   } catch {
@@ -189,10 +189,36 @@ function notifyNativeMissing(command: PlayerCommand) {
   );
 }
 
+function emitBridgeHud(command: PlayerCommand) {
+  if (command.action === "seek") {
+    window.dispatchEvent(
+      new CustomEvent("baoflix-tv-player-hud", {
+        detail: {
+          type: "seek",
+          delta: command.seconds || 10,
+        },
+      })
+    );
+    return;
+  }
+
+  if (command.action === "play") {
+    window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail: { type: "play" } }));
+    return;
+  }
+
+  if (command.action === "pause") {
+    window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail: { type: "pause" } }));
+    return;
+  }
+
+  if (command.action === "toggle-play") {
+    window.dispatchEvent(new CustomEvent("baoflix-tv-player-hud", { detail: { type: "toggle" } }));
+  }
+}
+
 function handleIframeOnlyCommand(command: PlayerCommand) {
   const nativeHandled = callNativeBridge(command);
-
-  if (nativeHandled) return true;
 
   const focused = focusIframePlayer();
   const iframe = getVisiblePlayerIframe();
@@ -206,7 +232,10 @@ function handleIframeOnlyCommand(command: PlayerCommand) {
     notifyNativeMissing(command);
   }
 
-  return focused || Boolean(iframe);
+  const handled = nativeHandled || focused || Boolean(iframe);
+  if (handled) emitBridgeHud(command);
+
+  return handled;
 }
 
 export default function TvPlayerCommandBridge() {
