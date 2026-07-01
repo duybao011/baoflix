@@ -31,6 +31,7 @@ const AREA_FOCUS_PREFIX = "baoflix_tv_area_focus:";
 const ROUTE_STACK_KEY = "baoflix_tv_route_stack_v1";
 const ROUTE_EVENT_NAME = "baoflix-tv-route-change";
 const HISTORY_PATCH_FLAG = "__baoflixTvHistoryPatched";
+const NAV_REPEAT_DEBOUNCE_MS = 42;
 
 function getUserAgent() {
   if (typeof navigator === "undefined") return "";
@@ -345,7 +346,7 @@ function restoreFocus(pathname: string) {
 
 function focusElement(element: HTMLElement, pathname?: string) {
   element.focus({ preventScroll: true });
-  element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+  element.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
 
   if (pathname) rememberFocus(pathname, element);
 }
@@ -961,6 +962,7 @@ function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
 export default function TvRemoteNavigator() {
   const pathname = usePathname();
   const [enabled, setEnabled] = useState(false);
+  const lastGridMoveRef = { current: 0 };
 
   useEffect(() => {
     function refreshEnabled() {
@@ -1131,6 +1133,21 @@ export default function TvRemoteNavigator() {
       }
 
       if (!direction) return;
+
+      if (
+        event.repeat &&
+        !hiddenOverlay &&
+        !visibleOverlay &&
+        !(activeElement instanceof HTMLElement && activeElement.closest("[data-tv-search-keyboard]"))
+      ) {
+        const now = performance.now();
+        if (now - lastGridMoveRef.current < NAV_REPEAT_DEBOUNCE_MS) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        lastGridMoveRef.current = now;
+      }
 
       if (
         direction === "up" &&

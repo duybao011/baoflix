@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getImageUrl } from "@/lib/kkphim";
 
 type NavItem = { label: string; href: string; highlight?: boolean };
@@ -202,13 +202,33 @@ function NavButton({ item, onClick }: { item: NavItem; onClick?: () => void }) {
 
 export default function Header() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const [currentKeyword, setCurrentKeyword] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const isSearchPage = pathname === "/tim-kiem";
   const isTvMode = pathname === "/tv";
   const isWatchPage = pathname.startsWith("/xem") || (pathname.startsWith("/ca-nhan/") && pathname.includes("/xem"));
-  const currentKeyword = searchParams.get("q") || searchParams.get("keyword") || "";
+  useEffect(() => {
+    function refreshCurrentKeyword() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        setCurrentKeyword(params.get("q") || params.get("keyword") || "");
+      } catch {
+        setCurrentKeyword("");
+      }
+    }
+
+    refreshCurrentKeyword();
+    window.addEventListener("popstate", refreshCurrentKeyword);
+    window.addEventListener("baoflix-tv-route-change", refreshCurrentKeyword);
+    window.addEventListener("focus", refreshCurrentKeyword);
+
+    return () => {
+      window.removeEventListener("popstate", refreshCurrentKeyword);
+      window.removeEventListener("baoflix-tv-route-change", refreshCurrentKeyword);
+      window.removeEventListener("focus", refreshCurrentKeyword);
+    };
+  }, [pathname]);
   const desktopNavItems = uniqueNavItems(isTvMode ? tvModeNavItems : [...mainNavItems, ...quickNavItems]);
   const mobileMainItems = uniqueNavItems(isTvMode ? tvModeNavItems : mainNavItems);
   const mobileQuickItems = uniqueNavItems(isTvMode ? quickNavItems.slice(0, 8) : quickNavItems);
