@@ -27,7 +27,10 @@ const ROW_THRESHOLD = 22;
 const TV_SESSION_KEY = "baoflix_tv_mode";
 const SEEK_SECONDS = 10;
 const FOCUS_MEMORY_PREFIX = "baoflix_tv_focus:";
+const AREA_FOCUS_PREFIX = "baoflix_tv_area_focus:";
 const ROUTE_STACK_KEY = "baoflix_tv_route_stack_v1";
+const ROUTE_EVENT_NAME = "baoflix-tv-route-change";
+const HISTORY_PATCH_FLAG = "__baoflixTvHistoryPatched";
 
 function getUserAgent() {
   if (typeof navigator === "undefined") return "";
@@ -120,27 +123,7 @@ function isMenuKey(event: KeyboardEvent) {
 }
 
 function isSearchKey(event: KeyboardEvent) {
-  return (
-    event.key === "Search" ||
-    event.key === "Find" ||
-    event.keyCode === 84
-  );
-}
-
-function getHiddenWatchOverlay() {
-  return document.querySelector<HTMLElement>(
-    "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
-  );
-}
-
-function getVisibleWatchOverlay() {
-  return document.querySelector<HTMLElement>(
-    "[data-tv-overlay='watch'][data-tv-overlay-visible='true']"
-  );
-}
-
-function isOverlayPanelOpen(overlay: HTMLElement | null) {
-  return overlay?.dataset.tvOverlayMode === "panel" || Boolean(overlay?.dataset.tvOverlayPanel);
+  return event.key === "Search" || event.key === "Find" || event.keyCode === 84;
 }
 
 function isTextInput(element: Element | null) {
@@ -198,38 +181,20 @@ function getTvRail() {
   return document.querySelector<HTMLElement>("[data-tv-rail='true']");
 }
 
-function getFirstFocusableInside(selector: string) {
-  const root = document.querySelector<HTMLElement>(selector);
-  if (!root || !isVisibleElement(root)) return null;
-  return getDefaultFocusable(root) || getFocusableElements(root)[0] || null;
+function getHiddenWatchOverlay() {
+  return document.querySelector<HTMLElement>(
+    "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
+  );
 }
 
-function isInsideTvRail(element: Element | null) {
-  return element instanceof HTMLElement && Boolean(element.closest("[data-tv-rail='true']"));
+function getVisibleWatchOverlay() {
+  return document.querySelector<HTMLElement>(
+    "[data-tv-overlay='watch'][data-tv-overlay-visible='true']"
+  );
 }
 
-function focusRailFromContent(pathname: string) {
-  const rail = getTvRail();
-  if (!rail || !isVisibleElement(rail)) return false;
-
-  const target =
-    rail.querySelector<HTMLElement>("[data-tv-focus-key='rail:home']") ||
-    getDefaultFocusable(rail) ||
-    getFocusableElements(rail)[0];
-
-  if (!target) return false;
-  focusElement(target, pathname);
-  return true;
-}
-
-function focusContentFromRail(pathname: string) {
-  const target =
-    getFirstFocusableInside("main [data-tv-scope]") ||
-    getFirstFocusableInside("main");
-
-  if (!target) return false;
-  focusElement(target, pathname);
-  return true;
+function isOverlayPanelOpen(overlay: HTMLElement | null) {
+  return overlay?.dataset.tvOverlayMode === "panel" || Boolean(overlay?.dataset.tvOverlayPanel);
 }
 
 function getModalScope() {
@@ -246,22 +211,171 @@ function getDefaultFocusable(root: ParentNode) {
       ? root.querySelector<HTMLElement>("[data-tv-default], [data-tv-overlay-default], [data-tv-tab-active='true']")
       : document.querySelector<HTMLElement>("[data-tv-default], [data-tv-overlay-default], [data-tv-tab-active='true']");
 
-  if (defaultElement && isVisibleElement(defaultElement)) return defaultElement;
+  if (
+    defaultElement &&
+    isVisibleElement(defaultElement) &&
+    defaultElement.tabIndex !== -1 &&
+    !defaultElement.hasAttribute("data-tv-skip")
+  ) {
+    return defaultElement;
+  }
+
   return getFocusableElements(root)[0] || null;
 }
 
-function getOverlayDefaultFocusable(overlay: HTMLElement) {
-  return (
-    overlay.querySelector<HTMLElement>("[data-tv-overlay-default]") ||
-    overlay.querySelector<HTMLElement>("a[href], button:not([disabled])")
-  );
+function getFirstFocusableInside(selector: string) {
+  const root = document.querySelector<HTMLElement>(selector);
+  if (!root || !isVisibleElement(root)) return null;
+  return getDefaultFocusable(root) || getFocusableElements(root)[0] || null;
 }
 
-function getOverlaySeekFocusable(overlay: HTMLElement, direction: SeekDirection) {
-  return (
-    overlay.querySelector<HTMLElement>(`[data-tv-seek='${direction}']`) ||
-    getOverlayDefaultFocusable(overlay)
-  );
+function isInsideTvRail(element: Element | null) {
+  return element instanceof HTMLElement && Boolean(element.closest("[data-tv-rail='true']"));
+}
+
+function cssEscape(value: string) {
+  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
+  return value.replace(/"/g, '\\"');
+}
+
+function getFocusMemoryValue(element: HTMLElement) {
+  const dataKey = element.getAttribute("data-tv-focus-key");
+  const href = element instanceof HTMLAnchorElement ? element.getAttribute("href") : "";
+
+  if (dataKey) return `data:${dataKey}`;
+  if (href) return `href:${href}`;
+  return "";
+}
+
+function getElementByFocusMemoryValue(value: string) {
+  let target: HTMLElement | null = null;
+
+  if (value.startsWith("href:")) {
+    const href = value.slice(5);
+    target = document.querySelector<HTMLElement>(`a[href="${cssEscape(href)}"]`);
+  } else if (value.startsWith("data:")) {
+    const key = value.slice(5);
+    target = document.querySelector<HTMLElement>(`[data-tv-focus-key="${cssEscape(key)}"]`);
+  }
+
+  if (
+    !target ||
+    !isVisibleElement(target) ||
+    target.tabIndex === -1 ||
+    target.hasAttribute("data-tv-skip")
+  ) {
+    return null;
+  }
+
+  return target;
+}
+
+function getFocusAreaKey(pathname: string, element: HTMLElement) {
+  if (element.closest("[data-tv-modal]")) return `${pathname}:modal`;
+  if (element.closest("[data-tv-overlay='watch']")) return `${pathname}:overlay`;
+  if (element.closest("[data-tv-search-keyboard]")) return `${pathname}:search-keyboard`;
+  if (element.closest("header")) return `${pathname}:header`;
+  if (element.closest("[data-tv-rail='true']")) return `${pathname}:rail`;
+  if (element.closest("[data-tv-filter-panel]")) return `${pathname}:filter`;
+
+  const section = element.closest<HTMLElement>("[data-tv-section]");
+  if (section?.dataset.tvSection) return `${pathname}:section:${section.dataset.tvSection}`;
+
+  if (element.closest("main")) return `${pathname}:content`;
+  return `${pathname}:document`;
+}
+
+function rememberAreaFocus(pathname: string, element: HTMLElement, value = getFocusMemoryValue(element)) {
+  if (!value) return;
+
+  try {
+    const areaKey = getFocusAreaKey(pathname, element);
+    sessionStorage.setItem(`${AREA_FOCUS_PREFIX}${areaKey}`, value);
+
+    if (
+      element.closest("main") &&
+      !element.closest("[data-tv-rail='true']") &&
+      !element.closest("[data-tv-modal]") &&
+      !element.closest("[data-tv-overlay='watch']") &&
+      !element.closest("[data-tv-search-keyboard]")
+    ) {
+      sessionStorage.setItem(`${AREA_FOCUS_PREFIX}${pathname}:content`, value);
+    }
+  } catch {
+    // Ignore storage errors in restricted WebViews.
+  }
+}
+
+function getRememberedFocusable(areaKey: string) {
+  try {
+    const value = sessionStorage.getItem(`${AREA_FOCUS_PREFIX}${areaKey}`);
+    if (!value) return null;
+    return getElementByFocusMemoryValue(value);
+  } catch {
+    return null;
+  }
+}
+
+function rememberFocus(pathname: string, element: HTMLElement) {
+  const value = getFocusMemoryValue(element);
+  if (!value) return;
+
+  try {
+    sessionStorage.setItem(`${FOCUS_MEMORY_PREFIX}${pathname}`, value);
+    rememberAreaFocus(pathname, element, value);
+  } catch {
+    // Ignore storage errors in restricted WebViews.
+  }
+}
+
+function restoreFocus(pathname: string) {
+  try {
+    const value = sessionStorage.getItem(`${FOCUS_MEMORY_PREFIX}${pathname}`);
+    if (!value) return false;
+
+    const target = getElementByFocusMemoryValue(value);
+    if (!target) return false;
+
+    focusElement(target, pathname);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function focusElement(element: HTMLElement, pathname?: string) {
+  element.focus({ preventScroll: true });
+  element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+
+  if (pathname) rememberFocus(pathname, element);
+}
+
+function focusRailFromContent(pathname: string) {
+  const rail = getTvRail();
+  if (!rail || !isVisibleElement(rail)) return false;
+
+  const rememberedRail = getRememberedFocusable(`${pathname}:rail`);
+  const target =
+    rememberedRail ||
+    rail.querySelector<HTMLElement>("[data-tv-focus-key='rail:home']") ||
+    getDefaultFocusable(rail) ||
+    getFocusableElements(rail)[0];
+
+  if (!target) return false;
+  focusElement(target, pathname);
+  return true;
+}
+
+function focusContentFromRail(pathname: string) {
+  const rememberedContent = getRememberedFocusable(`${pathname}:content`);
+  const target =
+    rememberedContent ||
+    getFirstFocusableInside("main [data-tv-scope]") ||
+    getFirstFocusableInside("main");
+
+  if (!target) return false;
+  focusElement(target, pathname);
+  return true;
 }
 
 function getFirstMainFocusableElement() {
@@ -304,6 +418,12 @@ function focusInputFromKeyboard(activeElement: Element | null, pathname: string)
 }
 
 function focusPageContentFromTransientUi(pathname: string) {
+  const remembered = getRememberedFocusable(`${pathname}:content`);
+  if (remembered) {
+    focusElement(remembered, pathname);
+    return true;
+  }
+
   const selectors = [
     "[data-tv-section='top-actions'] [data-tv-default]",
     "[data-tv-section='top-actions'] a[href]:not([data-tv-skip])",
@@ -368,16 +488,6 @@ function focusHeaderMenu(pathname: string) {
   return true;
 }
 
-function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
-  if (!(activeElement instanceof HTMLElement)) return false;
-
-  const focusableElements = getFocusableElements(root);
-  const rows = buildRows(root, focusableElements);
-  const { rowIndex } = findRowIndex(rows, activeElement);
-
-  return rowIndex <= 0;
-}
-
 function toFocusEntry(element: HTMLElement): FocusEntry {
   return {
     element,
@@ -397,6 +507,7 @@ function buildRectRows(elements: HTMLElement[]) {
 
   entries.forEach((entry) => {
     const lastRow = rows[rows.length - 1];
+
     if (!lastRow) {
       rows.push([entry]);
       return;
@@ -452,6 +563,7 @@ function buildRows(root: ParentNode, elements: HTMLElement[]) {
   });
 
   const outsideElements = elements.filter((element) => !elementsInsideExplicitRows.has(element));
+
   return [...rows, ...buildRectRows(outsideElements)].sort((a, b) => {
     const aTop = a[0]?.rect.top ?? 0;
     const bTop = b[0]?.rect.top ?? 0;
@@ -462,14 +574,19 @@ function buildRows(root: ParentNode, elements: HTMLElement[]) {
 
 function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect) {
   const currentCenter = currentRect.left + currentRect.width / 2;
-  return row.reduce<FocusEntry | null>((best, entry) => {
-    if (!best) return entry;
-    const bestCenter = best.rect.left + best.rect.width / 2;
-    const entryCenter = entry.rect.left + entry.rect.width / 2;
-    return Math.abs(entryCenter - currentCenter) < Math.abs(bestCenter - currentCenter)
-      ? entry
-      : best;
-  }, null)?.element || null;
+
+  return (
+    row.reduce<FocusEntry | null>((best, entry) => {
+      if (!best) return entry;
+
+      const bestCenter = best.rect.left + best.rect.width / 2;
+      const entryCenter = entry.rect.left + entry.rect.width / 2;
+
+      return Math.abs(entryCenter - currentCenter) < Math.abs(bestCenter - currentCenter)
+        ? entry
+        : best;
+    }, null)?.element || null
+  );
 }
 
 function findRowIndex(rows: FocusEntry[][], current: HTMLElement) {
@@ -526,66 +643,18 @@ function getLinearCandidate(
   return null;
 }
 
-function getFocusMemoryValue(element: HTMLElement) {
-  const dataKey = element.getAttribute("data-tv-focus-key");
-  const href = element instanceof HTMLAnchorElement ? element.getAttribute("href") : "";
-
-  if (dataKey) return `data:${dataKey}`;
-  if (href) return `href:${href}`;
-  return "";
+function getOverlayDefaultFocusable(overlay: HTMLElement) {
+  return (
+    overlay.querySelector<HTMLElement>("[data-tv-overlay-default]") ||
+    overlay.querySelector<HTMLElement>("a[href], button:not([disabled])")
+  );
 }
 
-function rememberFocus(pathname: string, element: HTMLElement) {
-  const value = getFocusMemoryValue(element);
-  if (!value) return;
-
-  try {
-    sessionStorage.setItem(`${FOCUS_MEMORY_PREFIX}${pathname}`, value);
-  } catch {
-    // Ignore storage errors in restricted WebViews.
-  }
-}
-
-function cssEscape(value: string) {
-  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
-  return value.replace(/"/g, '\\"');
-}
-
-function restoreFocus(pathname: string) {
-  try {
-    const value = sessionStorage.getItem(`${FOCUS_MEMORY_PREFIX}${pathname}`);
-    if (!value) return false;
-
-    let target: HTMLElement | null = null;
-    if (value.startsWith("href:")) {
-      const href = value.slice(5);
-      target = document.querySelector<HTMLElement>(`a[href="${cssEscape(href)}"]`);
-    } else if (value.startsWith("data:")) {
-      const key = value.slice(5);
-      target = document.querySelector<HTMLElement>(`[data-tv-focus-key="${cssEscape(key)}"]`);
-    }
-
-    if (
-      !target ||
-      !isVisibleElement(target) ||
-      target.tabIndex === -1 ||
-      target.hasAttribute("data-tv-skip")
-    ) {
-      return false;
-    }
-
-    focusElement(target, pathname);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function focusElement(element: HTMLElement, pathname?: string) {
-  element.focus({ preventScroll: true });
-  element.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
-
-  if (pathname) rememberFocus(pathname, element);
+function getOverlaySeekFocusable(overlay: HTMLElement, direction: SeekDirection) {
+  return (
+    overlay.querySelector<HTMLElement>(`[data-tv-seek='${direction}']`) ||
+    getOverlayDefaultFocusable(overlay)
+  );
 }
 
 function dispatchOverlayCommand(action: OverlayCommandAction, options?: { focus?: boolean }) {
@@ -612,6 +681,7 @@ function focusOverlaySeekButton(direction: SeekDirection, pathname: string) {
   window.setTimeout(() => {
     const overlay = getVisibleWatchOverlay();
     if (!overlay) return;
+
     const target = getOverlaySeekFocusable(overlay, direction);
     if (target) focusElement(target, pathname);
   }, 60);
@@ -628,6 +698,7 @@ function clickActiveElement(event: KeyboardEvent) {
 function closeModalIfNeeded(event: KeyboardEvent) {
   const modalScope = getModalScope();
   if (!modalScope) return false;
+
   const closeButton = modalScope.querySelector<HTMLElement>("[data-tv-close]");
   if (!closeButton) return false;
 
@@ -639,6 +710,7 @@ function closeModalIfNeeded(event: KeyboardEvent) {
 
 function focusActiveTabButtonFromPanel(activeElement: Element | null, pathname: string) {
   if (!(activeElement instanceof HTMLElement)) return false;
+
   const panel = activeElement.closest<HTMLElement>("[data-tv-tab-panel]");
   if (!panel) return false;
 
@@ -651,12 +723,14 @@ function focusActiveTabButtonFromPanel(activeElement: Element | null, pathname: 
   const { rowIndex } = findRowIndex(rows, activeElement);
 
   if (rowIndex > 0) return false;
+
   focusElement(activeTab, pathname);
   return true;
 }
 
 function focusActiveTabPanel(activeElement: Element | null, pathname: string) {
   if (!(activeElement instanceof HTMLElement)) return false;
+
   const tabList = activeElement.closest<HTMLElement>("[data-tv-tab-list]");
   if (!tabList) return false;
 
@@ -780,15 +854,40 @@ function rememberRoute(route = getCurrentRoute()) {
 function popRouteTarget(current = getCurrentRoute()) {
   const stack = readRouteStack().filter(Boolean);
 
-  while (stack.length && stack[stack.length - 1] === current) {
-    stack.pop();
-  }
+  while (stack.length && stack[stack.length - 1] === current) stack.pop();
 
   const target = stack.pop() || "";
   writeRouteStack(stack);
 
   if (!target || target === current) return "";
   return target;
+}
+
+function installRouteWatcher() {
+  const w = window as Window & { [HISTORY_PATCH_FLAG]?: boolean };
+  if (w[HISTORY_PATCH_FLAG]) return;
+  w[HISTORY_PATCH_FLAG] = true;
+
+  const notify = () => {
+    window.setTimeout(() => {
+      window.dispatchEvent(new Event(ROUTE_EVENT_NAME));
+    }, 0);
+  };
+
+  const oldPushState = window.history.pushState;
+  const oldReplaceState = window.history.replaceState;
+
+  window.history.pushState = function pushState(...args) {
+    const result = oldPushState.apply(this, args);
+    notify();
+    return result;
+  };
+
+  window.history.replaceState = function replaceState(...args) {
+    const result = oldReplaceState.apply(this, args);
+    notify();
+    return result;
+  };
 }
 
 function getFallbackBackHref(path = window.location.pathname) {
@@ -845,10 +944,20 @@ function handlePlaybackShortcut(event: KeyboardEvent, direction: Direction | nul
 function jumpToPageSection(selector: string, pathname: string) {
   const target = document.querySelector<HTMLElement>(selector);
   if (!target || !isVisibleElement(target)) return false;
+
   focusElement(target, pathname);
   return true;
 }
 
+function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
+  if (!(activeElement instanceof HTMLElement)) return false;
+
+  const focusableElements = getFocusableElements(root);
+  const rows = buildRows(root, focusableElements);
+  const { rowIndex } = findRowIndex(rows, activeElement);
+
+  return rowIndex <= 0;
+}
 export default function TvRemoteNavigator() {
   const pathname = usePathname();
   const [enabled, setEnabled] = useState(false);
@@ -877,7 +986,22 @@ export default function TvRemoteNavigator() {
   useEffect(() => {
     if (!enabled) return;
 
+    installRouteWatcher();
     rememberRoute(getCurrentRoute());
+
+    function rememberCurrentRoute() {
+      rememberRoute(getCurrentRoute());
+    }
+
+    window.addEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute);
+    window.addEventListener("popstate", rememberCurrentRoute);
+    window.addEventListener("hashchange", rememberCurrentRoute);
+
+    return () => {
+      window.removeEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute);
+      window.removeEventListener("popstate", rememberCurrentRoute);
+      window.removeEventListener("hashchange", rememberCurrentRoute);
+    };
   }, [enabled, pathname]);
 
   useEffect(() => {
@@ -937,8 +1061,10 @@ export default function TvRemoteNavigator() {
         if (visibleOverlay) {
           event.preventDefault();
           event.stopPropagation();
+
           if (overlayHasPanel) dispatchOverlayCommand("close-panel", { focus: true });
           else dispatchOverlayCommand("hide");
+
           return;
         }
 
@@ -1010,6 +1136,32 @@ export default function TvRemoteNavigator() {
         direction === "up" &&
         !openModalScope &&
         !activeIsInsideVisibleOverlay &&
+        focusInputFromKeyboard(activeElement, pathname)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      if (
+        direction === "down" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
+        activeElement instanceof HTMLElement &&
+        activeElement.closest("header")
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (isTextInput(activeElement) && focusSearchKeyboard(pathname)) return;
+        if (focusPageContentFromTransientUi(pathname)) return;
+        return;
+      }
+
+      if (
+        direction === "up" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
         !isInsideTvRail(activeElement) &&
         activeElement instanceof HTMLElement
       ) {
@@ -1050,7 +1202,6 @@ export default function TvRemoteNavigator() {
         event.stopPropagation();
         return;
       }
-      if (shouldLetInputHandleKey(activeElement, event)) return;
 
       if (
         direction === "down" &&
@@ -1072,6 +1223,8 @@ export default function TvRemoteNavigator() {
         }
         return;
       }
+
+      if (shouldLetInputHandleKey(activeElement, event)) return;
 
       if (direction === "down" && focusActiveTabPanel(activeElement, pathname)) {
         event.preventDefault();
@@ -1114,8 +1267,7 @@ export default function TvRemoteNavigator() {
 
       const modalScope = getModalScope();
       const activeScope = getActiveScope(activeElement);
-      const activeHeader =
-        activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("header") : null;
+      const activeHeader = activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("header") : null;
       const root = modalScope || activeScope || activeHeader || visibleOverlay || getMainScope() || document;
       const focusableElements = getFocusableElements(root);
 
@@ -1150,11 +1302,15 @@ export default function TvRemoteNavigator() {
 
         if (
           root instanceof HTMLElement &&
-          (root.dataset.tvLock === "true" || root.dataset.tvModal || root.dataset.tvOverlay === "watch")
+          direction === "down" &&
+          root.closest("header") &&
+          focusPageContentFromTransientUi(pathname)
         ) {
           event.preventDefault();
           event.stopPropagation();
+          return;
         }
+
         return;
       }
 
@@ -1163,8 +1319,11 @@ export default function TvRemoteNavigator() {
       focusElement(nextElement, pathname);
     }
 
-    document.addEventListener("keydown", handleKeyDown, true);
-    return () => document.removeEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown, true);
+    };
   }, [enabled, pathname]);
 
   return null;
