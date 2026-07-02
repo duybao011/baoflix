@@ -21,7 +21,7 @@ type FocusEntry = {
 };
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
-type OverlayCommandAction = "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "activity";
+type OverlayCommandAction = "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "panel-back" | "confirm-exit" | "activity";
 
 const ROW_THRESHOLD = 22;
 const TV_SESSION_KEY = "baoflix_tv_mode";
@@ -31,6 +31,7 @@ const AREA_FOCUS_PREFIX = "baoflix_tv_area_focus:";
 const ROUTE_STACK_KEY = "baoflix_tv_route_stack_v1";
 const ROUTE_EVENT_NAME = "baoflix-tv-route-change";
 const HISTORY_PATCH_FLAG = "__baoflixTvHistoryPatched";
+const NAV_REPEAT_DEBOUNCE_MS = 42;
 
 function getUserAgent() {
   if (typeof navigator === "undefined") return "";
@@ -195,6 +196,10 @@ function getVisibleWatchOverlay() {
 
 function isOverlayPanelOpen(overlay: HTMLElement | null) {
   return overlay?.dataset.tvOverlayMode === "panel" || Boolean(overlay?.dataset.tvOverlayPanel);
+}
+
+function isOverlayExitConfirm(overlay: HTMLElement | null) {
+  return overlay?.dataset.tvOverlayMode === "confirm-exit";
 }
 
 function getModalScope() {
@@ -961,6 +966,7 @@ function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
 export default function TvRemoteNavigator() {
   const pathname = usePathname();
   const [enabled, setEnabled] = useState(false);
+  const lastGridMoveRef = { current: 0 };
 
   useEffect(() => {
     function refreshEnabled() {
@@ -1028,6 +1034,7 @@ export default function TvRemoteNavigator() {
       const hiddenOverlay = getHiddenWatchOverlay();
       const visibleOverlay = getVisibleWatchOverlay();
       const overlayHasPanel = isOverlayPanelOpen(visibleOverlay);
+      const overlayIsExitConfirm = isOverlayExitConfirm(visibleOverlay);
       const direction = getDirectionFromEvent(event);
       const activeIsInsideVisibleOverlay =
         visibleOverlay && activeElement instanceof HTMLElement && visibleOverlay.contains(activeElement);
@@ -1062,9 +1069,21 @@ export default function TvRemoteNavigator() {
           event.preventDefault();
           event.stopPropagation();
 
-          if (overlayHasPanel) dispatchOverlayCommand("close-panel", { focus: true });
+          if (overlayIsExitConfirm) {
+            goBack(event);
+            return;
+          }
+
+          if (overlayHasPanel) dispatchOverlayCommand("panel-back", { focus: true });
           else dispatchOverlayCommand("hide");
 
+          return;
+        }
+
+        if (hiddenOverlay) {
+          event.preventDefault();
+          event.stopPropagation();
+          dispatchOverlayCommand("confirm-exit", { focus: true });
           return;
         }
 
@@ -1089,7 +1108,8 @@ export default function TvRemoteNavigator() {
         !isTextInput(activeElement) &&
         !activeIsInsideVisibleOverlay &&
         visibleOverlay &&
-        !overlayHasPanel
+        !overlayHasPanel &&
+        !overlayIsExitConfirm
       ) {
         if (direction === "left" || direction === "right") {
           event.preventDefault();
@@ -1131,6 +1151,21 @@ export default function TvRemoteNavigator() {
       }
 
       if (!direction) return;
+
+      if (
+        event.repeat &&
+        !hiddenOverlay &&
+        !visibleOverlay &&
+        !(activeElement instanceof HTMLElement && activeElement.closest("[data-tv-search-keyboard]"))
+      ) {
+        const now = performance.now();
+        if (now - lastGridMoveRef.current < NAV_REPEAT_DEBOUNCE_MS) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        lastGridMoveRef.current = now;
+      }
 
       if (
         direction === "up" &&

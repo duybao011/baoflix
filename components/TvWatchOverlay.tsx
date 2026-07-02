@@ -30,7 +30,7 @@ type ShowOverlayDetail = {
 };
 
 type OverlayCommandDetail = {
-  action: "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "activity";
+  action: "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "panel-back" | "confirm-exit" | "activity";
   focus?: boolean;
 };
 
@@ -42,7 +42,7 @@ type PlayerHudDetail = {
 };
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
-type OverlayMode = "hidden" | "peek" | "panel";
+type OverlayMode = "hidden" | "peek" | "panel" | "confirm-exit";
 type OverlayPanel = "episodes" | "sources" | null;
 
 const AUTO_HIDE_MS = 3400;
@@ -151,6 +151,12 @@ function getHudLabel(hud: PlayerHudDetail) {
   return "Phát / tạm dừng";
 }
 
+function getProgressPercent(currentTime?: number, duration?: number) {
+  if (!duration || !Number.isFinite(duration) || duration <= 0) return 0;
+  const current = Number.isFinite(currentTime || NaN) ? Number(currentTime) : 0;
+  return Math.min(Math.max((current / duration) * 100, 0), 100);
+}
+
 function getCurrentChunkIndex(episodeIndex: number, chunkCount: number) {
   if (!chunkCount) return 0;
 
@@ -179,6 +185,7 @@ export default function TvWatchOverlay({
   const hideTimerRef = useRef<number | null>(null);
   const nativeHintTimerRef = useRef<number | null>(null);
   const hudTimerRef = useRef<number | null>(null);
+  const exitConfirmTimerRef = useRef<number | null>(null);
   const pointerActivityFrameRef = useRef<number | null>(null);
   const overlayModeRef = useRef<OverlayMode>("peek");
   const overlayPanelRef = useRef<OverlayPanel>(null);
@@ -250,12 +257,34 @@ export default function TvWatchOverlay({
     }
   }
 
+  function clearExitConfirmTimer() {
+    if (exitConfirmTimerRef.current) {
+      window.clearTimeout(exitConfirmTimerRef.current);
+      exitConfirmTimerRef.current = null;
+    }
+  }
+
   function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
     clearHideTimer();
+    clearExitConfirmTimer();
     setOverlayPanel(null);
     setOverlayMode("hidden");
 
     if (focusPlayer) focusPlayerSurface();
+  }
+
+  function showExitConfirm() {
+    clearHideTimer();
+    clearExitConfirmTimer();
+    setOverlayPanel(null);
+    setOverlayMode("confirm-exit");
+
+    exitConfirmTimerRef.current = window.setTimeout(() => {
+      hideOverlay({ focusPlayer: true });
+      exitConfirmTimerRef.current = null;
+    }, 2400);
+
+    focusElement("[data-tv-exit-cancel], [data-tv-exit-confirm='true'] a[href], [data-tv-exit-confirm='true'] button:not([disabled])", 70);
   }
 
   function scheduleHide() {
@@ -273,6 +302,7 @@ export default function TvWatchOverlay({
   }
 
   function showPeek({ focus = false }: { focus?: boolean } = {}) {
+    clearExitConfirmTimer();
     setOverlayPanel(null);
     setOverlayMode("peek");
     scheduleHide();
@@ -313,6 +343,48 @@ export default function TvWatchOverlay({
   function handleChunkClick(index: number) {
     setActiveChunkIndex(index);
     focusPanelDefault("episodes", 95);
+  }
+
+  function handlePanelBack() {
+    const active = document.activeElement;
+
+    if (!(active instanceof HTMLElement)) {
+      closePanel({ keepOverlay: true });
+      return;
+    }
+
+    if (overlayPanel === "episodes") {
+      if (active.closest("[data-tv-episode-grid]")) {
+        const activeChunk = document.querySelector<HTMLElement>(
+          `[data-tv-episode-chunks] [data-tv-focus-key="overlay-episode-chunk:${episodeChunks[safeChunkIndex]?.label || ""}"]`
+        );
+        const fallbackChunk = document.querySelector<HTMLElement>(
+          "[data-tv-episode-chunks] button:not([disabled])"
+        );
+        const target = activeChunk || fallbackChunk;
+
+        if (target) {
+          target.focus({ preventScroll: true });
+          target.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+          return;
+        }
+
+        focusElement("[data-tv-focus-key='overlay-tab:episodes']", 0);
+        return;
+      }
+
+      if (active.closest("[data-tv-episode-chunks]")) {
+        focusElement("[data-tv-focus-key='overlay-tab:episodes']", 0);
+        return;
+      }
+    }
+
+    if (overlayPanel === "sources" && active.closest("[data-tv-panel='sources']")) {
+      focusElement("[data-tv-focus-key='overlay-tab:sources']", 0);
+      return;
+    }
+
+    closePanel({ keepOverlay: true });
   }
 
   function handleSeek(direction: "backward" | "forward") {
@@ -394,6 +466,16 @@ export default function TvWatchOverlay({
         return;
       }
 
+      if (detail.action === "panel-back") {
+        handlePanelBack();
+        return;
+      }
+
+      if (detail.action === "confirm-exit") {
+        showExitConfirm();
+        return;
+      }
+
       if (detail.action === "activity") resetPeekTimer();
     }
 
@@ -434,6 +516,7 @@ export default function TvWatchOverlay({
 
       if (nativeHintTimerRef.current) window.clearTimeout(nativeHintTimerRef.current);
       if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current);
+      if (exitConfirmTimerRef.current) window.clearTimeout(exitConfirmTimerRef.current);
       if (pointerActivityFrameRef.current) {
         window.cancelAnimationFrame(pointerActivityFrameRef.current);
         pointerActivityFrameRef.current = null;
@@ -492,14 +575,60 @@ export default function TvWatchOverlay({
             <div className="text-lg font-black leading-none">{getHudLabel(hud)}</div>
 
             {hud.type === "seek" && hud.duration ? (
-              <div className="mt-1 text-[10px] font-bold text-slate-300">
-                {formatTime(hud.currentTime)} / {formatTime(hud.duration)}
-              </div>
+              <>
+                <div className="mt-1 text-[10px] font-bold text-slate-300">
+                  {formatTime(hud.currentTime)} / {formatTime(hud.duration)}
+                </div>
+                <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className="h-full rounded-full bg-yellow-300"
+                    style={{ width: `${getProgressPercent(hud.currentTime, hud.duration)}%` }}
+                  />
+                </div>
+              </>
             ) : null}
           </div>
         )}
 
-        {!panelOpen && (
+        {overlayMode === "confirm-exit" && (
+          <div
+            data-tv-exit-confirm="true"
+            className="pointer-events-auto mx-auto mb-2 w-full max-w-[440px] rounded-2xl border border-white/10 bg-black/[0.76] p-3 text-center shadow-2xl backdrop-blur-md"
+          >
+            <p className="text-sm font-black text-white">Thoát khỏi phim?</p>
+            <p className="mt-1 text-[11px] font-bold text-slate-300">Bấm Back lần nữa để rời phim, hoặc chọn xem tiếp.</p>
+
+            <div data-tv-row className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                data-tv-exit-cancel
+                data-tv-overlay-default
+                data-tv-focus-key="overlay-exit:cancel"
+                onClick={() => hideOverlay({ focusPlayer: true })}
+                className={[
+                  "rounded-xl border border-white/10 bg-white/[0.08] px-3 py-2 text-[11px] font-black text-white hover:bg-white/[0.14]",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Xem tiếp
+              </button>
+
+              <Link
+                href={`/phim/${movie.slug}`}
+                prefetch={false}
+                data-tv-focus-key="overlay-exit:detail"
+                className={[
+                  "rounded-xl bg-yellow-300 px-3 py-2 text-[11px] font-black text-black hover:bg-yellow-200",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Thoát phim
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {!panelOpen && overlayMode !== "confirm-exit" && (
           <div className="mx-auto max-w-[440px] min-[1280px]:max-w-[500px]">
             <div
               data-tv-row
@@ -720,7 +849,7 @@ export default function TvWatchOverlay({
                 )}
 
                 {episodeChunks.length > 1 && (
-                  <div data-tv-row data-tv-row-wrap="true" className="mb-2 flex gap-2 overflow-x-auto pb-1">
+                  <div data-tv-episode-chunks data-tv-row data-tv-row-wrap="true" className="mb-2 flex gap-2 overflow-x-auto pb-1">
                     {episodeChunks.map((chunk, index) => {
                       const hasCurrent =
                         safeEpisodeIndex >= chunk.start && safeEpisodeIndex <= chunk.end;
@@ -749,6 +878,7 @@ export default function TvWatchOverlay({
                 )}
 
                 <div
+                  data-tv-episode-grid
                   data-tv-row
                   data-tv-row-wrap="true"
                   className="grid max-h-[30vh] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6"
