@@ -1118,6 +1118,24 @@ function isFirstRowInScope(activeElement: Element | null, root: ParentNode) {
   return rowIndex <= 0;
 }
 
+function isLastRowInScope(activeElement: Element | null, root: ParentNode) {
+  if (!(activeElement instanceof HTMLElement)) return false;
+
+  const focusableElements = getFocusableElements(root);
+  const rows = buildRows(root, focusableElements);
+  const { rowIndex } = findRowIndex(rows, activeElement);
+
+  return rowIndex >= 0 && rowIndex >= rows.length - 1;
+}
+
+function dismissSearchKeyboard(focusKey = "tv-search:input") {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-search-keyboard-dismiss", {
+      detail: { focusKey },
+    })
+  );
+}
+
 function getFocusOutRule(element: HTMLElement, direction: Direction) {
   const attr = `data-tv-focus-out-${direction}`;
   let current: HTMLElement | null = element;
@@ -1315,6 +1333,13 @@ export default function TvRemoteNavigator() {
       }
 
       if (isBackKey(event) && !(isTextInput(activeElement) && isTextDeleteBackspace(event))) {
+        if (activeSearchKeyboard) {
+          event.preventDefault();
+          event.stopPropagation();
+          dismissSearchKeyboard("tv-search:input");
+          return;
+        }
+
         if (closeModalIfNeeded(event)) return;
 
         if (visibleOverlay) {
@@ -1424,11 +1449,24 @@ export default function TvRemoteNavigator() {
         !openModalScope &&
         !activeIsInsideVisibleOverlay &&
         activeSearchKeyboard &&
-        isFirstRowInScope(activeElement, activeSearchKeyboard) &&
-        focusInputFromKeyboard(activeElement, pathname)
+        isFirstRowInScope(activeElement, activeSearchKeyboard)
       ) {
         event.preventDefault();
         event.stopPropagation();
+        dismissSearchKeyboard("tv-search:input");
+        return;
+      }
+
+      if (
+        direction === "down" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
+        activeSearchKeyboard &&
+        isLastRowInScope(activeElement, activeSearchKeyboard)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        dismissSearchKeyboard("tv-search:submit");
         return;
       }
 

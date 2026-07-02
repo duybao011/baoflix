@@ -158,6 +158,8 @@ export default function TvSearchBox() {
   const wrapperRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const timer = useRef<number | null>(null);
+  const suppressKeyboardTimer = useRef<number | null>(null);
+  const suppressKeyboardRef = useRef(false);
 
   const [keyword, setKeyword] = useState("");
   const [history, setHistory] = useState<string[]>([]);
@@ -178,13 +180,51 @@ export default function TvSearchBox() {
     window.addEventListener("focus", refresh);
     window.addEventListener("baoflix-tv-mode-change", refresh);
 
+    function handleDismissKeyboard(event: Event) {
+      const detail = (event as CustomEvent<{ focusKey?: string }>).detail || {};
+      dismissKeyboard(detail.focusKey || "tv-search:input");
+    }
+
+    window.addEventListener("baoflix-tv-search-keyboard-dismiss", handleDismissKeyboard as EventListener);
+
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
+      if (suppressKeyboardTimer.current) window.clearTimeout(suppressKeyboardTimer.current);
+      window.removeEventListener("baoflix-tv-search-keyboard-dismiss", handleDismissKeyboard as EventListener);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
       window.removeEventListener("baoflix-tv-mode-change", refresh);
     };
   }, []);
+
+  function dismissKeyboard(focusKey = "tv-search:input") {
+    if (timer.current) {
+      window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+
+    if (suppressKeyboardTimer.current) {
+      window.clearTimeout(suppressKeyboardTimer.current);
+    }
+
+    suppressKeyboardRef.current = true;
+    setFocused(false);
+
+    window.setTimeout(() => {
+      const target =
+        document.querySelector<HTMLElement>(`[data-tv-focus-key="${focusKey}"]`) ||
+        inputRef.current ||
+        document.querySelector<HTMLElement>("[data-tv-section='search-strip'] button:not([disabled]), [data-tv-section='search-strip'] a[href]");
+
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+    }, 0);
+
+    suppressKeyboardTimer.current = window.setTimeout(() => {
+      suppressKeyboardRef.current = false;
+      suppressKeyboardTimer.current = null;
+    }, 320);
+  }
 
   function go(q: string) {
     const text = q.trim();
@@ -197,6 +237,7 @@ export default function TvSearchBox() {
 
     setHistory(saveHistory(text));
     setKeyword("");
+    suppressKeyboardRef.current = true;
     setFocused(false);
     router.push(`/tim-kiem?q=${encodeURIComponent(text)}`);
   }
@@ -207,6 +248,8 @@ export default function TvSearchBox() {
   }
 
   function schedule() {
+    if (suppressKeyboardRef.current) return;
+
     setFocused(true);
 
     if (timer.current) window.clearTimeout(timer.current);
@@ -384,7 +427,7 @@ export default function TvSearchBox() {
               </div>
             ))}
 
-            <div data-tv-row data-tv-row-key="search-keyboard:actions" data-tv-row-wrap="true" className="mt-1 grid grid-cols-4 gap-1">
+            <div data-tv-row data-tv-row-key="search-keyboard:actions" data-tv-row-wrap="true" className="mt-1 grid grid-cols-5 gap-1">
               <button
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
@@ -422,6 +465,19 @@ export default function TvSearchBox() {
                 ].join(" ")}
               >
                 Xóa hết
+              </button>
+
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => dismissKeyboard("tv-search:submit")}
+                data-tv-focus-key="tv-search-keyboard:done"
+                className={[
+                  "min-h-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Xong
               </button>
 
               <button
