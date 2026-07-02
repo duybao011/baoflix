@@ -799,6 +799,8 @@ function focusActiveTabButtonFromPanel(activeElement: Element | null, pathname: 
 
   const root = panel.closest<HTMLElement>("[data-tv-tabs-root]");
   const activeTab = root?.querySelector<HTMLElement>("[data-tv-tab-active='true']");
+  const tabList = root?.querySelector<HTMLElement>("[data-tv-tab-list]");
+  if (tabList?.dataset.tvTabListOrientation === "vertical") return false;
   if (!activeTab) return false;
 
   const panelElements = getFocusableElements(panel);
@@ -816,6 +818,11 @@ function focusActiveTabPanel(activeElement: Element | null, pathname: string) {
 
   const tabList = activeElement.closest<HTMLElement>("[data-tv-tab-list]");
   if (!tabList) return false;
+
+  // Horizontal tabs: ArrowDown moves from tab row into active panel.
+  // Vertical filter groups already use normal D-pad Up/Down for group navigation.
+  // Enter/OK on each group handles jumping into the option panel.
+  if (tabList.dataset.tvTabListOrientation === "vertical") return false;
 
   const root = tabList.closest<HTMLElement>("[data-tv-tabs-root]");
   const panel = root?.querySelector<HTMLElement>("[data-tv-tab-panel-active='true']");

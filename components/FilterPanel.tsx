@@ -532,6 +532,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           data-tv-row-key="filter:groups"
           data-tv-row-wrap="true"
           data-tv-tab-list
+          data-tv-tab-list-orientation="vertical"
           data-tv-focus-out-right="selector:[data-tv-tab-panel-active='true'] [data-tv-option-selected='true'], [data-tv-tab-panel-active='true'] button:not([disabled])"
           className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-1"
         >
