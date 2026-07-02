@@ -411,15 +411,35 @@ function getScrollAlignment(element: HTMLElement) {
   return element.closest<HTMLElement>("[data-tv-scroll-align]")?.dataset.tvScrollAlign || "nearest";
 }
 
+function isElementComfortablyInViewport(element: HTMLElement) {
+  const rect = element.getBoundingClientRect();
+  const padding = Math.min(120, Math.max(64, window.innerHeight * 0.12));
+
+  return rect.top >= padding && rect.bottom <= window.innerHeight - padding;
+}
+
 function focusElement(element: HTMLElement, pathname?: string) {
   element.focus({ preventScroll: true });
 
   const align = getScrollAlignment(element);
+  const shouldCenter = align === "center" || align === "force-center";
+
   element.scrollIntoView({
     behavior: "auto",
-    block: align === "center" ? "center" : "nearest",
-    inline: align === "center" ? "center" : "nearest",
+    block: shouldCenter ? "center" : "nearest",
+    inline: shouldCenter ? "center" : "nearest",
   });
+
+  window.setTimeout(() => {
+    if (!isVisibleElement(element)) return;
+    if (isElementComfortablyInViewport(element)) return;
+
+    element.scrollIntoView({
+      behavior: "auto",
+      block: "center",
+      inline: "nearest",
+    });
+  }, 0);
 
   if (pathname) rememberFocus(pathname, element);
 }
@@ -1254,6 +1274,8 @@ export default function TvRemoteNavigator() {
       const direction = getDirectionFromEvent(event);
       const activeIsInsideVisibleOverlay =
         visibleOverlay && activeElement instanceof HTMLElement && visibleOverlay.contains(activeElement);
+      const activeSearchKeyboard =
+        activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("[data-tv-search-keyboard]") : null;
 
       if (
         !isBackKey(event) &&
@@ -1401,6 +1423,8 @@ export default function TvRemoteNavigator() {
         direction === "up" &&
         !openModalScope &&
         !activeIsInsideVisibleOverlay &&
+        activeSearchKeyboard &&
+        isFirstRowInScope(activeElement, activeSearchKeyboard) &&
         focusInputFromKeyboard(activeElement, pathname)
       ) {
         event.preventDefault();
@@ -1427,6 +1451,7 @@ export default function TvRemoteNavigator() {
         direction === "up" &&
         !openModalScope &&
         !activeIsInsideVisibleOverlay &&
+        !activeSearchKeyboard &&
         !isInsideTvRail(activeElement) &&
         activeElement instanceof HTMLElement
       ) {
@@ -1533,7 +1558,7 @@ export default function TvRemoteNavigator() {
       const modalScope = getModalScope();
       const activeScope = getActiveScope(activeElement);
       const activeHeader = activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("header") : null;
-      const root = modalScope || activeScope || activeHeader || visibleOverlay || getMainScope() || document;
+      const root = modalScope || activeSearchKeyboard || activeScope || activeHeader || visibleOverlay || getMainScope() || document;
       const focusableElements = getFocusableElements(root);
 
       if (!focusableElements.length) return;

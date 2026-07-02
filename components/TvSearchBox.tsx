@@ -10,7 +10,7 @@ const QUICK_FILTER_HREF =
   "/loc?country=trung-quoc&sort_lang=long-tieng&category=co-trang&sort_field=year&sort_type=desc";
 
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-[1.045] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const TV_KEYBOARD_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
@@ -256,7 +256,7 @@ export default function TvSearchBox() {
       ref={wrapperRef}
       data-tv-section="search-strip"
       onBlur={handleBlur}
-      className="rounded-2xl border border-white/10 bg-white/[0.032] p-3"
+      className="rounded-xl border border-white/10 bg-white/[0.032] p-2 min-[1280px]:p-2.5"
     >
       <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-start">
         <form onSubmit={submit} data-tv-row className="grid gap-2 sm:grid-cols-[1fr_auto]">
@@ -285,7 +285,7 @@ export default function TvSearchBox() {
             onChange={(event) => setKeyword(event.target.value)}
             placeholder="Tìm phim..."
             className={[
-              "h-11 rounded-xl border border-white/10 bg-black/30 px-4 text-sm font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300 min-[1280px]:h-12",
+              "h-10 rounded-lg border border-white/10 bg-black/30 px-3 text-[13px] font-bold text-white outline-none placeholder:text-slate-500 focus:border-yellow-300 min-[1280px]:h-11",
               TV_FOCUS_CLASS,
             ].join(" ")}
           />
@@ -294,7 +294,7 @@ export default function TvSearchBox() {
             type="submit"
             data-tv-focus-key="tv-search:submit"
             className={[
-              "h-11 rounded-xl bg-yellow-300 px-5 text-sm font-black text-black hover:bg-yellow-200 min-[1280px]:h-12",
+              "h-10 rounded-lg bg-yellow-300 px-4 text-[13px] font-black text-black hover:bg-yellow-200 min-[1280px]:h-11",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -308,7 +308,7 @@ export default function TvSearchBox() {
             prefetch={false}
             data-tv-focus-key="tv-search:main-filter"
             className={[
-              "rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-2 text-[11px] font-black text-yellow-100 hover:bg-yellow-300 hover:text-black",
+              "rounded-full border border-yellow-300/30 bg-yellow-300/10 px-2.5 py-1.5 text-[10px] font-black text-yellow-100 hover:bg-yellow-300 hover:text-black",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -323,7 +323,7 @@ export default function TvSearchBox() {
                 onClick={() => go(item)}
                 data-tv-focus-key={`tv-search:history:${item}`}
                 className={[
-                  "max-w-[150px] truncate rounded-full border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black text-slate-200 hover:bg-red-600 hover:text-white",
+                  "max-w-[132px] truncate rounded-full border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] font-black text-slate-200 hover:bg-red-600 hover:text-white",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
@@ -352,10 +352,13 @@ export default function TvSearchBox() {
         <div
           data-tv-search-keyboard
           data-tv-row
+          data-tv-row-key="search:keyboard"
           data-tv-row-wrap="true"
-          className="mt-2 rounded-2xl border border-white/10 bg-black/35 p-2"
+          data-tv-scroll-align="center"
+          data-tv-focus-out-up="selector:[data-tv-keyboard-input]"
+          className="mt-1.5 rounded-xl border border-white/10 bg-black/40 p-1.5"
         >
-          <div className="grid gap-1.5">
+          <div className="grid gap-1">
             {TV_KEYBOARD_ROWS.map((row, rowIndex) => (
               <div
                 key={row.join("")}
@@ -371,7 +374,7 @@ export default function TvSearchBox() {
                     onClick={() => appendKeyboardValue(keyValue)}
                     data-tv-focus-key={`tv-search-keyboard:${rowIndex}:${keyValue}`}
                     className={[
-                      "min-h-9 min-w-9 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-black text-white hover:bg-white/10",
+                      "min-h-8 min-w-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9 min-[1280px]:min-w-9",
                       TV_FOCUS_CLASS,
                     ].join(" ")}
                   >
@@ -381,14 +384,14 @@ export default function TvSearchBox() {
               </div>
             ))}
 
-            <div data-tv-row data-tv-row-wrap="true" className="mt-1 grid grid-cols-4 gap-1.5">
+            <div data-tv-row data-tv-row-key="search-keyboard:actions" data-tv-row-wrap="true" className="mt-1 grid grid-cols-4 gap-1">
               <button
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => appendKeyboardValue(" ")}
                 data-tv-focus-key="tv-search-keyboard:space"
                 className={[
-                  "min-h-10 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-black text-white hover:bg-white/10",
+                  "min-h-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
@@ -401,11 +404,11 @@ export default function TvSearchBox() {
                 onClick={backspaceKeyboardValue}
                 data-tv-focus-key="tv-search-keyboard:backspace"
                 className={[
-                  "min-h-10 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-black text-white hover:bg-white/10",
+                  "min-h-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
-                Xóa ký tự
+                Xóa
               </button>
 
               <button
@@ -414,7 +417,7 @@ export default function TvSearchBox() {
                 onClick={clearKeyword}
                 data-tv-focus-key="tv-search-keyboard:clear"
                 className={[
-                  "min-h-10 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-black text-white hover:bg-white/10",
+                  "min-h-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
@@ -427,7 +430,7 @@ export default function TvSearchBox() {
                 onClick={() => go(keyword)}
                 data-tv-focus-key="tv-search-keyboard:submit"
                 className={[
-                  "min-h-10 rounded-xl bg-yellow-300 px-2 text-sm font-black text-black hover:bg-yellow-200",
+                  "min-h-8 rounded-lg bg-yellow-300 px-1.5 text-xs font-black text-black hover:bg-yellow-200 min-[1280px]:min-h-9",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >

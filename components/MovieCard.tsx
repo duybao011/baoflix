@@ -71,12 +71,12 @@ export default function MovieCard({
   }
 
   return (
-    <article className="group relative overflow-hidden rounded-xl border border-white/10 bg-white/[0.035] shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300">
+    <article className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-md shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300">
       <Link
         href={`/phim/${movie.slug}`}
         data-tv-default={tvDefault ? true : undefined}
         data-tv-focus-key={`movie:${movie.slug}`}
-        className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
         aria-label={`Mở phim ${movie.name}`}
       >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
@@ -102,8 +102,8 @@ export default function MovieCard({
           )}
         </div>
 
-        <div className="min-h-[58px] space-y-0.5 p-2">
-          <h3 className="line-clamp-2 text-[12px] font-black leading-tight text-white group-hover:text-red-300 min-[1280px]:text-[13px]">
+        <div className="min-h-[52px] space-y-0.5 p-1.5">
+          <h3 className="line-clamp-2 text-[11px] font-black leading-tight text-white group-hover:text-red-300 min-[1280px]:text-[12px]">
             {movie.name}
           </h3>
 

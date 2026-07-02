@@ -41,7 +41,7 @@ type QuickPreset = {
 const LOC_FOCUS_KEY = "baoflix_tv_loc_focus_after_nav";
 
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-[1.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const types = [
   { label: "Tất cả", value: "tat-ca" },
@@ -282,7 +282,7 @@ function Chip({
       data-tv-option-active={optionActive ? "true" : undefined}
       data-tv-option-selected={active ? "true" : undefined}
       className={[
-        "min-h-[36px] rounded-lg border px-3 py-1.5 text-[12px] font-black leading-tight transition min-[1280px]:min-h-[38px]",
+        "min-h-[32px] rounded-lg border px-2.5 py-1 text-[11px] font-black leading-tight transition min-[1280px]:min-h-[34px]",
         active
           ? "border-yellow-300 bg-yellow-300 text-black"
           : "border-white/10 bg-white/[0.055] text-slate-200 hover:bg-white/10",
@@ -462,14 +462,14 @@ export default function FilterPanel({ genres, countries, current }: Props) {
       data-tv-autofocus="true"
       data-tv-filter-panel
       data-tv-tabs-root
-      className="rounded-3xl border border-white/10 bg-white/[0.035] p-3 shadow-[0_20px_70px_rgba(0,0,0,0.18)] min-[1280px]:p-4"
+      className="rounded-2xl border border-white/10 bg-white/[0.035] p-2.5 shadow-[0_20px_70px_rgba(0,0,0,0.18)] min-[1280px]:p-3"
     >
-      <div className="mb-3 grid gap-3 xl:grid-cols-[1fr_auto] xl:items-center">
+      <div className="mb-2.5 grid gap-2.5 xl:grid-cols-[1fr_auto] xl:items-center">
         <div className="min-w-0">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-300">
             TV Filter
           </p>
-          <h2 className="mt-0.5 text-xl font-black leading-tight min-[1280px]:text-2xl">
+          <h2 className="mt-0.5 text-lg font-black leading-tight min-[1280px]:text-xl">
             Chọn gu phim
           </h2>
           <p className="mt-1 text-xs font-semibold text-slate-400">
@@ -496,7 +496,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               ].join(" ")}
             >
               <span className="block leading-none">{preset.label}</span>
-              <span className="mt-1 block text-[9px] font-bold text-slate-400">{preset.desc}</span>
+              <span className="mt-1 block text-[8px] font-bold text-slate-400">{preset.desc}</span>
             </button>
           ))}
         </div>
@@ -526,7 +526,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
         </div>
       )}
 
-      <div className="grid gap-3 xl:grid-cols-[190px_1fr_150px]">
+      <div className="grid gap-2.5 xl:grid-cols-[168px_1fr_132px]">
         <div
           data-tv-row
           data-tv-row-key="filter:groups"
@@ -545,15 +545,15 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               data-tv-tab-active={tab === item.id ? "true" : undefined}
               data-tv-focus-key={`filter-tab:${item.id}`}
               className={[
-                "min-h-[44px] rounded-xl border px-3 py-2 text-left transition",
+                "min-h-[38px] rounded-lg border px-2.5 py-1.5 text-left transition",
                 tab === item.id
                   ? "border-yellow-300 bg-yellow-300 text-black"
                   : "border-white/10 bg-white/[0.055] text-slate-200 hover:bg-white/10",
                 TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              <span className="block text-[12px] font-black leading-tight">{item.label}</span>
-              <span className={["mt-0.5 block text-[9px] font-bold", tab === item.id ? "text-black/60" : "text-slate-500"].join(" ")}>
+              <span className="block text-[11px] font-black leading-tight">{item.label}</span>
+              <span className={["mt-0.5 block text-[8px] font-bold", tab === item.id ? "text-black/60" : "text-slate-500"].join(" ")}>
                 {item.hint}
               </span>
             </button>
@@ -563,9 +563,10 @@ export default function FilterPanel({ genres, countries, current }: Props) {
         <div
           data-tv-tab-panel
           data-tv-tab-panel-active="true"
+          data-tv-scroll-align="center"
           data-tv-focus-out-left={panelFocusOutLeft()}
           data-tv-focus-out-right={optionPanelFocusOutRight()}
-          className="min-h-[220px] rounded-2xl border border-white/10 bg-black/20 p-3 min-[1280px]:min-h-[240px]"
+          className="min-h-[176px] rounded-xl border border-white/10 bg-black/20 p-2.5 min-[1280px]:min-h-[192px]"
         >
           {tab === "type" && (
             <div data-tv-row data-tv-row-key="filter:type" data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -588,7 +589,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               data-tv-row
               data-tv-row-key="filter:country"
               data-tv-row-wrap="true"
-              className="grid max-h-[44vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+              className="grid max-h-[38vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
             >
               <Chip
                 active={!country.length}
@@ -618,7 +619,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
               data-tv-row
               data-tv-row-key="filter:category"
               data-tv-row-wrap="true"
-              className="grid max-h-[44vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+              className="grid max-h-[38vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
             >
               <Chip
                 active={!category.length}
@@ -720,7 +721,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             data-tv-loc-filter-nav="true"
             data-tv-focus-key="filter:apply-side"
             className={[
-              "rounded-xl bg-yellow-300 px-4 py-3 text-[12px] font-black text-black hover:bg-yellow-200 xl:min-h-[48px]",
+              "rounded-lg bg-yellow-300 px-3 py-2 text-[11px] font-black text-black hover:bg-yellow-200 xl:min-h-[40px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -733,7 +734,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             data-tv-focus-key="filter:reset-side"
             data-tv-loc-filter-nav="true"
             className={[
-              "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[12px] font-black text-white hover:bg-white/10 xl:min-h-[48px]",
+              "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black text-white hover:bg-white/10 xl:min-h-[40px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -745,7 +746,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
             onClick={() => router.push("/tv")}
             data-tv-focus-key="filter:tv-home"
             className={[
-              "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[12px] font-black text-white hover:bg-white/10 xl:min-h-[48px]",
+              "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black text-white hover:bg-white/10 xl:min-h-[40px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
