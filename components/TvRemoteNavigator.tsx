@@ -983,6 +983,51 @@ function getFallbackBackHref(path = window.location.pathname) {
   return "/";
 }
 
+function normalizeRoutePath(route: string) {
+  try {
+    return new URL(route, window.location.origin).pathname;
+  } catch {
+    return route.split("?")[0].split("#")[0] || "/";
+  }
+}
+
+function isSameRoutePath(a: string, b: string) {
+  return normalizeRoutePath(a) === normalizeRoutePath(b);
+}
+
+function isWatchRoute(route = getCurrentRoute()) {
+  const path = normalizeRoutePath(route);
+  return /^\/xem\/[^/]+/.test(path) || /^\/ca-nhan\/[^/]+\/xem/.test(path);
+}
+
+function sanitizeStackForWatchExit(current: string, detailHref: string) {
+  const detailPath = normalizeRoutePath(detailHref);
+  const nextStack = readRouteStack().filter(Boolean);
+
+  while (nextStack.length) {
+    const last = nextStack[nextStack.length - 1];
+
+    if (last === current || isWatchRoute(last) || isSameRoutePath(last, detailPath)) {
+      nextStack.pop();
+      continue;
+    }
+
+    break;
+  }
+
+  writeRouteStack(nextStack);
+}
+
+function exitWatch(event?: KeyboardEvent, href = getFallbackBackHref(window.location.pathname)) {
+  event?.preventDefault();
+  event?.stopPropagation();
+
+  const current = getCurrentRoute();
+  sanitizeStackForWatchExit(current, href);
+
+  window.location.href = href;
+}
+
 function goBack(event: KeyboardEvent) {
   event.preventDefault();
   event.stopPropagation();
@@ -991,6 +1036,10 @@ function goBack(event: KeyboardEvent) {
   const stackedTarget = popRouteTarget(current);
 
   if (stackedTarget) {
+    if (isWatchRoute(current) && isSameRoutePath(stackedTarget, getFallbackBackHref(window.location.pathname))) {
+      sanitizeStackForWatchExit(current, stackedTarget);
+    }
+
     window.location.href = stackedTarget;
     return;
   }
@@ -1181,6 +1230,11 @@ export default function TvRemoteNavigator() {
   useEffect(() => {
     if (!enabled) return;
 
+    function handleExitWatch(event: Event) {
+      const detail = (event as CustomEvent<{ href?: string }>).detail || {};
+      exitWatch(undefined, detail.href || getFallbackBackHref(window.location.pathname));
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
       if (event.altKey || event.ctrlKey || event.metaKey) return;
 
@@ -1239,7 +1293,7 @@ export default function TvRemoteNavigator() {
           event.stopPropagation();
 
           if (overlayIsExitConfirm) {
-            goBack(event);
+            exitWatch(event);
             return;
           }
 
@@ -1529,9 +1583,11 @@ export default function TvRemoteNavigator() {
       focusElement(nextElement, pathname);
     }
 
+    window.addEventListener("baoflix-tv-exit-watch", handleExitWatch as EventListener);
     window.addEventListener("keydown", handleKeyDown, true);
 
     return () => {
+      window.removeEventListener("baoflix-tv-exit-watch", handleExitWatch as EventListener);
       window.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [enabled, pathname]);

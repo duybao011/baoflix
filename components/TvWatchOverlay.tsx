@@ -133,6 +133,14 @@ function focusPlayerSurface() {
   dispatchPlayerCommand("focus-player");
 }
 
+function exitWatchToDetail(href: string) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-exit-watch", {
+      detail: { href },
+    })
+  );
+}
+
 function formatTime(seconds?: number) {
   if (!Number.isFinite(seconds || NaN)) return "";
 
@@ -331,7 +339,7 @@ export default function TvWatchOverlay({
 
     setOverlayMode("panel");
     setOverlayPanel(panel);
-    focusPanelDefault(panel, panel === "episodes" ? 95 : 70);
+    focusPanelDefault(panel, panel === "episodes" ? 160 : 70);
   }
 
   function closePanel({ keepOverlay = true }: { keepOverlay?: boolean } = {}) {
@@ -548,6 +556,26 @@ export default function TvWatchOverlay({
   }, []);
 
   useEffect(() => {
+    if (overlayMode !== "panel" || overlayPanel !== "episodes") return;
+
+    if (safeChunkIndex !== currentChunkIndex) {
+      setActiveChunkIndex(currentChunkIndex);
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      focusElement(
+        "[data-tv-panel='episodes'] [data-tv-episode-current='true'], [data-tv-panel='episodes'] [data-tv-panel-default='episodes']",
+        0
+      );
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [overlayMode, overlayPanel, safeChunkIndex, currentChunkIndex, safeEpisodeIndex, episodeItems.length]);
+
+  useEffect(() => {
     setOverlayPanel(null);
     setActiveChunkIndex(currentChunkIndex);
     showPeek({ focus: false });
@@ -627,17 +655,17 @@ export default function TvWatchOverlay({
                 Xem tiếp
               </button>
 
-              <Link
-                href={`/phim/${movie.slug}`}
-                prefetch={false}
+              <button
+                type="button"
                 data-tv-focus-key="overlay-exit:detail"
+                onClick={() => exitWatchToDetail(`/phim/${movie.slug}`)}
                 className={[
                   "rounded-xl bg-yellow-300 px-3 py-2 text-[11px] font-black text-black hover:bg-yellow-200",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
                 Thoát phim
-              </Link>
+              </button>
             </div>
           </div>
         )}
