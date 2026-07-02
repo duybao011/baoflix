@@ -203,6 +203,8 @@ export default function TvWatchOverlay({
   const hudTimerRef = useRef<number | null>(null);
   const exitConfirmTimerRef = useRef<number | null>(null);
   const pointerActivityFrameRef = useRef<number | null>(null);
+  const pendingCurrentEpisodeFocusRef = useRef(false);
+  const episodeFocusTimersRef = useRef<number[]>([]);
   const overlayModeRef = useRef<OverlayMode>("peek");
   const overlayPanelRef = useRef<OverlayPanel>(null);
 
@@ -255,6 +257,53 @@ export default function TvWatchOverlay({
   const hiddenFocusProps = useMemo(() => {
     return overlayVisible ? {} : { tabIndex: -1, "aria-hidden": true };
   }, [overlayVisible]);
+
+  function clearEpisodeFocusTimers() {
+    episodeFocusTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    episodeFocusTimersRef.current = [];
+  }
+
+  function focusCurrentEpisodeElement() {
+    const selectors = [
+      `[data-tv-panel='episodes'] [data-tv-focus-key="overlay-episode:${safeEpisodeIndex}"]`,
+      `[data-tv-panel='episodes'] [data-tv-episode-current='true']`,
+      `[data-tv-episode-grid] [data-tv-focus-key="overlay-episode:${safeEpisodeIndex}"]`,
+      `[data-tv-episode-grid] [data-tv-episode-current='true']`,
+    ];
+
+    const target = selectors
+      .map((selector) => document.querySelector<HTMLElement>(selector))
+      .find(Boolean);
+
+    if (!target) return false;
+
+    const grid = target.closest<HTMLElement>("[data-tv-episode-grid]");
+    if (grid) {
+      const targetTop = target.offsetTop;
+      const nextTop = Math.max(0, targetTop - grid.clientHeight / 2 + target.offsetHeight / 2);
+      grid.scrollTo({ top: nextTop, behavior: "auto" });
+    }
+
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+    pendingCurrentEpisodeFocusRef.current = false;
+    return true;
+  }
+
+  function focusCurrentEpisodeSoon() {
+    clearEpisodeFocusTimers();
+    pendingCurrentEpisodeFocusRef.current = true;
+
+    [0, 40, 90, 160, 260, 420, 650].forEach((delay) => {
+      const timer = window.setTimeout(() => {
+        if (!pendingCurrentEpisodeFocusRef.current) return;
+        if (overlayModeRef.current !== "panel" || overlayPanelRef.current !== "episodes") return;
+        focusCurrentEpisodeElement();
+      }, delay);
+
+      episodeFocusTimersRef.current.push(timer);
+    });
+  }
 
   function setOverlayMode(value: OverlayMode) {
     overlayModeRef.current = value;
@@ -321,6 +370,8 @@ export default function TvWatchOverlay({
 
   function showPeek({ focus = false }: { focus?: boolean } = {}) {
     requestFocusLock(100);
+    pendingCurrentEpisodeFocusRef.current = false;
+    clearEpisodeFocusTimers();
     clearExitConfirmTimer();
     setOverlayPanel(null);
     setOverlayMode("peek");
@@ -335,11 +386,17 @@ export default function TvWatchOverlay({
 
     if (panel === "episodes") {
       setActiveChunkIndex(currentChunkIndex);
+      setOverlayMode("panel");
+      setOverlayPanel("episodes");
+      focusCurrentEpisodeSoon();
+      return;
     }
 
+    pendingCurrentEpisodeFocusRef.current = false;
+    clearEpisodeFocusTimers();
     setOverlayMode("panel");
     setOverlayPanel(panel);
-    focusPanelDefault(panel, panel === "episodes" ? 160 : 70);
+    focusPanelDefault(panel, 70);
   }
 
   function closePanel({ keepOverlay = true }: { keepOverlay?: boolean } = {}) {
@@ -364,7 +421,18 @@ export default function TvWatchOverlay({
   function handleChunkClick(index: number) {
     requestFocusLock(120);
     setActiveChunkIndex(index);
-    focusPanelDefault("episodes", 95);
+
+    if (index === currentChunkIndex) {
+      focusCurrentEpisodeSoon();
+      return;
+    }
+
+    pendingCurrentEpisodeFocusRef.current = false;
+    clearEpisodeFocusTimers();
+
+    window.setTimeout(() => {
+      focusElement("[data-tv-episode-grid] a[href], [data-tv-episode-grid] button:not([disabled])", 80);
+    }, 0);
   }
 
   function handlePanelBack() {
@@ -539,6 +607,7 @@ export default function TvWatchOverlay({
       if (nativeHintTimerRef.current) window.clearTimeout(nativeHintTimerRef.current);
       if (hudTimerRef.current) window.clearTimeout(hudTimerRef.current);
       if (exitConfirmTimerRef.current) window.clearTimeout(exitConfirmTimerRef.current);
+      clearEpisodeFocusTimers();
       if (pointerActivityFrameRef.current) {
         window.cancelAnimationFrame(pointerActivityFrameRef.current);
         pointerActivityFrameRef.current = null;
@@ -559,20 +628,14 @@ export default function TvWatchOverlay({
     if (overlayMode !== "panel" || overlayPanel !== "episodes") return;
 
     if (safeChunkIndex !== currentChunkIndex) {
+      pendingCurrentEpisodeFocusRef.current = true;
       setActiveChunkIndex(currentChunkIndex);
       return;
     }
 
-    const frame = window.requestAnimationFrame(() => {
-      focusElement(
-        "[data-tv-panel='episodes'] [data-tv-episode-current='true'], [data-tv-panel='episodes'] [data-tv-panel-default='episodes']",
-        0
-      );
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-    };
+    if (pendingCurrentEpisodeFocusRef.current) {
+      focusCurrentEpisodeSoon();
+    }
   }, [overlayMode, overlayPanel, safeChunkIndex, currentChunkIndex, safeEpisodeIndex, episodeItems.length]);
 
   useEffect(() => {
@@ -737,6 +800,7 @@ export default function TvWatchOverlay({
               <button
                 type="button"
                 data-tv-focus-key="overlay:episodes"
+                data-tv-open-current-episode="true"
                 {...hiddenFocusProps}
                 onClick={() => openPanel("episodes")}
                 disabled={!currentEpisodes.length}
@@ -926,6 +990,7 @@ export default function TvWatchOverlay({
                   data-tv-row
                   data-tv-row-key="overlay:episode-grid"
                   data-tv-row-wrap="true"
+                  data-tv-scroll-align="center"
                   className="grid max-h-[30vh] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6"
                 >
                   {episodeItems.map(({ episode, episodeIndex, href }) => {
