@@ -84,7 +84,9 @@ function Rail() {
     <aside
       data-tv-rail="true"
       data-tv-row
+      data-tv-row-key="tv-rail"
       data-tv-row-wrap="true"
+      data-tv-focus-out-right="content"
       className="sticky top-4 hidden h-[calc(100vh-2rem)] shrink-0 grid-cols-1 gap-2 rounded-2xl border border-white/10 bg-black/30 p-2 backdrop-blur lg:grid lg:w-[92px] xl:w-[104px]"
     >
       {railItems.map(([label, href, key], index) =>
@@ -324,7 +326,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             </Link>
           </div>
 
-          <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          <div data-tv-row data-tv-row-key="tv-home:top-actions" data-tv-row-wrap="true" data-tv-focus-out-left="rail" className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
             {actions.map((action, index) => (
               <Tile key={action.focusKey} {...action} tvDefault={index === 0} />
             ))}
@@ -341,7 +343,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             <ContinueStrip item={first} />
 
             {other.length > 0 && (
-              <div data-tv-row data-tv-row-wrap="true" className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+              <div data-tv-row data-tv-row-key="tv-home:continue-grid" data-tv-row-wrap="true" data-tv-focus-out-left="rail" className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
                 {other.map((item) => (
                   <Card
                     key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
@@ -363,7 +365,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
           <section data-tv-section="china-series">
             <SectionTitle title="Phim bộ Trung Quốc" desc={chineseSeries.length ? "Hàng chính cho TV." : "Đang dùng cache TV gần nhất."} href="/loc?type=phim-bo&country=trung-quoc" />
 
-            <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            <div data-tv-row data-tv-row-key="tv-home:china-series" data-tv-row-wrap="true" data-tv-focus-out-left="rail" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
               {homeChinese.slice(0, 16).map((movie) => (
                 <Card
                   key={movie.slug}
@@ -384,7 +386,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
           <section data-tv-section="custom">
             <SectionTitle title="Phim riêng" desc="Kho riêng gọn cho TV." href="/ca-nhan" />
 
-            <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            <div data-tv-row data-tv-row-key="tv-home:custom" data-tv-row-wrap="true" data-tv-focus-out-left="rail" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
               {customMovies.slice(0, 8).map((item) => (
                 <Card
                   key={item.movie.slug}
@@ -405,7 +407,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
           <section data-tv-section="favorites">
             <SectionTitle title="Yêu thích" desc="Phim đã lưu." href="/yeu-thich" />
 
-            <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
+            <div data-tv-row data-tv-row-key="tv-home:favorites" data-tv-row-wrap="true" data-tv-focus-out-left="rail" className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8">
               {favorites.slice(0, 8).map((item) => (
                 <Card
                   key={item.slug}

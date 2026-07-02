@@ -100,6 +100,14 @@ function focusElement(selector: string, delay = 60) {
   }, delay);
 }
 
+function requestFocusLock(ms = 120) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-focus-lock", {
+      detail: { ms },
+    })
+  );
+}
+
 function focusOverlayDefault() {
   focusElement(
     "[data-tv-overlay='watch'][data-tv-overlay-visible='true'] [data-tv-overlay-default], [data-tv-overlay='watch'][data-tv-overlay-visible='true'] a[href], [data-tv-overlay='watch'][data-tv-overlay-visible='true'] button:not([disabled])"
@@ -265,6 +273,7 @@ export default function TvWatchOverlay({
   }
 
   function hideOverlay({ focusPlayer = true }: { focusPlayer?: boolean } = {}) {
+    requestFocusLock(120);
     clearHideTimer();
     clearExitConfirmTimer();
     setOverlayPanel(null);
@@ -274,6 +283,7 @@ export default function TvWatchOverlay({
   }
 
   function showExitConfirm() {
+    requestFocusLock(140);
     clearHideTimer();
     clearExitConfirmTimer();
     setOverlayPanel(null);
@@ -302,6 +312,7 @@ export default function TvWatchOverlay({
   }
 
   function showPeek({ focus = false }: { focus?: boolean } = {}) {
+    requestFocusLock(100);
     clearExitConfirmTimer();
     setOverlayPanel(null);
     setOverlayMode("peek");
@@ -311,6 +322,7 @@ export default function TvWatchOverlay({
   }
 
   function openPanel(panel: Exclude<OverlayPanel, null>) {
+    requestFocusLock(140);
     clearHideTimer();
 
     if (panel === "episodes") {
@@ -323,6 +335,7 @@ export default function TvWatchOverlay({
   }
 
   function closePanel({ keepOverlay = true }: { keepOverlay?: boolean } = {}) {
+    requestFocusLock(120);
     setOverlayPanel(null);
 
     if (keepOverlay) showPeek({ focus: true });
@@ -341,6 +354,7 @@ export default function TvWatchOverlay({
   }
 
   function handleChunkClick(index: number) {
+    requestFocusLock(120);
     setActiveChunkIndex(index);
     focusPanelDefault("episodes", 95);
   }
@@ -598,7 +612,7 @@ export default function TvWatchOverlay({
             <p className="text-sm font-black text-white">Thoát khỏi phim?</p>
             <p className="mt-1 text-[11px] font-bold text-slate-300">Bấm Back lần nữa để rời phim, hoặc chọn xem tiếp.</p>
 
-            <div data-tv-row className="mt-3 grid grid-cols-2 gap-2">
+            <div data-tv-row data-tv-row-key="overlay:exit-confirm" className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 data-tv-exit-cancel
@@ -632,6 +646,7 @@ export default function TvWatchOverlay({
           <div className="mx-auto max-w-[440px] min-[1280px]:max-w-[500px]">
             <div
               data-tv-row
+              data-tv-row-key="overlay:transport"
               className={[
                 "grid grid-cols-3 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
@@ -685,6 +700,7 @@ export default function TvWatchOverlay({
 
             <div
               data-tv-row
+              data-tv-row-key="overlay:actions"
               className={[
                 "mt-2 grid grid-cols-3 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
@@ -755,7 +771,7 @@ export default function TvWatchOverlay({
                 </h2>
               </div>
 
-              <div data-tv-row className="flex shrink-0 items-center gap-2">
+              <div data-tv-row data-tv-row-key="overlay:panel-tabs" className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   data-tv-focus-key="overlay-tab:episodes"
@@ -805,7 +821,7 @@ export default function TvWatchOverlay({
             {overlayPanel === "episodes" && (
               <div data-tv-panel="episodes">
                 {(previousHref || nextHref) && (
-                  <div data-tv-row className="mb-2 grid grid-cols-2 gap-2">
+                  <div data-tv-row data-tv-row-key="overlay:episode-prev-next" className="mb-2 grid grid-cols-2 gap-2">
                     {previousHref ? (
                       <Link
                         href={previousHref}
@@ -849,7 +865,7 @@ export default function TvWatchOverlay({
                 )}
 
                 {episodeChunks.length > 1 && (
-                  <div data-tv-episode-chunks data-tv-row data-tv-row-wrap="true" className="mb-2 flex gap-2 overflow-x-auto pb-1">
+                  <div data-tv-episode-chunks data-tv-row data-tv-row-key="overlay:episode-chunks" data-tv-row-wrap="true" className="mb-2 flex gap-2 overflow-x-auto pb-1">
                     {episodeChunks.map((chunk, index) => {
                       const hasCurrent =
                         safeEpisodeIndex >= chunk.start && safeEpisodeIndex <= chunk.end;
@@ -880,6 +896,7 @@ export default function TvWatchOverlay({
                 <div
                   data-tv-episode-grid
                   data-tv-row
+                  data-tv-row-key="overlay:episode-grid"
                   data-tv-row-wrap="true"
                   className="grid max-h-[30vh] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6"
                 >
