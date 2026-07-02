@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Taxonomy } from "@/lib/kkphim";
 
@@ -22,6 +22,21 @@ type Props = {
 };
 
 type Tab = "type" | "country" | "category" | "lang" | "year" | "sort";
+
+type FilterDraft = {
+  type: string;
+  country: string[];
+  category: string[];
+  year: string;
+  lang: string;
+  sort: string;
+};
+
+type QuickPreset = {
+  label: string;
+  desc: string;
+  draft: FilterDraft;
+};
 
 const LOC_FOCUS_KEY = "baoflix_tv_loc_focus_after_nav";
 
@@ -70,13 +85,13 @@ const sorts = [
   },
 ];
 
-const tabs: { id: Tab; label: string }[] = [
-  { id: "type", label: "Loại" },
-  { id: "country", label: "Quốc gia" },
-  { id: "category", label: "Thể loại" },
-  { id: "lang", label: "Ngôn ngữ" },
-  { id: "year", label: "Năm" },
-  { id: "sort", label: "Sắp xếp" },
+const tabs: { id: Tab; label: string; hint: string }[] = [
+  { id: "type", label: "Loại", hint: "Phim lẻ/bộ" },
+  { id: "country", label: "Quốc gia", hint: "Trung, Hàn..." },
+  { id: "category", label: "Thể loại", hint: "Cổ trang..." },
+  { id: "lang", label: "Ngôn ngữ", hint: "Lồng tiếng" },
+  { id: "year", label: "Năm", hint: "Năm phát hành" },
+  { id: "sort", label: "Sắp xếp", hint: "Mới nhất" },
 ];
 
 const years = Array.from({ length: 18 }, (_, index) =>
@@ -110,6 +125,59 @@ const genrePriority = [
   "khoa-hoc",
   "tai-lieu",
 ];
+
+const DEFAULT_DRAFT: FilterDraft = {
+  type: "tat-ca",
+  country: [],
+  category: [],
+  year: "tat-ca",
+  lang: "tat-ca",
+  sort: "modified.time:desc",
+};
+
+const quickPresets: QuickPreset[] = [
+  {
+    label: "Trung lồng tiếng",
+    desc: "Phim bộ • Cổ trang",
+    draft: {
+      type: "phim-bo",
+      country: ["trung-quoc"],
+      category: ["co-trang"],
+      year: "tat-ca",
+      lang: "long-tieng",
+      sort: "modified.time:desc",
+    },
+  },
+  {
+    label: "Hàn mới",
+    desc: "Phim bộ • Năm mới",
+    draft: {
+      type: "phim-bo",
+      country: ["han-quoc"],
+      category: [],
+      year: "tat-ca",
+      lang: "tat-ca",
+      sort: "year:desc",
+    },
+  },
+  {
+    label: "Anime",
+    desc: "Hoạt hình mới",
+    draft: {
+      type: "hoat-hinh",
+      country: ["nhat-ban"],
+      category: [],
+      year: "tat-ca",
+      lang: "vietsub",
+      sort: "modified.time:desc",
+    },
+  },
+];
+
+function cssEscape(value: string) {
+  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(value);
+  return value.replace(/"/g, '\\"');
+}
 
 function parse(value?: string) {
   return String(value || "")
@@ -158,14 +226,7 @@ function buildFilterHref({
   year,
   lang,
   sort,
-}: {
-  type: string;
-  country: string[];
-  category: string[];
-  year: string;
-  lang: string;
-  sort: string;
-}) {
+}: FilterDraft) {
   const params = new URLSearchParams();
   const selectedSort = sorts.find((item) => item.value === sort);
   const sortField = selectedSort?.sort_field || "modified.time";
@@ -181,7 +242,23 @@ function buildFilterHref({
   if (sortType !== "desc") params.set("sort_type", sortType);
 
   const query = params.toString();
-  return query ? `/loc?${query}` : "/loc";
+  return query ? `/loc?${params.toString()}` : "/loc";
+}
+
+function getTaxonomyName(items: Taxonomy[], slug: string) {
+  return items.find((item) => item.slug === slug)?.name || slug;
+}
+
+function getTypeName(value: string) {
+  return types.find((item) => item.value === value)?.label || value;
+}
+
+function getLangName(value: string) {
+  return langs.find((item) => item.value === value)?.label || value;
+}
+
+function getSortName(value: string) {
+  return sorts.find((item) => item.value === value)?.label || value;
 }
 
 function Chip({
@@ -189,17 +266,21 @@ function Chip({
   children,
   onClick,
   focusKey,
+  optionActive,
 }: {
   active?: boolean;
   children: React.ReactNode;
   onClick?: () => void;
   focusKey: string;
+  optionActive?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       data-tv-focus-key={focusKey}
+      data-tv-option-active={optionActive ? "true" : undefined}
+      data-tv-option-selected={active ? "true" : undefined}
       className={[
         "min-h-[36px] rounded-lg border px-3 py-1.5 text-[12px] font-black leading-tight transition min-[1280px]:min-h-[38px]",
         active
@@ -215,6 +296,7 @@ function Chip({
 
 export default function FilterPanel({ genres, countries, current }: Props) {
   const router = useRouter();
+  const pendingOptionFocusRef = useRef<Tab | null>(null);
 
   const [tab, setTab] = useState<Tab>("type");
   const [type, setType] = useState(current.type || "tat-ca");
@@ -252,13 +334,81 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     [genres]
   );
 
-  const selectedCount =
-    (type !== "tat-ca" ? 1 : 0) +
-    country.length +
-    category.length +
-    (year !== "tat-ca" ? 1 : 0) +
-    (lang !== "tat-ca" ? 1 : 0) +
-    (sort !== "modified.time:desc" ? 1 : 0);
+  const draft: FilterDraft = { type, country, category, year, lang, sort };
+
+  const selectedSummary = useMemo(() => {
+    const list: string[] = [];
+
+    if (type !== "tat-ca") list.push(getTypeName(type));
+    country.forEach((slug) => list.push(getTaxonomyName(sortedCountries, slug)));
+    category.forEach((slug) => list.push(getTaxonomyName(sortedGenres, slug)));
+    if (year !== "tat-ca") list.push(year);
+    if (lang !== "tat-ca") list.push(getLangName(lang));
+    if (sort !== "modified.time:desc") list.push(getSortName(sort));
+
+    return list;
+  }, [category, country, lang, sortedCountries, sortedGenres, sort, type, year]);
+
+  const selectedCount = selectedSummary.length;
+
+  function selectedFocusKeyForTab(nextTab: Tab) {
+    if (nextTab === "type") return `filter-type:${type}`;
+    if (nextTab === "country") return `filter-country:${country[0] || "all"}`;
+    if (nextTab === "category") return `filter-category:${category[0] || "all"}`;
+    if (nextTab === "lang") return `filter-lang:${lang}`;
+    if (nextTab === "year") return `filter-year:${year}`;
+    return `filter-sort:${sort}`;
+  }
+
+  function focusOptionForTab(nextTab: Tab) {
+    const key = selectedFocusKeyForTab(nextTab);
+    const selectors = [
+      `[data-tv-focus-key="${cssEscape(key)}"]`,
+      "[data-tv-tab-panel-active='true'] [data-tv-option-selected='true']",
+      "[data-tv-tab-panel-active='true'] button:not([disabled])",
+    ];
+
+    const target = selectors
+      .map((selector) => document.querySelector<HTMLElement>(selector))
+      .find(Boolean);
+
+    if (!target) return false;
+
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
+    pendingOptionFocusRef.current = null;
+    return true;
+  }
+
+  function focusOptionForTabSoon(nextTab: Tab) {
+    pendingOptionFocusRef.current = nextTab;
+
+    [0, 45, 95, 170, 280].forEach((delay) => {
+      window.setTimeout(() => {
+        if (pendingOptionFocusRef.current !== nextTab) return;
+        focusOptionForTab(nextTab);
+      }, delay);
+    });
+  }
+
+  function selectTab(nextTab: Tab, moveToOption = false) {
+    setTab(nextTab);
+
+    if (moveToOption) {
+      window.dispatchEvent(
+        new CustomEvent("baoflix-tv-focus-lock", {
+          detail: { ms: 130 },
+        })
+      );
+      focusOptionForTabSoon(nextTab);
+    }
+  }
+
+  useEffect(() => {
+    if (!pendingOptionFocusRef.current) return;
+    if (pendingOptionFocusRef.current !== tab) return;
+    focusOptionForTabSoon(tab);
+  }, [tab, type, country, category, year, lang, sort]);
 
   function navigateTo(href: string, mode: "results" | "filter" = "results") {
     saveLocFocusIntent(mode);
@@ -272,20 +422,37 @@ export default function FilterPanel({ genres, countries, current }: Props) {
     router.replace(href, { scroll: false });
   }
 
+  function applyDraft(nextDraft: FilterDraft) {
+    setType(nextDraft.type);
+    setCountry(nextDraft.country);
+    setCategory(nextDraft.category);
+    setYear(nextDraft.year);
+    setLang(nextDraft.lang);
+    setSort(nextDraft.sort);
+    navigateTo(buildFilterHref(nextDraft), "results");
+  }
+
   function apply() {
-    const href = buildFilterHref({ type, country, category, year, lang, sort });
-    navigateTo(href, "results");
+    navigateTo(buildFilterHref(draft), "results");
   }
 
   function reset() {
-    setType("tat-ca");
-    setCountry([]);
-    setCategory([]);
-    setYear("tat-ca");
-    setLang("tat-ca");
-    setSort("modified.time:desc");
+    setType(DEFAULT_DRAFT.type);
+    setCountry(DEFAULT_DRAFT.country);
+    setCategory(DEFAULT_DRAFT.category);
+    setYear(DEFAULT_DRAFT.year);
+    setLang(DEFAULT_DRAFT.lang);
+    setSort(DEFAULT_DRAFT.sort);
     setTab("type");
     navigateTo("/loc", "results");
+  }
+
+  function panelFocusOutLeft() {
+    return `focus-key:filter-tab:${tab}`;
+  }
+
+  function optionPanelFocusOutRight() {
+    return "focus-key:filter:apply-side";
   }
 
   return (
@@ -297,7 +464,7 @@ export default function FilterPanel({ genres, countries, current }: Props) {
       data-tv-tabs-root
       className="rounded-3xl border border-white/10 bg-white/[0.035] p-3 shadow-[0_20px_70px_rgba(0,0,0,0.18)] min-[1280px]:p-4"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-3 grid gap-3 xl:grid-cols-[1fr_auto] xl:items-center">
         <div className="min-w-0">
           <p className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-300">
             TV Filter
@@ -310,14 +477,249 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           </p>
         </div>
 
-        <div data-tv-row data-tv-row-key="filter:top-actions" className="grid grid-cols-2 gap-2">
+        <div
+          data-tv-row
+          data-tv-row-key="filter:preset"
+          data-tv-row-wrap="true"
+          className="flex flex-wrap gap-2 xl:justify-end"
+        >
+          {quickPresets.map((preset) => (
+            <button
+              key={preset.label}
+              type="button"
+              onClick={() => applyDraft(preset.draft)}
+              data-tv-loc-filter-nav="true"
+              data-tv-focus-key={`filter-preset:${preset.label}`}
+              className={[
+                "min-h-[38px] rounded-xl border border-white/10 bg-black/25 px-3 py-2 text-left text-[11px] font-black text-white hover:bg-white/10",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              <span className="block leading-none">{preset.label}</span>
+              <span className="mt-1 block text-[9px] font-bold text-slate-400">{preset.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {selectedSummary.length > 0 && (
+        <div
+          data-tv-row
+          data-tv-row-key="filter:summary"
+          data-tv-row-wrap="true"
+          className="mb-3 flex flex-wrap gap-1.5 rounded-2xl border border-white/10 bg-black/20 p-2"
+        >
+          {selectedSummary.slice(0, 8).map((item) => (
+            <span
+              key={item}
+              className="rounded-full bg-yellow-300/12 px-2.5 py-1 text-[10px] font-black text-yellow-100"
+            >
+              {item}
+            </span>
+          ))}
+
+          {selectedSummary.length > 8 && (
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-black text-slate-300">
+              +{selectedSummary.length - 8}
+            </span>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-3 xl:grid-cols-[190px_1fr_150px]">
+        <div
+          data-tv-row
+          data-tv-row-key="filter:groups"
+          data-tv-row-wrap="true"
+          data-tv-tab-list
+          data-tv-focus-out-right="selector:[data-tv-tab-panel-active='true'] [data-tv-option-selected='true'], [data-tv-tab-panel-active='true'] button:not([disabled])"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-1"
+        >
+          {tabs.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => selectTab(item.id, true)}
+              data-tv-default={item.id === "type" ? true : undefined}
+              data-tv-tab-active={tab === item.id ? "true" : undefined}
+              data-tv-focus-key={`filter-tab:${item.id}`}
+              className={[
+                "min-h-[44px] rounded-xl border px-3 py-2 text-left transition",
+                tab === item.id
+                  ? "border-yellow-300 bg-yellow-300 text-black"
+                  : "border-white/10 bg-white/[0.055] text-slate-200 hover:bg-white/10",
+                TV_FOCUS_CLASS,
+              ].join(" ")}
+            >
+              <span className="block text-[12px] font-black leading-tight">{item.label}</span>
+              <span className={["mt-0.5 block text-[9px] font-bold", tab === item.id ? "text-black/60" : "text-slate-500"].join(" ")}>
+                {item.hint}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div
+          data-tv-tab-panel
+          data-tv-tab-panel-active="true"
+          data-tv-focus-out-left={panelFocusOutLeft()}
+          data-tv-focus-out-right={optionPanelFocusOutRight()}
+          className="min-h-[220px] rounded-2xl border border-white/10 bg-black/20 p-3 min-[1280px]:min-h-[240px]"
+        >
+          {tab === "type" && (
+            <div data-tv-row data-tv-row-key="filter:type" data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {types.map((item) => (
+                <Chip
+                  key={item.value}
+                  active={type === item.value}
+                  optionActive={type === item.value}
+                  onClick={() => setType(item.value)}
+                  focusKey={`filter-type:${item.value}`}
+                >
+                  {item.label}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {tab === "country" && (
+            <div
+              data-tv-row
+              data-tv-row-key="filter:country"
+              data-tv-row-wrap="true"
+              className="grid max-h-[44vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            >
+              <Chip
+                active={!country.length}
+                optionActive={!country.length}
+                onClick={() => setCountry([])}
+                focusKey="filter-country:all"
+              >
+                Tất cả
+              </Chip>
+
+              {sortedCountries.map((item) => (
+                <Chip
+                  key={item.slug}
+                  active={country.includes(item.slug)}
+                  optionActive={country[0] === item.slug}
+                  onClick={() => setCountry((old) => toggle(old, item.slug))}
+                  focusKey={`filter-country:${item.slug}`}
+                >
+                  {item.name}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {tab === "category" && (
+            <div
+              data-tv-row
+              data-tv-row-key="filter:category"
+              data-tv-row-wrap="true"
+              className="grid max-h-[44vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            >
+              <Chip
+                active={!category.length}
+                optionActive={!category.length}
+                onClick={() => setCategory([])}
+                focusKey="filter-category:all"
+              >
+                Tất cả
+              </Chip>
+
+              {sortedGenres.map((item) => (
+                <Chip
+                  key={item.slug}
+                  active={category.includes(item.slug)}
+                  optionActive={category[0] === item.slug}
+                  onClick={() => setCategory((old) => toggle(old, item.slug))}
+                  focusKey={`filter-category:${item.slug}`}
+                >
+                  {item.name}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {tab === "lang" && (
+            <div data-tv-row data-tv-row-key="filter:lang" data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {langs.map((item) => (
+                <Chip
+                  key={item.value}
+                  active={lang === item.value}
+                  optionActive={lang === item.value}
+                  onClick={() => setLang(item.value)}
+                  focusKey={`filter-lang:${item.value}`}
+                >
+                  {item.label}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {tab === "year" && (
+            <div
+              data-tv-row
+              data-tv-row-key="filter:year"
+              data-tv-row-wrap="true"
+              className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9"
+            >
+              <Chip
+                active={year === "tat-ca"}
+                optionActive={year === "tat-ca"}
+                onClick={() => setYear("tat-ca")}
+                focusKey="filter-year:all"
+              >
+                Tất cả
+              </Chip>
+
+              {years.map((item) => (
+                <Chip
+                  key={item}
+                  active={year === item}
+                  optionActive={year === item}
+                  onClick={() => setYear(item)}
+                  focusKey={`filter-year:${item}`}
+                >
+                  {item}
+                </Chip>
+              ))}
+            </div>
+          )}
+
+          {tab === "sort" && (
+            <div data-tv-row data-tv-row-key="filter:sort" data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {sorts.map((item) => (
+                <Chip
+                  key={item.value}
+                  active={sort === item.value}
+                  optionActive={sort === item.value}
+                  onClick={() => setSort(item.value)}
+                  focusKey={`filter-sort:${item.value}`}
+                >
+                  {item.label}
+                </Chip>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div
+          data-tv-row
+          data-tv-row-key="filter:side-actions"
+          data-tv-row-wrap="true"
+          data-tv-focus-out-left="selector:[data-tv-tab-panel-active='true'] [data-tv-option-selected='true'], [data-tv-tab-panel-active='true'] button:not([disabled])"
+          className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-1 xl:content-start"
+        >
           <button
             type="button"
             onClick={apply}
-            data-tv-focus-key="filter:apply-top"
+            data-tv-jump-results="true"
             data-tv-loc-filter-nav="true"
+            data-tv-focus-key="filter:apply-side"
             className={[
-              "rounded-xl bg-yellow-300 px-4 py-2 text-[12px] font-black text-black hover:bg-yellow-200",
+              "rounded-xl bg-yellow-300 px-4 py-3 text-[12px] font-black text-black hover:bg-yellow-200 xl:min-h-[48px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
@@ -327,220 +729,28 @@ export default function FilterPanel({ genres, countries, current }: Props) {
           <button
             type="button"
             onClick={reset}
-            data-tv-focus-key="filter:reset-top"
+            data-tv-focus-key="filter:reset-side"
             data-tv-loc-filter-nav="true"
             className={[
-              "rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-[12px] font-black text-white hover:bg-white/10",
+              "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[12px] font-black text-white hover:bg-white/10 xl:min-h-[48px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
             Xóa lọc
           </button>
-        </div>
-      </div>
 
-      <div
-        data-tv-row
-        data-tv-row-key="filter:tabs"
-        data-tv-row-wrap="true"
-        data-tv-tab-list
-        className="mb-3 flex flex-wrap gap-2"
-      >
-        {tabs.map((item) => (
           <button
-            key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
-            data-tv-default={item.id === "type" ? true : undefined}
-            data-tv-tab-active={tab === item.id ? "true" : undefined}
-            data-tv-focus-key={`filter-tab:${item.id}`}
+            onClick={() => router.push("/tv")}
+            data-tv-focus-key="filter:tv-home"
             className={[
-              "min-h-[36px] rounded-lg border px-3 py-1.5 text-[12px] font-black transition min-[1280px]:min-h-[38px]",
-              tab === item.id
-                ? "border-yellow-300 bg-yellow-300 text-black"
-                : "border-white/10 bg-white/[0.055] text-slate-200 hover:bg-white/10",
+              "rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[12px] font-black text-white hover:bg-white/10 xl:min-h-[48px]",
               TV_FOCUS_CLASS,
             ].join(" ")}
           >
-            {item.label}
+            TV Hub
           </button>
-        ))}
-      </div>
-
-      <div
-        data-tv-tab-panel
-        data-tv-tab-panel-active="true"
-        className="min-h-[168px] rounded-2xl border border-white/10 bg-black/20 p-3 min-[1280px]:min-h-[184px]"
-      >
-        {tab === "type" && (
-          <div data-tv-row data-tv-row-key="filter:type" data-tv-row-wrap="true" className="flex flex-wrap gap-2">
-            {types.map((item) => (
-              <Chip
-                key={item.value}
-                active={type === item.value}
-                onClick={() => setType(item.value)}
-                focusKey={`filter-type:${item.value}`}
-              >
-                {item.label}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {tab === "country" && (
-          <div
-            data-tv-row
-            data-tv-row-key="filter:country"
-            data-tv-row-wrap="true"
-            className="grid max-h-[42vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7"
-          >
-            <Chip
-              active={!country.length}
-              onClick={() => setCountry([])}
-              focusKey="filter-country:all"
-            >
-              Tất cả
-            </Chip>
-
-            {sortedCountries.slice(0, 42).map((item) => (
-              <Chip
-                key={item.slug}
-                active={country.includes(item.slug)}
-                onClick={() => setCountry((old) => toggle(old, item.slug))}
-                focusKey={`filter-country:${item.slug}`}
-              >
-                {item.name}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {tab === "category" && (
-          <div
-            data-tv-row
-            data-tv-row-key="filter:category"
-            data-tv-row-wrap="true"
-            className="grid max-h-[42vh] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7"
-          >
-            <Chip
-              active={!category.length}
-              onClick={() => setCategory([])}
-              focusKey="filter-category:all"
-            >
-              Tất cả
-            </Chip>
-
-            {sortedGenres.slice(0, 42).map((item) => (
-              <Chip
-                key={item.slug}
-                active={category.includes(item.slug)}
-                onClick={() => setCategory((old) => toggle(old, item.slug))}
-                focusKey={`filter-category:${item.slug}`}
-              >
-                {item.name}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {tab === "lang" && (
-          <div data-tv-row data-tv-row-key="filter:lang" data-tv-row-wrap="true" className="flex flex-wrap gap-2">
-            {langs.map((item) => (
-              <Chip
-                key={item.value}
-                active={lang === item.value}
-                onClick={() => setLang(item.value)}
-                focusKey={`filter-lang:${item.value}`}
-              >
-                {item.label}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {tab === "year" && (
-          <div
-            data-tv-row
-            data-tv-row-key="filter:year"
-            data-tv-row-wrap="true"
-            className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9"
-          >
-            <Chip
-              active={year === "tat-ca"}
-              onClick={() => setYear("tat-ca")}
-              focusKey="filter-year:all"
-            >
-              Tất cả
-            </Chip>
-
-            {years.map((item) => (
-              <Chip
-                key={item}
-                active={year === item}
-                onClick={() => setYear(item)}
-                focusKey={`filter-year:${item}`}
-              >
-                {item}
-              </Chip>
-            ))}
-          </div>
-        )}
-
-        {tab === "sort" && (
-          <div data-tv-row data-tv-row-key="filter:sort" data-tv-row-wrap="true" className="flex flex-wrap gap-2">
-            {sorts.map((item) => (
-              <Chip
-                key={item.value}
-                active={sort === item.value}
-                onClick={() => setSort(item.value)}
-                focusKey={`filter-sort:${item.value}`}
-              >
-                {item.label}
-              </Chip>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div data-tv-row data-tv-row-key="filter:bottom-actions" className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-        <button
-          type="button"
-          onClick={apply}
-          data-tv-jump-results="true"
-          data-tv-loc-filter-nav="true"
-          data-tv-focus-key="filter:apply-bottom"
-          className={[
-            "rounded-xl bg-yellow-300 px-4 py-2.5 text-[12px] font-black text-black hover:bg-yellow-200",
-            TV_FOCUS_CLASS,
-          ].join(" ")}
-        >
-          Áp dụng lọc
-        </button>
-
-        <button
-          type="button"
-          onClick={reset}
-          data-tv-focus-key="filter:reset-bottom"
-          data-tv-loc-filter-nav="true"
-          className={[
-            "rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] font-black text-white hover:bg-white/10",
-            TV_FOCUS_CLASS,
-          ].join(" ")}
-        >
-          Xóa lọc
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/tv")}
-          data-tv-focus-key="filter:tv-home"
-          className={[
-            "rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-[12px] font-black text-white hover:bg-white/10",
-            TV_FOCUS_CLASS,
-          ].join(" ")}
-        >
-          TV Hub
-        </button>
+        </div>
       </div>
     </section>
   );

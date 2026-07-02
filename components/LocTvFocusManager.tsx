@@ -49,21 +49,21 @@ function getVisibleTarget(selectors: string[]) {
   return null;
 }
 
-function focusElement(target: HTMLElement) {
+function focusElement(target: HTMLElement, block: ScrollLogicalPosition = "start") {
   target.focus({ preventScroll: true });
-  target.scrollIntoView({ behavior: "auto", block: "start", inline: "nearest" });
+  target.scrollIntoView({ behavior: "auto", block, inline: "nearest" });
 }
 
 function focusFilter() {
   const target = getVisibleTarget([
-    "[data-tv-filter-panel] [data-tv-default]",
     "[data-tv-filter-panel] [data-tv-tab-active='true']",
+    "[data-tv-filter-panel] [data-tv-default]",
     "[data-tv-filter-panel] button:not([disabled])",
   ]);
 
   if (!target) return false;
 
-  focusElement(target);
+  focusElement(target, "center");
   return true;
 }
 
@@ -77,16 +77,16 @@ function focusResults() {
 
   if (!target) return false;
 
-  focusElement(target);
+  focusElement(target, "start");
   return true;
 }
 
 function runFocusIntent(mode?: string | null) {
   const focusMode = mode === "filter" ? "filter" : "results";
 
-  requestFocusLock(180);
+  requestFocusLock(220);
 
-  const delays = [80, 180, 320, 520, 760];
+  const delays = [80, 180, 320, 520, 760, 1040];
 
   delays.forEach((delay) => {
     window.setTimeout(() => {
