@@ -71,12 +71,12 @@ export default function MovieCard({
   }
 
   return (
-    <article className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-md shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300">
+    <article className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.035] shadow-md shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/80 focus-within:ring-offset-2 focus-within:ring-offset-black">
       <Link
         href={`/phim/${movie.slug}`}
         data-tv-default={tvDefault ? true : undefined}
         data-tv-focus-key={`movie:${movie.slug}`}
-        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-4 focus-visible:ring-offset-black"
+        className="block focus-visible:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.16),0_18px_38px_rgba(0,0,0,0.55)]"
         aria-label={`Mở phim ${movie.name}`}
       >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">

@@ -17,6 +17,7 @@ type CompactMovieCardProps = {
   bottomPrimary?: string;
   bottomSecondary?: string;
   meta?: Array<string | number | false | null | undefined>;
+  tvDefault?: boolean;
   onRemove?: () => void;
   removeLabel?: string;
   removeAriaLabel?: string;
@@ -25,7 +26,7 @@ type CompactMovieCardProps = {
 };
 
 const TV_CARD_FOCUS_CLASS =
-  "focus-visible:scale-[1.035] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.025] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.16),0_18px_38px_rgba(0,0,0,0.55)]";
 
 function getBadgeClass(tone: BadgeTone) {
   if (tone === "yellow") return "bg-yellow-300 text-black";
@@ -44,6 +45,7 @@ export default function CompactMovieCard({
   bottomPrimary,
   bottomSecondary,
   meta = [],
+  tvDefault = false,
   onRemove,
   removeLabel = "Xóa",
   removeAriaLabel,
@@ -92,33 +94,34 @@ export default function CompactMovieCard({
   return (
     <article
       data-tv-card="compact-movie"
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.045] transition hover:-translate-y-1 hover:bg-white/[0.075]"
+      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/80 focus-within:ring-offset-2 focus-within:ring-offset-black"
     >
       <Link
         href={href}
         prefetch={false}
+        data-tv-default={tvDefault ? true : undefined}
         data-tv-focus-key={`compact-card:${href}`}
-        className={["block rounded-2xl", TV_CARD_FOCUS_CLASS].join(" ")}
+        className={["block rounded-lg", TV_CARD_FOCUS_CLASS].join(" ")}
       >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
           <img
             src={getImageUrl(image)}
             alt={title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105 group-focus-within:scale-105"
+            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.035] group-focus-within:scale-[1.035]"
             loading="lazy"
             decoding="async"
           />
 
           {(bottomPrimary || bottomSecondary) && (
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent p-2 pt-14">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent p-1.5 pt-10">
               {bottomPrimary && (
-                <p className="line-clamp-1 text-[11px] font-black text-red-300">
+                <p className="line-clamp-1 text-[10px] font-black text-red-300">
                   {bottomPrimary}
                 </p>
               )}
 
               {bottomSecondary && (
-                <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-yellow-300">
+                <p className="mt-0.5 line-clamp-1 text-[9px] font-bold text-yellow-300">
                   {bottomSecondary}
                 </p>
               )}
@@ -128,7 +131,7 @@ export default function CompactMovieCard({
           {topBadge && (
             <span
               className={[
-                "absolute left-2 top-2 rounded-full px-2 py-1 text-[10px] font-black",
+                "absolute left-1.5 top-1.5 max-w-[78%] truncate rounded-md px-1.5 py-0.5 text-[9px] font-black",
                 getBadgeClass(topBadgeTone),
               ].join(" ")}
             >
@@ -137,24 +140,24 @@ export default function CompactMovieCard({
           )}
 
           {rightBadge && (
-            <span className="absolute right-2 top-2 rounded-full bg-yellow-300 px-2 py-1 text-[10px] font-black text-black">
+            <span className="absolute right-1.5 top-1.5 rounded-md bg-yellow-300 px-1.5 py-0.5 text-[9px] font-black text-black">
               {rightBadge}
             </span>
           )}
         </div>
 
-        <div className="space-y-1 p-3">
-          <h2 className="line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-white">
+        <div className="min-h-[52px] space-y-0.5 p-1.5">
+          <h2 className="line-clamp-2 text-[11px] font-black leading-tight text-white min-[1280px]:text-[12px]">
             {title}
           </h2>
 
           {originName && (
-            <p className="line-clamp-1 text-xs text-slate-400">{originName}</p>
+            <p className="line-clamp-1 text-[9px] font-semibold text-slate-400">{originName}</p>
           )}
 
           {visibleMeta.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1 text-[11px] text-slate-500">
-              {visibleMeta.map((item, index) => (
+            <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold text-slate-500">
+              {visibleMeta.slice(0, 3).map((item, index) => (
                 <span key={`${item}-${index}`}>
                   {index > 0 ? "• " : ""}
                   {item}
@@ -172,7 +175,7 @@ export default function CompactMovieCard({
           data-tv-skip
           tabIndex={-1}
           className={[
-            "absolute right-2 top-2 rounded-full border px-2.5 py-1 text-[11px] font-black text-white backdrop-blur",
+            "absolute right-1.5 top-1.5 rounded-md border px-1.5 py-0.5 text-[9px] font-black text-white backdrop-blur",
             confirmingDelete
               ? "border-red-400 bg-red-600"
               : "border-white/10 bg-black/75 hover:bg-red-600",
@@ -182,7 +185,7 @@ export default function CompactMovieCard({
           ].join(" ")}
           aria-label={removeAriaLabel || removeLabel}
         >
-          {confirmingDelete ? "Chắc chắn?" : removeLabel}
+          {confirmingDelete ? "Chắc?" : removeLabel}
         </button>
       )}
     </article>

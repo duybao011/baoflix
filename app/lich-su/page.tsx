@@ -16,7 +16,7 @@ type HistoryItem = WatchHistoryItem & {
 };
 
 const TV_FOCUS_CLASS =
-  "focus-visible:scale-[1.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "focus-visible:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
 const langOptions = [
   { label: "Tất cả ngôn ngữ", value: "tat-ca" },
@@ -104,7 +104,7 @@ function SelectBox({
       onChange={(event) => onChange(event.target.value)}
       data-tv-focus-key={focusKey}
       className={[
-        "rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-sm text-white outline-none",
+        "h-9 rounded-lg border border-white/10 bg-[#10131d] px-2.5 text-[12px] font-bold text-white outline-none min-[1280px]:h-10",
         TV_FOCUS_CLASS,
       ].join(" ")}
     >
@@ -214,6 +214,15 @@ export default function HistoryPage() {
     return result;
   }, [items, keyword, type, lang, server, country, year, sort]);
 
+  const activeFilterCount =
+    (keyword.trim() ? 1 : 0) +
+    (type !== "tat-ca" ? 1 : 0) +
+    (lang !== "tat-ca" ? 1 : 0) +
+    (server !== "tat-ca" ? 1 : 0) +
+    (country !== "tat-ca" ? 1 : 0) +
+    (year !== "tat-ca" ? 1 : 0) +
+    (sort !== "latest" ? 1 : 0);
+
   function clearHistory() {
     clearWatchHistory();
     setItems([]);
@@ -243,62 +252,72 @@ export default function HistoryPage() {
       data-tv-scope="history-page"
       data-tv-lock="true"
       data-tv-autofocus="true"
-      className="baoflix-tv-page"
+      className="baoflix-tv-page space-y-3"
     >
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black">Lịch sử xem</h1>
-          <p className="mt-1 text-slate-400">
-            Remote TV ưu tiên cụm lọc rồi xuống danh sách phim.
-          </p>
-        </div>
+      <header className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/[0.045] to-yellow-300/[0.06] p-3 min-[1280px]:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-300/90">
+              TV History
+            </p>
+            <h1 className="mt-0.5 text-xl font-black leading-tight min-[1280px]:text-2xl">
+              Lịch sử xem
+            </h1>
+            <p className="mt-0.5 text-xs font-semibold text-slate-400">
+              {filteredItems.length}/{items.length} mục
+              {activeFilterCount ? ` • ${activeFilterCount} lọc đang bật` : ""}
+            </p>
+          </div>
 
-        <div data-tv-row className="flex gap-2">
-          <button
-            type="button"
-            onClick={clearFilters}
-            data-tv-default
-            data-tv-focus-key="history:clear-filters-top"
-            className={[
-              "rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-white/10",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Xóa lọc
-          </button>
-
-          {items.length > 0 && (
+          <div data-tv-row data-tv-row-key="history:top-actions" className="flex gap-2">
             <button
               type="button"
-              onClick={clearHistory}
-              data-tv-focus-key="history:clear-history"
+              onClick={clearFilters}
+              data-tv-default
+              data-tv-focus-key="history:clear-filters-top"
               className={[
-                "rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-black hover:bg-red-600",
+                "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black hover:bg-white/10",
                 TV_FOCUS_CLASS,
               ].join(" ")}
             >
-              Xóa lịch sử
+              Xóa lọc
             </button>
-          )}
+
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={clearHistory}
+                data-tv-focus-key="history:clear-history"
+                className={[
+                  "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black hover:bg-red-600",
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Xóa lịch sử
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      </header>
 
       <section
         data-tv-section="history-filters"
-        className="mb-6 rounded-3xl border border-white/10 bg-white/[0.04] p-4"
+        data-tv-scroll-align="center"
+        className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 min-[1280px]:p-3"
       >
         <div
           data-tv-row
+          data-tv-row-key="history:filters"
           data-tv-row-wrap="true"
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+          className="grid gap-2 md:grid-cols-3 xl:grid-cols-7"
         >
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
             data-tv-focus-key="history:keyword"
-            placeholder="Tìm trong lịch sử..."
+            placeholder="Tìm lịch sử..."
             className={[
-              "rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-sm text-white outline-none",
+              "h-9 rounded-lg border border-white/10 bg-[#10131d] px-2.5 text-[12px] font-bold text-white outline-none placeholder:text-slate-500 min-[1280px]:h-10",
               TV_FOCUS_CLASS,
             ].join(" ")}
           />
@@ -351,39 +370,25 @@ export default function HistoryPage() {
             <option value="oldest">Xem cũ nhất</option>
             <option value="az">Tên A-Z</option>
           </SelectBox>
-
-          <button
-            type="button"
-            onClick={clearFilters}
-            data-tv-focus-key="history:clear-filters"
-            className={[
-              "rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black hover:bg-white/10",
-              TV_FOCUS_CLASS,
-            ].join(" ")}
-          >
-            Xóa lọc
-          </button>
         </div>
-
-        <p className="mt-4 text-sm text-slate-400">
-          Đang hiện {filteredItems.length}/{items.length} mục lịch sử.
-        </p>
       </section>
 
       {filteredItems.length === 0 ? (
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-slate-400">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-slate-400">
           Chưa có lịch sử phù hợp.
         </div>
       ) : (
         <div
           data-tv-section="history-results"
           data-tv-row
+          data-tv-row-key="history:results"
           data-tv-row-wrap="true"
-          className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6"
+          data-tv-scroll-align="center"
+          className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8 2xl:grid-cols-9"
         >
-          {filteredItems.map((item) => (
+          {filteredItems.map((item, index) => (
             <CompactMovieCard
-              key={item.slug}
+              key={`${item.isCustom ? "custom" : "normal"}-${item.slug}`}
               href={getHistoryHref(item)}
               title={item.name}
               originName={item.origin_name}
@@ -391,16 +396,18 @@ export default function HistoryPage() {
               topBadge={item.quality}
               topBadgeTone="dark"
               rightBadge={item.isCustom ? "Riêng" : undefined}
-              bottomPrimary={`Xem tiếp: ${item.episodeName || "Tập đang xem"}`}
+              bottomPrimary={item.episodeName || "Tập đang xem"}
               bottomSecondary={getSourceLabel(item)}
               meta={[
                 item.year,
                 item.lang,
                 item.watchedAt && formatWatchedTime(item.watchedAt),
               ]}
+              tvDefault={index === 0}
               onRemove={() => removeHistoryMovie(item)}
               removeLabel="Xóa"
               removeAriaLabel={`Xóa ${item.name} khỏi lịch sử`}
+              hideRemoveUntilHover
             />
           ))}
         </div>
