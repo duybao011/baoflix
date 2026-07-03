@@ -1063,6 +1063,11 @@ function goBack(event: KeyboardEvent) {
   const stackedTarget = popRouteTarget(current);
 
   if (stackedTarget) {
+    if (isSameRoutePath(stackedTarget, current)) {
+      window.location.href = getFallbackBackHref(window.location.pathname);
+      return;
+    }
+
     if (isWatchRoute(current) && isSameRoutePath(stackedTarget, getFallbackBackHref(window.location.pathname))) {
       sanitizeStackForWatchExit(current, stackedTarget);
     }
@@ -1103,6 +1108,56 @@ function handlePlaybackShortcut(event: KeyboardEvent, direction: Direction | nul
 function jumpToPageSection(selector: string, pathname: string) {
   const target = document.querySelector<HTMLElement>(selector);
   if (!target || !isVisibleElement(target)) return false;
+
+  focusElement(target, pathname);
+  return true;
+}
+
+function getFirstSectionFocusable(section: HTMLElement) {
+  return (
+    getDefaultFocusable(section) ||
+    getFocusableElements(section)[0] ||
+    null
+  );
+}
+
+function getVisibleMainSections() {
+  const main = document.querySelector<HTMLElement>("main") || document.body;
+  return Array.from(main.querySelectorAll<HTMLElement>("[data-tv-section]"))
+    .filter(isVisibleElement)
+    .filter((section) => getFocusableElements(section).length > 0);
+}
+
+function focusFirstContentSection(pathname: string) {
+  const sections = getVisibleMainSections();
+  const preferred = sections.find((section) => !section.hasAttribute("data-tv-page-chrome")) || sections[0];
+  const target = preferred ? getFirstSectionFocusable(preferred) : getFirstMainFocusableElement();
+
+  if (!target) return false;
+  focusElement(target, pathname);
+  return true;
+}
+
+function focusPageSectionBoundary(current: HTMLElement, direction: Direction, pathname: string) {
+  if (direction !== "up" && direction !== "down") return false;
+  if (current.closest("[data-tv-overlay='watch'], [data-tv-modal], [data-tv-search-keyboard]")) return false;
+
+  if (direction === "down" && current.closest("[data-tv-page-top-actions]")) {
+    return focusFirstContentSection(pathname);
+  }
+
+  const currentSection = current.closest<HTMLElement>("[data-tv-section]");
+  if (!currentSection) return false;
+
+  const sections = getVisibleMainSections();
+  const index = sections.findIndex((section) => section === currentSection);
+  if (index < 0) return false;
+
+  const targetSection = direction === "down" ? sections[index + 1] : sections[index - 1];
+  if (!targetSection) return false;
+
+  const target = getFirstSectionFocusable(targetSection);
+  if (!target) return false;
 
   focusElement(target, pathname);
   return true;
@@ -1474,6 +1529,20 @@ export default function TvRemoteNavigator() {
         direction === "down" &&
         !openModalScope &&
         !activeIsInsideVisibleOverlay &&
+        !activeSearchKeyboard &&
+        activeElement instanceof HTMLElement &&
+        activeElement.closest("[data-tv-page-top-actions]") &&
+        focusFirstContentSection(pathname)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      if (
+        direction === "down" &&
+        !openModalScope &&
+        !activeIsInsideVisibleOverlay &&
         activeElement instanceof HTMLElement &&
         activeElement.closest("header")
       ) {
@@ -1617,6 +1686,17 @@ export default function TvRemoteNavigator() {
       const nextElement = getLinearCandidate(current, root, focusableElements, direction, pathname);
 
       if (!nextElement || nextElement === current) {
+        if (
+          !openModalScope &&
+          !activeIsInsideVisibleOverlay &&
+          !activeSearchKeyboard &&
+          focusPageSectionBoundary(current, direction, pathname)
+        ) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
         if (handleFocusOutRule(current, direction, pathname)) {
           event.preventDefault();
           event.stopPropagation();

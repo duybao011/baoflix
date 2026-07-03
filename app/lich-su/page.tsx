@@ -269,11 +269,16 @@ export default function HistoryPage() {
             </p>
           </div>
 
-          <div data-tv-row data-tv-row-key="history:top-actions" className="flex gap-2">
+          <div
+            data-tv-row
+            data-tv-row-key="history:top-actions"
+            data-tv-page-top-actions
+            data-tv-focus-out-down="selector:[data-tv-section='history-filters'] input, [data-tv-section='history-filters'] select, [data-tv-section='history-results'] a[href]"
+            className="flex gap-2"
+          >
             <button
               type="button"
               onClick={clearFilters}
-              data-tv-default
               data-tv-focus-key="history:clear-filters-top"
               className={[
                 "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-black hover:bg-white/10",
@@ -303,6 +308,8 @@ export default function HistoryPage() {
       <section
         data-tv-section="history-filters"
         data-tv-scroll-align="center"
+        data-tv-focus-out-up="focus-key:history:clear-filters-top"
+        data-tv-focus-out-down="selector:[data-tv-section='history-results'] a[href]"
         className="rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 min-[1280px]:p-3"
       >
         <div
@@ -384,6 +391,7 @@ export default function HistoryPage() {
           data-tv-row-key="history:results"
           data-tv-row-wrap="true"
           data-tv-scroll-align="center"
+          data-tv-focus-out-up="selector:[data-tv-section='history-filters'] input, [data-tv-section='history-filters'] select"
           className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 xl:grid-cols-8 2xl:grid-cols-9"
         >
           {filteredItems.map((item, index) => (

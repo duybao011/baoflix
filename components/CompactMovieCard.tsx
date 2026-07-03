@@ -26,7 +26,7 @@ type CompactMovieCardProps = {
 };
 
 const TV_CARD_FOCUS_CLASS =
-  "focus-visible:scale-[1.025] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.16),0_18px_38px_rgba(0,0,0,0.55)]";
+  "focus-visible:scale-[1.018] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.16),0_18px_38px_rgba(0,0,0,0.55)]";
 
 function getBadgeClass(tone: BadgeTone) {
   if (tone === "yellow") return "bg-yellow-300 text-black";
@@ -94,7 +94,7 @@ export default function CompactMovieCard({
   return (
     <article
       data-tv-card="compact-movie"
-      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/80 focus-within:ring-offset-2 focus-within:ring-offset-black"
+      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/90 focus-within:ring-offset-2 focus-within:ring-offset-black focus-within:shadow-[0_0_0_4px_rgba(250,204,21,0.16),0_16px_34px_rgba(0,0,0,0.5)]"
     >
       <Link
         href={href}
