@@ -463,10 +463,42 @@ function focusRailFromContent(pathname: string) {
 
 function focusContentFromRail(pathname: string) {
   const rememberedContent = getRememberedFocusable(`${pathname}:content`);
-  const target =
-    rememberedContent ||
-    getFirstFocusableInside("main [data-tv-scope]") ||
-    getFirstFocusableInside("main");
+
+  if (rememberedContent && !isInsideTvRail(rememberedContent)) {
+    focusElement(rememberedContent, pathname);
+    return true;
+  }
+
+  const selectors = [
+    "[data-tv-section='top-actions'] [data-tv-default]",
+    "[data-tv-section='top-actions'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='top-actions'] button:not([disabled]):not([data-tv-skip])",
+    "[data-tv-section='search-strip'] input:not([disabled])",
+    "[data-tv-section='search-strip'] button:not([disabled]):not([data-tv-skip])",
+    "[data-tv-section='continue'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='filter-results'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='history-results'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='china-series'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='custom'] a[href]:not([data-tv-skip])",
+    "[data-tv-section='favorites'] a[href]:not([data-tv-skip])",
+  ];
+
+  for (const selector of selectors) {
+    const candidates = Array.from(document.querySelectorAll<HTMLElement>(selector));
+    const target = candidates.find((element) => {
+      return element.tabIndex !== -1 && isVisibleElement(element) && !isInsideTvRail(element);
+    });
+
+    if (target) {
+      focusElement(target, pathname);
+      return true;
+    }
+  }
+
+  const mainScope = getMainScope();
+  const main = document.querySelector<HTMLElement>("main");
+  const root = mainScope || main || document;
+  const target = getFocusableElements(root).find((element) => !isInsideTvRail(element));
 
   if (!target) return false;
   focusElement(target, pathname);
@@ -1730,18 +1762,18 @@ export default function TvRemoteNavigator() {
       const nextElement = getLinearCandidate(current, root, focusableElements, direction, pathname);
 
       if (!nextElement || nextElement === current) {
+        if (handleFocusOutRule(current, direction, pathname)) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+
         if (
           !openModalScope &&
           !activeIsInsideVisibleOverlay &&
           !activeSearchKeyboard &&
           focusPageSectionBoundary(current, direction, pathname)
         ) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-
-        if (handleFocusOutRule(current, direction, pathname)) {
           event.preventDefault();
           event.stopPropagation();
           return;
