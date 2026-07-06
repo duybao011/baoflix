@@ -17,6 +17,14 @@ const FOCUSABLE_SELECTOR = [
 
 const TV_SESSION_KEY = "baoflix_tv_mode";
 const TV_LOCAL_KEY = "baoflix_tv_mode";
+const NAVIGATOR_ACTIVE_FLAG = "__baoflixTvNavigatorActive";
+
+function isTvNavigatorActive() {
+  if (typeof window === "undefined") return false;
+
+  const flags = window as unknown as Record<string, boolean | undefined>;
+  return Boolean(flags[NAVIGATOR_ACTIVE_FLAG]);
+}
 
 function isLikelyTvDevice() {
   if (typeof navigator === "undefined" || typeof window === "undefined") {
@@ -146,6 +154,8 @@ export default function TvAutoFocus() {
     if (!enabled) return;
 
     const timer = window.setTimeout(() => {
+      if (isTvNavigatorActive()) return;
+
       const modal = document.querySelector<HTMLElement>("[data-tv-modal][data-tv-scope]");
 
       const scope =
@@ -161,8 +171,6 @@ export default function TvAutoFocus() {
       if (!scope) return;
 
       const restored = restoreLastTvFocus(scope, undefined, {
-        // Modal chọn tập nên ưu tiên data-tv-default/current episode,
-        // tránh fallback theo index của focus ngoài trang.
         allowIndexFallback: !modal,
       });
 
@@ -182,7 +190,7 @@ export default function TvAutoFocus() {
       if (firstFocusable) {
         focusElement(firstFocusable);
       }
-    }, 160);
+    }, 220);
 
     return () => {
       window.clearTimeout(timer);

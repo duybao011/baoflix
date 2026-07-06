@@ -36,6 +36,7 @@ const HISTORY_PATCH_FLAG = "__baoflixTvHistoryPatched";
 const NAV_REPEAT_DEBOUNCE_MS = 42;
 const DEFAULT_FOCUS_LOCK_MS = 120;
 const FOCUS_LOCK_EVENT_NAME = "baoflix-tv-focus-lock";
+const NAVIGATOR_ACTIVE_FLAG = "__baoflixTvNavigatorActive";
 
 function getUserAgent() {
   if (typeof navigator === "undefined") return "";
@@ -961,6 +962,18 @@ function rememberRoute(route = getCurrentRoute()) {
   writeRouteStack(stack);
 }
 
+function replaceRememberedRoute(route = getCurrentRoute()) {
+  const stack = readRouteStack();
+  const last = stack[stack.length - 1];
+
+  if (last === route) return;
+
+  if (stack.length) stack[stack.length - 1] = route;
+  else stack.push(route);
+
+  writeRouteStack(stack);
+}
+
 function popRouteTarget(current = getCurrentRoute()) {
   const stack = readRouteStack().filter(Boolean);
 
@@ -978,9 +991,13 @@ function installRouteWatcher() {
   if (w[HISTORY_PATCH_FLAG]) return;
   w[HISTORY_PATCH_FLAG] = true;
 
-  const notify = () => {
+  const notify = (action: "push" | "replace" | "pop" = "push") => {
     window.setTimeout(() => {
-      window.dispatchEvent(new Event(ROUTE_EVENT_NAME));
+      window.dispatchEvent(
+        new CustomEvent(ROUTE_EVENT_NAME, {
+          detail: { action },
+        })
+      );
     }, 0);
   };
 
@@ -989,15 +1006,17 @@ function installRouteWatcher() {
 
   window.history.pushState = function pushState(...args) {
     const result = oldPushState.apply(this, args);
-    notify();
+    notify("push");
     return result;
   };
 
   window.history.replaceState = function replaceState(...args) {
     const result = oldReplaceState.apply(this, args);
-    notify();
+    notify("replace");
     return result;
   };
+
+  window.addEventListener("popstate", () => notify("pop"));
 }
 
 function getFallbackBackHref(path = window.location.pathname) {
@@ -1114,15 +1133,12 @@ function jumpToPageSection(selector: string, pathname: string) {
 }
 
 function getFirstSectionFocusable(section: HTMLElement) {
-  return (
-    getDefaultFocusable(section) ||
-    getFocusableElements(section)[0] ||
-    null
-  );
+  return getDefaultFocusable(section) || getFocusableElements(section)[0] || null;
 }
 
 function getVisibleMainSections() {
   const main = document.querySelector<HTMLElement>("main") || document.body;
+
   return Array.from(main.querySelectorAll<HTMLElement>("[data-tv-section]"))
     .filter(isVisibleElement)
     .filter((section) => getFocusableElements(section).length > 0);
@@ -1134,6 +1150,7 @@ function focusFirstContentSection(pathname: string) {
   const target = preferred ? getFirstSectionFocusable(preferred) : getFirstMainFocusableElement();
 
   if (!target) return false;
+
   focusElement(target, pathname);
   return true;
 }
@@ -1290,23 +1307,40 @@ export default function TvRemoteNavigator() {
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    const w = window as unknown as Record<string, boolean | undefined>;
+    w[NAVIGATOR_ACTIVE_FLAG] = enabled;
+
+    if (!enabled) {
+      return () => {
+        w[NAVIGATOR_ACTIVE_FLAG] = false;
+      };
+    }
 
     installRouteWatcher();
     focusLockUntilRef.current = nowMs() + DEFAULT_FOCUS_LOCK_MS;
     rememberRoute(getCurrentRoute());
 
-    function rememberCurrentRoute() {
+    function rememberCurrentRoute(event?: Event) {
       focusLockUntilRef.current = nowMs() + DEFAULT_FOCUS_LOCK_MS;
+
+      const detail = (event as CustomEvent<{ action?: "push" | "replace" | "pop" }> | undefined)?.detail;
+      const action = detail?.action || "push";
+
+      if (action === "replace" || action === "pop") {
+        replaceRememberedRoute(getCurrentRoute());
+        return;
+      }
+
       rememberRoute(getCurrentRoute());
     }
 
-    window.addEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute);
+    window.addEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute as EventListener);
     window.addEventListener("popstate", rememberCurrentRoute);
     window.addEventListener("hashchange", rememberCurrentRoute);
 
     return () => {
-      window.removeEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute);
+      w[NAVIGATOR_ACTIVE_FLAG] = false;
+      window.removeEventListener(ROUTE_EVENT_NAME, rememberCurrentRoute as EventListener);
       window.removeEventListener("popstate", rememberCurrentRoute);
       window.removeEventListener("hashchange", rememberCurrentRoute);
     };
