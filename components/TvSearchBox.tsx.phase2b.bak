@@ -398,68 +398,15 @@ export default function TvSearchBox() {
           data-tv-row-key="search:keyboard"
           data-tv-row-wrap="true"
           data-tv-scroll-align="center"
-          data-tv-scroll-padding="72"
-          data-tv-keyboard-panel="search"
           data-tv-focus-out-up="selector:[data-tv-keyboard-input]"
-          className="mt-1.5 rounded-xl border border-white/10 bg-black/50 p-1.5 shadow-2xl shadow-black/35"
+          className="mt-1.5 rounded-xl border border-white/10 bg-black/40 p-1.5"
         >
           <div className="grid gap-1">
-            <div
-              data-tv-row
-              data-tv-row-key="search-keyboard:header"
-              className="mb-1 grid grid-cols-[1fr_auto] gap-1.5"
-            >
-              <div className="min-h-8 truncate rounded-lg border border-white/10 bg-white/[0.045] px-2.5 py-1.5 text-[11px] font-black text-slate-200">
-                {keyword.trim() ? keyword : "Nhập tên phim..."}
-              </div>
-
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => dismissKeyboard("tv-search:input")}
-                data-tv-focus-key="tv-search-keyboard:close"
-                className={[
-                  "min-h-8 rounded-lg border border-white/10 bg-white/5 px-3 text-[11px] font-black text-white hover:bg-white/10",
-                  TV_FOCUS_CLASS,
-                ].join(" ")}
-              >
-                Đóng
-              </button>
-            </div>
-
-            {hydrated && history.length > 0 && (
-              <div
-                data-tv-row
-                data-tv-row-key="search-keyboard:suggestions"
-                data-tv-row-wrap="true"
-                data-tv-row-loop="true"
-                className="mb-1 flex flex-wrap justify-center gap-1"
-              >
-                {history.slice(0, 4).map((item) => (
-                  <button
-                    key={`keyboard-suggestion-${item}`}
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => go(item)}
-                    data-tv-focus-key={`tv-search-keyboard:suggest:${item}`}
-                    className={[
-                      "max-w-[120px] truncate rounded-lg border border-yellow-300/25 bg-yellow-300/10 px-2 py-1.5 text-[10px] font-black text-yellow-100 hover:bg-yellow-300 hover:text-black",
-                      TV_FOCUS_CLASS,
-                    ].join(" ")}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            )}
-
             {TV_KEYBOARD_ROWS.map((row, rowIndex) => (
               <div
                 key={row.join("")}
                 data-tv-row
-                data-tv-row-key={`search-keyboard:letters:${rowIndex}`}
                 data-tv-row-wrap="true"
-                data-tv-row-loop="true"
                 className="flex flex-wrap justify-center gap-1.5"
               >
                 {row.map((keyValue) => (
@@ -480,13 +427,7 @@ export default function TvSearchBox() {
               </div>
             ))}
 
-            <div
-              data-tv-row
-              data-tv-row-key="search-keyboard:actions"
-              data-tv-row-wrap="true"
-              data-tv-row-loop="true"
-              className="mt-1 grid grid-cols-5 gap-1"
-            >
+            <div data-tv-row data-tv-row-key="search-keyboard:actions" data-tv-row-wrap="true" className="mt-1 grid grid-cols-5 gap-1">
               <button
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}

@@ -793,7 +793,7 @@ export default function TvWatchOverlay({
               data-tv-row
               data-tv-row-key="overlay:actions"
               className={[
-                "mt-2 grid grid-cols-4 gap-2",
+                "mt-2 grid grid-cols-3 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             >
@@ -843,20 +843,6 @@ export default function TvWatchOverlay({
               >
                 Player
               </button>
-
-              <button
-                type="button"
-                data-tv-focus-key="overlay:exit"
-                {...hiddenFocusProps}
-                onClick={showExitConfirm}
-                className={[
-                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
-                  SURFACE_BUTTON_CLASS,
-                  TV_FOCUS_CLASS,
-                ].join(" ")}
-              >
-                Thoát
-              </button>
             </div>
           </div>
         )}
@@ -864,8 +850,6 @@ export default function TvWatchOverlay({
         {panelOpen && (
           <div
             data-tv-panel={overlayPanel || undefined}
-            data-tv-scroll-align="center"
-            data-tv-scroll-padding="72"
             className="pointer-events-auto mx-auto max-h-[48vh] w-full max-w-[760px] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#070b12]/[0.92] p-3 shadow-[0_18px_56px_rgba(0,0,0,0.62)] backdrop-blur-xl min-[1280px]:max-w-[840px]"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
@@ -1007,9 +991,6 @@ export default function TvWatchOverlay({
                   data-tv-row-key="overlay:episode-grid"
                   data-tv-row-wrap="true"
                   data-tv-scroll-align="center"
-                  data-tv-scroll-padding="56"
-                  data-tv-focus-out-up="selector:[data-tv-episode-chunks] button:not([disabled]), [data-tv-focus-key='overlay-tab:episodes']"
-                  data-tv-focus-out-down="focus-key:overlay:full-episode-list"
                   className="grid max-h-[30vh] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6"
                 >
                   {episodeItems.map(({ episode, episodeIndex, href }) => {
@@ -1061,11 +1042,7 @@ export default function TvWatchOverlay({
               <div
                 data-tv-panel="sources"
                 data-tv-row
-                data-tv-row-key="overlay:sources-grid"
                 data-tv-row-wrap="true"
-                data-tv-scroll-align="center"
-                data-tv-scroll-padding="56"
-                data-tv-focus-out-up="focus-key:overlay-tab:sources"
                 className="grid max-h-[34vh] gap-2 overflow-y-auto pr-1"
               >
                 {sameEpisodeServerLinks.map((item) => {
