@@ -875,36 +875,22 @@ function getLinearCandidate(
   const nextRow = rows[rowIndex + 1];
   const currentEntry = currentRow[itemIndex];
   const rowContainer = current.closest<HTMLElement>("[data-tv-row]");
-  const shouldLoopX =
-    rowContainer?.dataset.tvRowLoop === "true" ||
-    rowContainer?.dataset.tvRowLoopX === "true" ||
-    rowContainer?.dataset.tvRowLoopAll === "true";
-
-  const shouldLoopY =
-    rowContainer?.dataset.tvRowLoopY === "true" ||
-    rowContainer?.dataset.tvRowLoopAll === "true";
-
-  const shouldLoopDown = shouldLoopY || rowContainer?.dataset.tvRowLoopDown === "true";
-  const shouldLoopUp = shouldLoopY || rowContainer?.dataset.tvRowLoopUp === "true";
+  const shouldLoop = rowContainer?.dataset.tvRowLoop === "true";
 
   if (direction === "right") {
-    return currentRow[itemIndex + 1]?.element || (shouldLoopX ? currentRow[0]?.element : current);
+    return currentRow[itemIndex + 1]?.element || (shouldLoop ? currentRow[0]?.element : current);
   }
 
   if (direction === "left") {
-    return currentRow[itemIndex - 1]?.element || (shouldLoopX ? currentRow[currentRow.length - 1]?.element : current);
+    return currentRow[itemIndex - 1]?.element || (shouldLoop ? currentRow[currentRow.length - 1]?.element : current);
   }
 
   if (direction === "down") {
-    if (nextRow) return getSmartRowCandidate(nextRow, currentEntry.rect, pathname);
-    return shouldLoopDown && rows[0] ? getSmartRowCandidate(rows[0], currentEntry.rect, pathname) : current;
+    return nextRow ? getSmartRowCandidate(nextRow, currentEntry.rect, pathname) : current;
   }
 
   if (direction === "up") {
-    if (previousRow) return getSmartRowCandidate(previousRow, currentEntry.rect, pathname);
-    return shouldLoopUp && rows[rows.length - 1]
-      ? getSmartRowCandidate(rows[rows.length - 1], currentEntry.rect, pathname)
-      : current;
+    return previousRow ? getSmartRowCandidate(previousRow, currentEntry.rect, pathname) : current;
   }
 
   return null;
