@@ -1144,9 +1144,14 @@ function getVisibleMainSections() {
     .filter((section) => getFocusableElements(section).length > 0);
 }
 
-function focusFirstContentSection(pathname: string) {
+function focusFirstContentSection(pathname: string, from?: HTMLElement) {
   const sections = getVisibleMainSections();
-  const preferred = sections.find((section) => !section.hasAttribute("data-tv-page-chrome")) || sections[0];
+  const currentSection = from?.closest<HTMLElement>("[data-tv-section]");
+  const preferred =
+    sections.find((section) => section !== currentSection && !section.hasAttribute("data-tv-page-chrome")) ||
+    sections.find((section) => section !== currentSection) ||
+    sections[0];
+
   const target = preferred ? getFirstSectionFocusable(preferred) : getFirstMainFocusableElement();
 
   if (!target) return false;
@@ -1160,7 +1165,7 @@ function focusPageSectionBoundary(current: HTMLElement, direction: Direction, pa
   if (current.closest("[data-tv-overlay='watch'], [data-tv-modal], [data-tv-search-keyboard]")) return false;
 
   if (direction === "down" && current.closest("[data-tv-page-top-actions]")) {
-    return focusFirstContentSection(pathname);
+    return focusFirstContentSection(pathname, current);
   }
 
   const currentSection = current.closest<HTMLElement>("[data-tv-section]");
@@ -1324,7 +1329,10 @@ export default function TvRemoteNavigator() {
       focusLockUntilRef.current = nowMs() + DEFAULT_FOCUS_LOCK_MS;
 
       const detail = (event as CustomEvent<{ action?: "push" | "replace" | "pop" }> | undefined)?.detail;
-      const action = detail?.action || "push";
+      const action =
+        event?.type === "popstate"
+          ? "pop"
+          : detail?.action || "push";
 
       if (action === "replace" || action === "pop") {
         replaceRememberedRoute(getCurrentRoute());
@@ -1566,7 +1574,7 @@ export default function TvRemoteNavigator() {
         !activeSearchKeyboard &&
         activeElement instanceof HTMLElement &&
         activeElement.closest("[data-tv-page-top-actions]") &&
-        focusFirstContentSection(pathname)
+        focusFirstContentSection(pathname, activeElement)
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -1699,6 +1707,8 @@ export default function TvRemoteNavigator() {
       const modalScope = getModalScope();
       const activeScope = getActiveScope(activeElement);
       const activeHeader = activeElement instanceof HTMLElement ? activeElement.closest<HTMLElement>("header") : null;
+      // Priority: modal/keyboard/scope/header/overlay/page. This prevents page navigation
+      // from stealing D-pad movement while a transient UI owns focus.
       const root = modalScope || activeSearchKeyboard || activeScope || activeHeader || visibleOverlay || getMainScope() || document;
       const focusableElements = getFocusableElements(root);
 
