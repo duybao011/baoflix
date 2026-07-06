@@ -412,34 +412,135 @@ function getScrollAlignment(element: HTMLElement) {
   return element.closest<HTMLElement>("[data-tv-scroll-align]")?.dataset.tvScrollAlign || "nearest";
 }
 
-function isElementComfortablyInViewport(element: HTMLElement) {
-  const rect = element.getBoundingClientRect();
-  const padding = Math.min(120, Math.max(64, window.innerHeight * 0.12));
+function getScrollPadding(element: HTMLElement, containerHeight = window.innerHeight) {
+  const raw = element.closest<HTMLElement>("[data-tv-scroll-padding]")?.dataset.tvScrollPadding;
+  const parsed = raw ? Number(raw) : Number.NaN;
 
-  return rect.top >= padding && rect.bottom <= window.innerHeight - padding;
+  if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  return Math.min(120, Math.max(56, containerHeight * 0.12));
 }
 
-function focusElement(element: HTMLElement, pathname?: string) {
-  element.focus({ preventScroll: true });
+function isScrollableElement(element: HTMLElement) {
+  const style = window.getComputedStyle(element);
+  const overflowY = `${style.overflowY} ${style.overflow}`;
+  const overflowX = `${style.overflowX} ${style.overflow}`;
+  const canScrollY = element.scrollHeight > element.clientHeight + 2 && /(auto|scroll|overlay)/.test(overflowY);
+  const canScrollX = element.scrollWidth > element.clientWidth + 2 && /(auto|scroll|overlay)/.test(overflowX);
 
-  const align = getScrollAlignment(element);
+  return canScrollY || canScrollX;
+}
+
+function getScrollableAncestors(element: HTMLElement) {
+  const ancestors: HTMLElement[] = [];
+  let current = element.parentElement;
+
+  while (current && current !== document.body) {
+    if (isScrollableElement(current)) ancestors.push(current);
+    current = current.parentElement;
+  }
+
+  return ancestors;
+}
+
+function getViewportRect() {
+  return {
+    top: 0,
+    left: 0,
+    bottom: window.innerHeight,
+    right: window.innerWidth,
+    width: window.innerWidth,
+    height: window.innerHeight,
+  };
+}
+
+function isElementComfortablyInRect(
+  element: HTMLElement,
+  rect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height" | "width">
+) {
+  const elementRect = element.getBoundingClientRect();
+  const padding = getScrollPadding(element, rect.height);
+  const horizontalPadding = Math.min(48, Math.max(20, rect.width * 0.04));
+
+  return (
+    elementRect.top >= rect.top + padding &&
+    elementRect.bottom <= rect.bottom - padding &&
+    elementRect.left >= rect.left + horizontalPadding &&
+    elementRect.right <= rect.right - horizontalPadding
+  );
+}
+
+function getScrollDeltaForRect(
+  elementRect: DOMRect,
+  containerRect: Pick<DOMRect, "top" | "bottom" | "left" | "right" | "height" | "width">,
+  align: string,
+  padding: number
+) {
   const shouldCenter = align === "center" || align === "force-center";
+  let top = 0;
+  let left = 0;
+
+  if (shouldCenter) {
+    top = elementRect.top + elementRect.height / 2 - (containerRect.top + containerRect.height / 2);
+    left = elementRect.left + elementRect.width / 2 - (containerRect.left + containerRect.width / 2);
+  } else {
+    if (elementRect.top < containerRect.top + padding) {
+      top = elementRect.top - (containerRect.top + padding);
+    } else if (elementRect.bottom > containerRect.bottom - padding) {
+      top = elementRect.bottom - (containerRect.bottom - padding);
+    }
+
+    const horizontalPadding = Math.min(72, Math.max(24, containerRect.width * 0.06));
+
+    if (elementRect.left < containerRect.left + horizontalPadding) {
+      left = elementRect.left - (containerRect.left + horizontalPadding);
+    } else if (elementRect.right > containerRect.right - horizontalPadding) {
+      left = elementRect.right - (containerRect.right - horizontalPadding);
+    }
+  }
+
+  return { top, left };
+}
+
+function scrollElementIntoAnchor(element: HTMLElement, align = getScrollAlignment(element)) {
+  const shouldCenter = align === "center" || align === "force-center";
+
+  getScrollableAncestors(element).forEach((container) => {
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const padding = getScrollPadding(element, containerRect.height);
+    const delta = getScrollDeltaForRect(elementRect, containerRect, align, padding);
+
+    if (Math.abs(delta.top) > 1 || Math.abs(delta.left) > 1) {
+      container.scrollBy({
+        top: delta.top,
+        left: delta.left,
+        behavior: "auto",
+      });
+    }
+  });
 
   element.scrollIntoView({
     behavior: "auto",
     block: shouldCenter ? "center" : "nearest",
     inline: shouldCenter ? "center" : "nearest",
   });
+}
+
+function isElementComfortablyInViewport(element: HTMLElement) {
+  return isElementComfortablyInRect(element, getViewportRect());
+}
+
+function focusElement(element: HTMLElement, pathname?: string) {
+  element.focus({ preventScroll: true });
+
+  const align = getScrollAlignment(element);
+  scrollElementIntoAnchor(element, align);
 
   window.setTimeout(() => {
     if (!isVisibleElement(element)) return;
     if (isElementComfortablyInViewport(element)) return;
 
-    element.scrollIntoView({
-      behavior: "auto",
-      block: "center",
-      inline: "nearest",
-    });
+    scrollElementIntoAnchor(element, "center");
   }, 0);
 
   if (pathname) rememberFocus(pathname, element);
@@ -700,7 +801,11 @@ function buildRows(root: ParentNode, elements: HTMLElement[]) {
   });
 }
 
-function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect, pathname?: string) {
+function getHorizontalOverlap(a: DOMRect, b: DOMRect) {
+  return Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+}
+
+function getSmartRowCandidate(row: FocusEntry[], currentRect: DOMRect, pathname?: string) {
   const rowKey = row[0]?.rowKey;
 
   if (pathname && rowKey) {
@@ -709,17 +814,29 @@ function getClosestByHorizontalCenter(row: FocusEntry[], currentRect: DOMRect, p
   }
 
   const currentCenter = currentRect.left + currentRect.width / 2;
+  const currentWidth = Math.max(1, currentRect.width);
 
   return (
     row.reduce<FocusEntry | null>((best, entry) => {
       if (!best) return entry;
 
+      const bestOverlap = getHorizontalOverlap(currentRect, best.rect) / currentWidth;
+      const entryOverlap = getHorizontalOverlap(currentRect, entry.rect) / currentWidth;
+
+      if (Math.abs(entryOverlap - bestOverlap) > 0.08) {
+        return entryOverlap > bestOverlap ? entry : best;
+      }
+
       const bestCenter = best.rect.left + best.rect.width / 2;
       const entryCenter = entry.rect.left + entry.rect.width / 2;
+      const bestDistance = Math.abs(bestCenter - currentCenter);
+      const entryDistance = Math.abs(entryCenter - currentCenter);
 
-      return Math.abs(entryCenter - currentCenter) < Math.abs(bestCenter - currentCenter)
-        ? entry
-        : best;
+      if (Math.abs(entryDistance - bestDistance) > 2) {
+        return entryDistance < bestDistance ? entry : best;
+      }
+
+      return entry.rect.top < best.rect.top ? entry : best;
     }, null)?.element || null
   );
 }
@@ -769,11 +886,11 @@ function getLinearCandidate(
   }
 
   if (direction === "down") {
-    return nextRow ? getClosestByHorizontalCenter(nextRow, currentEntry.rect, pathname) : current;
+    return nextRow ? getSmartRowCandidate(nextRow, currentEntry.rect, pathname) : current;
   }
 
   if (direction === "up") {
-    return previousRow ? getClosestByHorizontalCenter(previousRow, currentEntry.rect, pathname) : current;
+    return previousRow ? getSmartRowCandidate(previousRow, currentEntry.rect, pathname) : current;
   }
 
   return null;
