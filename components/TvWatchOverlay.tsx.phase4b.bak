@@ -698,7 +698,7 @@ export default function TvWatchOverlay({
         {overlayMode === "confirm-exit" && (
           <div
             data-tv-exit-confirm="true"
-            className="pointer-events-auto mx-auto mb-2 w-full max-w-[420px] rounded-3xl border border-white/10 bg-[#080c14]/[0.94] p-4 text-center shadow-[0_18px_54px_rgba(0,0,0,0.66)] backdrop-blur-xl"
+            className="pointer-events-auto mx-auto mb-2 w-full max-w-[440px] rounded-2xl border border-white/10 bg-black/[0.76] p-3 text-center shadow-2xl backdrop-blur-md"
           >
             <p className="text-sm font-black text-white">Thoát khỏi phim?</p>
             <p className="mt-1 text-[11px] font-bold text-slate-300">Bấm Back lần nữa để rời phim, hoặc chọn xem tiếp.</p>
@@ -740,7 +740,7 @@ export default function TvWatchOverlay({
               data-tv-row
               data-tv-row-key="overlay:transport"
               className={[
-                "grid grid-cols-3 gap-3",
+                "grid grid-cols-3 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             
@@ -752,7 +752,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={() => handleSeek("backward")}
                 className={[
-                  "flex min-h-[44px] items-center justify-center rounded-2xl px-4 text-[13px] font-black min-[1280px]:min-h-[48px] min-[1280px]:text-sm",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -767,7 +767,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={handleTogglePlay}
                 className={[
-                  "flex min-h-[44px] items-center justify-center rounded-2xl px-4 text-[13px] font-black min-[1280px]:min-h-[48px] min-[1280px]:text-sm",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   PRIMARY_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -782,7 +782,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={() => handleSeek("forward")}
                 className={[
-                  "flex min-h-[44px] items-center justify-center rounded-2xl px-4 text-[13px] font-black min-[1280px]:min-h-[48px] min-[1280px]:text-sm",
+                  "flex min-h-[34px] items-center justify-center px-3 text-[12px] font-black min-[1280px]:min-h-[38px] min-[1280px]:text-[13px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -795,7 +795,7 @@ export default function TvWatchOverlay({
               data-tv-row
               data-tv-row-key="overlay:actions"
               className={[
-                "mt-3 grid grid-cols-4 gap-2.5",
+                "mt-2 grid grid-cols-4 gap-2",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             
@@ -808,7 +808,7 @@ export default function TvWatchOverlay({
                 onClick={() => openPanel("episodes")}
                 disabled={!currentEpisodes.length}
                 className={[
-                  "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   !currentEpisodes.length ? "opacity-40" : "",
                   TV_FOCUS_CLASS,
@@ -824,7 +824,7 @@ export default function TvWatchOverlay({
                 onClick={() => openPanel("sources")}
                 disabled={!hasMultipleServers}
                 className={[
-                  "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   !hasMultipleServers ? "opacity-40" : "",
                   TV_FOCUS_CLASS,
@@ -839,7 +839,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={handleFocusPlayer}
                 className={[
-                  "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -853,7 +853,7 @@ export default function TvWatchOverlay({
                 {...hiddenFocusProps}
                 onClick={showExitConfirm}
                 className={[
-                  "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
+                  "flex min-h-[32px] items-center justify-center px-3 text-[11px] font-black min-[1280px]:min-h-[36px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
                   TV_FOCUS_CLASS,
                 ].join(" ")}
@@ -869,7 +869,7 @@ export default function TvWatchOverlay({
             data-tv-panel={overlayPanel || undefined}
             data-tv-scroll-align="center"
             data-tv-scroll-padding="72"
-            className="pointer-events-auto mx-auto max-h-[54vh] w-full max-w-[780px] overflow-hidden rounded-3xl border border-white/[0.12] bg-[#070b12]/[0.96] p-4 shadow-[0_22px_68px_rgba(0,0,0,0.68)] backdrop-blur-xl min-[1280px]:max-w-[880px]"
+            className="pointer-events-auto mx-auto max-h-[48vh] w-full max-w-[760px] overflow-hidden rounded-2xl border border-white/[0.12] bg-[#070b12]/[0.92] p-3 shadow-[0_18px_56px_rgba(0,0,0,0.62)] backdrop-blur-xl min-[1280px]:max-w-[840px]"
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -940,7 +940,7 @@ export default function TvWatchOverlay({
                         href={previousHref}
                         data-tv-focus-key="overlay:previous-episode"
                         className={[
-                          "flex min-h-[40px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] px-3 text-center text-[11px] font-black text-white transition hover:bg-white/15",
+                          "flex min-h-[34px] items-center justify-center rounded-xl border border-white/10 bg-white/[0.08] px-3 text-center text-[11px] font-black text-white transition hover:bg-white/15",
                           TV_FOCUS_CLASS,
                         ].join(" ")}
                       >
@@ -949,7 +949,7 @@ export default function TvWatchOverlay({
                     ) : (
                       <button
                         disabled
-                        className="flex min-h-[40px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 text-center text-[11px] font-black text-white opacity-35"
+                        className="flex min-h-[34px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-center text-[11px] font-black text-white opacity-35"
                       >
                         ← Tập trước
                       </button>
@@ -960,7 +960,7 @@ export default function TvWatchOverlay({
                         href={nextHref}
                         data-tv-focus-key="overlay:next-episode"
                         className={[
-                          "flex min-h-[40px] items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] px-3 text-center text-[11px] font-black text-white transition hover:bg-white/15",
+                          "flex min-h-[34px] items-center justify-center rounded-xl border border-white/10 bg-white/[0.08] px-3 text-center text-[11px] font-black text-white transition hover:bg-white/15",
                           TV_FOCUS_CLASS,
                         ].join(" ")}
                       >
@@ -969,7 +969,7 @@ export default function TvWatchOverlay({
                     ) : (
                       <button
                         disabled
-                        className="flex min-h-[40px] items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 text-center text-[11px] font-black text-white opacity-35"
+                        className="flex min-h-[34px] items-center justify-center rounded-xl border border-white/10 bg-white/5 px-3 text-center text-[11px] font-black text-white opacity-35"
                       >
                         Tập sau →
                       </button>
@@ -1019,7 +1019,7 @@ export default function TvWatchOverlay({
                   data-tv-scroll-padding="56"
                   data-tv-focus-out-up="selector:[data-tv-episode-chunks] button:not([disabled]), [data-tv-focus-key='overlay-tab:episodes']"
                   data-tv-focus-out-down="focus-key:overlay:full-episode-list"
-                  className="grid max-h-[34vh] grid-cols-4 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-5 min-[1280px]:grid-cols-6"
+                  className="grid max-h-[30vh] grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6"
                 >
                   {episodeItems.map(({ episode, episodeIndex, href }) => {
                     const watchedKey = getWatchedKey(movie.slug, safeServerIndex, episodeIndex);
@@ -1034,7 +1034,7 @@ export default function TvWatchOverlay({
                         data-tv-panel-default={isCurrent ? "episodes" : undefined}
                         data-tv-focus-key={`overlay-episode:${episodeIndex}`}
                         className={[
-                          "relative flex min-h-[40px] items-center justify-center rounded-2xl border px-2 text-center text-[11px] font-black transition",
+                          "relative flex min-h-[34px] items-center justify-center rounded-xl border px-2 text-center text-[10px] font-black transition",
                           isCurrent
                             ? "border-yellow-300 bg-yellow-300 text-black shadow-[0_0_18px_rgba(250,204,21,0.26)]"
                             : isWatched
@@ -1057,7 +1057,7 @@ export default function TvWatchOverlay({
                   data-tv-focus-key="overlay:full-episode-list"
                   onClick={openEpisodePanelFromOverlay}
                   className={[
-                    "mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2.5 text-[11px] font-black text-slate-200 hover:bg-white/[0.13]",
+                    "mt-3 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 py-2 text-[11px] font-black text-slate-200 hover:bg-white/[0.12]",
                     TV_FOCUS_CLASS,
                   ].join(" ")}
                 >
@@ -1075,7 +1075,7 @@ export default function TvWatchOverlay({
                 data-tv-scroll-align="center"
                 data-tv-scroll-padding="56"
                 data-tv-focus-out-up="focus-key:overlay-tab:sources"
-                className="grid max-h-[36vh] gap-2.5 overflow-y-auto pr-1"
+                className="grid max-h-[34vh] gap-2 overflow-y-auto pr-1"
               >
                 {sameEpisodeServerLinks.map((item) => {
                   const name = normalizeServerName(item.server.server_name);
@@ -1089,7 +1089,7 @@ export default function TvWatchOverlay({
                       data-tv-panel-default={isCurrent ? "sources" : undefined}
                       data-tv-focus-key={`overlay-source:${item.serverIndex}`}
                       className={[
-                        "rounded-2xl border px-4 py-3.5 text-left text-[12px] font-black transition",
+                        "rounded-xl border px-3 py-3 text-left text-[12px] font-black transition",
                         isCurrent
                           ? "border-yellow-300 bg-yellow-300 text-black"
                           : "border-white/10 bg-white/[0.08] text-white hover:bg-white/15",

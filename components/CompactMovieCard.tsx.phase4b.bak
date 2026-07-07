@@ -26,7 +26,7 @@ type CompactMovieCardProps = {
 };
 
 const TV_CARD_FOCUS_CLASS =
-  "focus-visible:scale-[1.014] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.15),0_18px_38px_rgba(0,0,0,0.55)]";
+  "focus-visible:scale-[1.018] focus-visible:border-yellow-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/90 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:shadow-[0_0_0_5px_rgba(250,204,21,0.16),0_18px_38px_rgba(0,0,0,0.55)]";
 
 function getBadgeClass(tone: BadgeTone) {
   if (tone === "yellow") return "bg-yellow-300 text-black";
@@ -94,26 +94,26 @@ export default function CompactMovieCard({
   return (
     <article
       data-tv-card="compact-movie"
-      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#10141f] transition hover:-translate-y-0.5 hover:border-yellow-300/70 hover:bg-[#151b2a] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/90 focus-within:ring-offset-2 focus-within:ring-offset-black focus-within:shadow-[0_0_0_4px_rgba(250,204,21,0.16),0_16px_34px_rgba(0,0,0,0.5)]"
+      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:bg-white/[0.07] focus-within:border-yellow-300 focus-within:ring-2 focus-within:ring-yellow-300/90 focus-within:ring-offset-2 focus-within:ring-offset-black focus-within:shadow-[0_0_0_4px_rgba(250,204,21,0.16),0_16px_34px_rgba(0,0,0,0.5)]"
     >
       <Link
         href={href}
         prefetch={false}
         data-tv-default={tvDefault ? true : undefined}
         data-tv-focus-key={`compact-card:${href}`}
-        className={["block rounded-2xl", TV_CARD_FOCUS_CLASS].join(" ")}
+        className={["block rounded-lg", TV_CARD_FOCUS_CLASS].join(" ")}
       >
         <div className="relative aspect-[2/3] overflow-hidden bg-slate-900">
           <img
             src={getImageUrl(image)}
             alt={title}
-            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.025] group-focus-within:scale-[1.025]"
+            className="h-full w-full object-cover transition duration-200 group-hover:scale-[1.035] group-focus-within:scale-[1.035]"
             loading="lazy"
             decoding="async"
           />
 
           {(bottomPrimary || bottomSecondary) && (
-            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/65 to-transparent p-2 pt-10">
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/75 to-transparent p-1.5 pt-10">
               {bottomPrimary && (
                 <p className="line-clamp-1 text-[10px] font-black text-red-300">
                   {bottomPrimary}
@@ -146,8 +146,8 @@ export default function CompactMovieCard({
           )}
         </div>
 
-        <div className="min-h-[50px] space-y-0.5 p-2">
-          <h2 className="line-clamp-2 text-[12px] font-black leading-tight text-white min-[1280px]:text-[13px]">
+        <div className="min-h-[52px] space-y-0.5 p-1.5">
+          <h2 className="line-clamp-2 text-[11px] font-black leading-tight text-white min-[1280px]:text-[12px]">
             {title}
           </h2>
 
@@ -157,7 +157,7 @@ export default function CompactMovieCard({
 
           {visibleMeta.length > 0 && (
             <div className="flex flex-wrap items-center gap-1 text-[9px] font-bold text-slate-500">
-              {visibleMeta.slice(0, 2).map((item, index) => (
+              {visibleMeta.slice(0, 3).map((item, index) => (
                 <span key={`${item}-${index}`}>
                   {index > 0 ? "• " : ""}
                   {item}
