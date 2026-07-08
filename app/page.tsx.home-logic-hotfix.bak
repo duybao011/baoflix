@@ -86,9 +86,9 @@ export default async function HomePage() {
       <PersonalDashboard />
 
       <ContinueWatching />
-      <MovieGrid sectionId="home-phim-bo" title="Phim bộ" href="/danh-sach/phim-bo" movies={phimBo.items} />
-      <MovieGrid sectionId="home-phim-le" title="Phim lẻ" href="/danh-sach/phim-le" movies={phimLe.items} />
-      <MovieGrid sectionId="home-hoat-hinh" title="Hoạt hình" href="/danh-sach/hoat-hinh" movies={hoatHinh.items} />
+      <MovieGrid title="Phim bộ" href="/danh-sach/phim-bo" movies={phimBo.items} />
+      <MovieGrid title="Phim lẻ" href="/danh-sach/phim-le" movies={phimLe.items} />
+      <MovieGrid title="Hoạt hình" href="/danh-sach/hoat-hinh" movies={hoatHinh.items} />
     </div>
   );
 }
