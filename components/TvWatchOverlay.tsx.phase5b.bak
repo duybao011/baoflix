@@ -413,7 +413,8 @@ export default function TvWatchOverlay({
 
   function openEpisodePanelFromOverlay() {
     clearHideTimer();
-    hideOverlay({ focusPlayer: false });
+    setActiveChunkIndex(currentChunkIndex);
+    setOverlayMode("panel");
     window.setTimeout(onOpenEpisodePanel, 0);
   }
 

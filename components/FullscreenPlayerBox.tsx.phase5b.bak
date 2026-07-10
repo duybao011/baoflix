@@ -292,8 +292,23 @@ export default function FullscreenPlayerBox({
         {children}
       </div>
 
-      {false && tvImmersive && playerHud && (
-        <div aria-hidden="true" />
+      {tvImmersive && playerHud && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[70] -translate-x-1/2 -translate-y-1/2 rounded-xl bg-black/60 px-4 py-2 text-center text-white shadow-xl backdrop-blur">
+          <div className="text-xl font-black">
+            {playerHud.type === "seek"
+              ? `${playerHud.delta && playerHud.delta > 0 ? "+" : ""}${playerHud.delta || 0}s`
+              : playerHud.type === "play"
+                ? "▶"
+                : "Ⅱ"}
+          </div>
+
+          {playerHud.type === "seek" && (
+            <p className="mt-0.5 text-[11px] text-slate-300">
+              {formatTime(playerHud.currentTime)}
+              {playerHud.duration ? ` / ${formatTime(playerHud.duration)}` : ""}
+            </p>
+          )}
+        </div>
       )}
 
       {!tvImmersive && (

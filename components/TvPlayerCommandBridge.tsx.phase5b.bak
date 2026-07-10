@@ -13,7 +13,6 @@ type PlayerCommandAction =
 type PlayerCommand = {
   action?: PlayerCommandAction;
   seconds?: number;
-  handled?: boolean;
 };
 
 type NativeBridge = {
@@ -229,16 +228,12 @@ function handleIframeOnlyCommand(command: PlayerCommand) {
     sendSafePostMessage(command);
   }
 
-  const handled = nativeHandled || focused || Boolean(iframe);
-
-  if (handled) {
-    command.handled = true;
-    emitBridgeHud(command);
-  }
-
-  if (!handled && command.action === "seek") {
+  if (!nativeHandled && command.action === "seek") {
     notifyNativeMissing(command);
   }
+
+  const handled = nativeHandled || focused || Boolean(iframe);
+  if (handled) emitBridgeHud(command);
 
   return handled;
 }
@@ -250,10 +245,7 @@ export default function TvPlayerCommandBridge() {
 
       const command = (event as CustomEvent<PlayerCommand>).detail || {};
 
-      window.setTimeout(() => {
-        if (command.handled) return;
-        handleIframeOnlyCommand(command);
-      }, 0);
+      handleIframeOnlyCommand(command);
     }
 
     window.__baoflixFocusWebPlayer = () => {

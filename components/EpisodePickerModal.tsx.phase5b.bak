@@ -58,7 +58,7 @@ function getInitialGroupIndex(episodeIndex: number) {
   return Math.max(0, Math.floor(episodeIndex / EPISODE_GROUP_SIZE));
 }
 
-function focusModalDefault(serverIndex: number, episodeIndex: number) {
+function focusModalDefault() {
   window.setTimeout(() => {
     const modal = document.querySelector<HTMLElement>(
       "[data-tv-modal='episode-picker']"
@@ -67,12 +67,6 @@ function focusModalDefault(serverIndex: number, episodeIndex: number) {
     if (!modal) return;
 
     const target =
-      modal.querySelector<HTMLElement>(
-        `[data-tv-focus-key="episode-picker:episode:${serverIndex}:${episodeIndex}"]`
-      ) ||
-      modal.querySelector<HTMLElement>(
-        `[data-tv-focus-key="episode-picker:server:${serverIndex}"]`
-      ) ||
       modal.querySelector<HTMLElement>("[data-tv-default]") ||
       modal.querySelector<HTMLElement>("a[href], button:not([disabled])");
 
@@ -80,7 +74,7 @@ function focusModalDefault(serverIndex: number, episodeIndex: number) {
 
     target.focus({ preventScroll: true });
     target.scrollIntoView({
-      behavior: "auto",
+      behavior: "smooth",
       block: "center",
       inline: "center",
     });
@@ -134,8 +128,12 @@ export default function EpisodePickerModal({
   );
 
   useEffect(() => {
-    focusModalDefault(safeServerIndex, safeEpisodeIndex);
-  }, [safeServerIndex, safeEpisodeIndex]);
+    focusModalDefault();
+  }, []);
+
+  useEffect(() => {
+    focusModalDefault();
+  }, [selectedServerIndex, activeGroupIndex]);
 
   function selectServer(serverIndex: number) {
     setSelectedServerIndex(serverIndex);
@@ -158,7 +156,7 @@ export default function EpisodePickerModal({
       data-tv-scope="episode-panel"
       data-tv-lock="true"
       data-tv-modal="episode-picker"
-      className="fixed inset-0 z-[120] flex items-end justify-center overflow-hidden bg-black/75 p-0 backdrop-blur-sm md:items-center md:p-6"
+      className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/75 p-0 backdrop-blur-sm md:items-center md:p-6"
     >
       <section className="flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b0f19] shadow-2xl md:max-h-[86dvh] md:rounded-3xl">
         <div className="shrink-0 border-b border-white/10 p-5">
@@ -245,7 +243,6 @@ export default function EpisodePickerModal({
                     key={`${item.server.server_name}-${item.serverIndex}`}
                     type="button"
                     onClick={() => selectServer(item.serverIndex)}
-                    data-tv-focus-key={`episode-picker:server:${item.serverIndex}`}
                     data-tv-default={active ? true : undefined}
                     className={[
                       "rounded-xl border px-4 py-2 text-sm font-black",
@@ -353,8 +350,6 @@ export default function EpisodePickerModal({
                       <Link
                         key={`${selectedServerIndex}-${episode.name}-${episodeIndex}`}
                         href={getEpisodeUrl(movie.slug, selectedServerIndex, episodeIndex)}
-                        data-tv-focus-key={`episode-picker:episode:${selectedServerIndex}:${episodeIndex}`}
-                        data-tv-episode-current={active ? "true" : undefined}
                         data-tv-default={active ? true : undefined}
                         onClick={onClose}
                         className={[

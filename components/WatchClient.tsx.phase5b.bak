@@ -40,59 +40,6 @@ function normalizeServerName(name?: string) {
   return name || "Server";
 }
 
-function normalizeEpisodeIdentity(value?: string) {
-  return String(value || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-}
-
-function getEpisodeNumber(value?: string) {
-  const match = normalizeEpisodeIdentity(value).match(/\d+(?:\.\d+)?/);
-  return match?.[0] || "";
-}
-
-function findMatchingEpisodeIndex(
-  currentEpisode: { name?: string; slug?: string } | undefined,
-  targetEpisodes: { name?: string; slug?: string }[],
-  fallbackIndex: number
-) {
-  if (!targetEpisodes.length) return -1;
-  if (!currentEpisode) {
-    return Math.min(fallbackIndex, targetEpisodes.length - 1);
-  }
-
-  const currentSlug = normalizeEpisodeIdentity(currentEpisode.slug);
-  const currentName = normalizeEpisodeIdentity(currentEpisode.name);
-  const currentNumber = getEpisodeNumber(currentEpisode.name || currentEpisode.slug);
-
-  const bySlug = currentSlug
-    ? targetEpisodes.findIndex(
-        (item) => normalizeEpisodeIdentity(item.slug) === currentSlug
-      )
-    : -1;
-  if (bySlug >= 0) return bySlug;
-
-  const byName = currentName
-    ? targetEpisodes.findIndex(
-        (item) => normalizeEpisodeIdentity(item.name) === currentName
-      )
-    : -1;
-  if (byName >= 0) return byName;
-
-  const byNumber = currentNumber
-    ? targetEpisodes.findIndex(
-        (item) => getEpisodeNumber(item.name || item.slug) === currentNumber
-      )
-    : -1;
-  if (byNumber >= 0) return byNumber;
-
-  return Math.min(fallbackIndex, targetEpisodes.length - 1);
-}
-
 function detectTvOverlayEnabled() {
   return isTvModeActive({ allowSessionOnDesktop: false });
 }
@@ -232,10 +179,9 @@ export default function WatchClient({
 
         if (!serverEpisodes.length) return null;
 
-        const targetEpisodeIndex = findMatchingEpisodeIndex(
-          episode,
-          serverEpisodes,
-          safeEpisodeIndex
+        const targetEpisodeIndex = Math.min(
+          safeEpisodeIndex,
+          Math.max(serverEpisodes.length - 1, 0)
         );
         const serverEpisode = serverEpisodes[targetEpisodeIndex];
 
@@ -256,7 +202,7 @@ export default function WatchClient({
       episodeIndex: number;
       href: string;
     }[];
-  }, [servers, safeEpisodeIndex, movie.slug, episode]);
+  }, [servers, safeEpisodeIndex, movie.slug]);
 
   const posterUrl = movie.thumb_url || movie.poster_url;
   const nativeVideoUrl = episode?.link_m3u8;

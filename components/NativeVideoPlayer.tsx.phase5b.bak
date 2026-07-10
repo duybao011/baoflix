@@ -56,17 +56,7 @@ function saveVideoProgress(progressKey: string | undefined, progress: StoredVide
   try {
     const map = readProgressMap();
     map[progressKey] = progress;
-
-    const trimmedEntries = Object.entries(map)
-      .sort(([, a], [, b]) => {
-        return Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || "");
-      })
-      .slice(0, 120);
-
-    localStorage.setItem(
-      VIDEO_PROGRESS_KEY,
-      JSON.stringify(Object.fromEntries(trimmedEntries))
-    );
+    localStorage.setItem(VIDEO_PROGRESS_KEY, JSON.stringify(map));
   } catch {
     // Ignore storage errors in restricted TV WebViews.
   }
@@ -344,41 +334,10 @@ export default function NativeVideoPlayer({
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         autoplayQuietly();
       });
-      let networkRecoveryCount = 0;
-      let mediaRecoveryCount = 0;
-
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal) return;
-
-        if (data.type === Hls.ErrorTypes.NETWORK_ERROR && networkRecoveryCount < 2) {
-          networkRecoveryCount += 1;
-          setError("Mạng chập chờn, đang thử tải lại nguồn...");
-          window.setTimeout(() => {
-            try {
-              hls.startLoad();
-            } catch {}
-          }, 900 * networkRecoveryCount);
-          return;
+        if (data.fatal) {
+          setError("Không phát được HLS bằng player native. Hãy thử đổi nguồn.");
         }
-
-        if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveryCount < 2) {
-          mediaRecoveryCount += 1;
-          setError("Luồng phát gặp lỗi, đang phục hồi player...");
-          window.setTimeout(() => {
-            try {
-              hls.recoverMediaError();
-            } catch {}
-          }, 500 * mediaRecoveryCount);
-          return;
-        }
-
-        setError("Không phát được HLS bằng player native. Hãy thử đổi nguồn.");
-      });
-
-      hls.on(Hls.Events.FRAG_LOADED, () => {
-        networkRecoveryCount = 0;
-        mediaRecoveryCount = 0;
-        setError("");
       });
 
       return () => {
