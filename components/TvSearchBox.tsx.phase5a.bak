@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isTvModeActive } from "@/lib/tvMode";
 
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
 const TV_SEARCH_INPUT_ID = "baoflix-tv-search-input";
@@ -84,11 +83,29 @@ function openKey(event: KeyboardEvent<HTMLInputElement>) {
 
 function isTvKeyboardEnabled() {
   if (typeof window === "undefined") return false;
-  if (window.location.pathname === "/tv") return true;
-  return isTvModeActive();
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tv") === "0") return false;
+    if (params.get("tv") === "1") return true;
+    if (window.location.pathname === "/tv") return true;
+
+    const ua = navigator.userAgent.toLowerCase();
+    if (
+      /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview|android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(
+        ua
+      )
+    ) {
+      return true;
+    }
+
+    return sessionStorage.getItem("baoflix_tv_mode") === "1";
+  } catch {
+    return false;
+  }
 }
 
-function requestKeyboard(input: HTMLInputElement | null, openNativeKeyboard = true) {
+function requestKeyboard(input: HTMLInputElement | null) {
   if (!input) return;
 
   try {
@@ -99,8 +116,6 @@ function requestKeyboard(input: HTMLInputElement | null, openNativeKeyboard = tr
       input.focus();
     } catch {}
   }
-
-  if (!openNativeKeyboard) return;
 
   try {
     input.click();
@@ -215,9 +230,8 @@ export default function TvSearchBox() {
     const text = q.trim();
 
     if (!text) {
-      const useTvKeyboard = isTvKeyboardEnabled();
-      requestKeyboard(inputRef.current, !useTvKeyboard);
-      setFocused(useTvKeyboard);
+      requestKeyboard(inputRef.current);
+      setFocused(true);
       return;
     }
 
@@ -236,21 +250,12 @@ export default function TvSearchBox() {
   function schedule() {
     if (suppressKeyboardRef.current) return;
 
-    const useTvKeyboard = isTvKeyboardEnabled();
-    setFocused(useTvKeyboard);
+    setFocused(true);
 
-    if (timer.current) {
-      window.clearTimeout(timer.current);
-      timer.current = null;
-    }
-
-    if (useTvKeyboard) {
-      requestKeyboard(inputRef.current, false);
-      return;
-    }
+    if (timer.current) window.clearTimeout(timer.current);
 
     timer.current = window.setTimeout(() => {
-      requestKeyboard(inputRef.current, true);
+      requestKeyboard(inputRef.current);
       timer.current = null;
     }, 60);
   }
@@ -277,20 +282,14 @@ export default function TvSearchBox() {
   function clearKeyword() {
     setKeyword("");
     setFocused(true);
-
-    if (!isTvKeyboardEnabled()) {
-      window.setTimeout(() => requestKeyboard(inputRef.current, true), 40);
-    }
+    window.setTimeout(() => requestKeyboard(inputRef.current), 40);
   }
 
   function clearHistory() {
     localStorage.removeItem(SEARCH_HISTORY_KEY);
     setHistory([]);
     setFocused(true);
-
-    if (!isTvKeyboardEnabled()) {
-      window.setTimeout(() => requestKeyboard(inputRef.current, true), 40);
-    }
+    window.setTimeout(() => requestKeyboard(inputRef.current), 40);
   }
 
   const showKeyboard = tvKeyboardEnabled && focused;
@@ -313,23 +312,17 @@ export default function TvSearchBox() {
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
-            readOnly={tvKeyboardEnabled}
             data-tv-keyboard-input
             data-tv-focus-key="tv-search:input"
             value={keyword}
             onFocus={schedule}
-            onClick={() => {
-              const useTvKeyboard = isTvKeyboardEnabled();
-              setFocused(useTvKeyboard);
-              requestKeyboard(inputRef.current, !useTvKeyboard);
-            }}
+            onClick={() => requestKeyboard(inputRef.current)}
             onKeyDown={(event) => {
               if (openKey(event) && !keyword.trim()) {
                 event.preventDefault();
                 event.stopPropagation();
-                const useTvKeyboard = isTvKeyboardEnabled();
-                requestKeyboard(inputRef.current, !useTvKeyboard);
-                setFocused(useTvKeyboard);
+                requestKeyboard(inputRef.current);
+                setFocused(true);
               }
             }}
             onChange={(event) => setKeyword(event.target.value)}
@@ -401,6 +394,9 @@ export default function TvSearchBox() {
       {showKeyboard && (
         <div
           data-tv-search-keyboard
+          data-tv-row
+          data-tv-row-key="search:keyboard"
+          data-tv-row-wrap="true"
           data-tv-scroll-align="center"
           data-tv-scroll-padding="72"
           data-tv-keyboard-panel="search"
@@ -473,7 +469,6 @@ export default function TvSearchBox() {
                     onMouseDown={(event) => event.preventDefault()}
                     onClick={() => appendKeyboardValue(keyValue)}
                     data-tv-focus-key={`tv-search-keyboard:${rowIndex}:${keyValue}`}
-                    data-tv-default={rowIndex === 0 && keyValue === "q" ? true : undefined}
                     className={[
                       "min-h-8 min-w-8 rounded-lg border border-white/10 bg-white/5 px-1.5 text-xs font-black text-white hover:bg-white/10 min-[1280px]:min-h-9 min-[1280px]:min-w-9",
                       TV_FOCUS_CLASS,

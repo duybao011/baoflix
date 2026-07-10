@@ -90,14 +90,9 @@ export default function SettingsPage() {
         document.documentElement.dataset.baoflixTvMode = "0";
       }
 
-      if (value === "always_tv") {
+      if (value === "always_tv" || value === "auto_detect") {
         sessionStorage.setItem(TV_SESSION_KEY, "1");
         document.documentElement.dataset.baoflixTvMode = "1";
-      }
-
-      if (value === "auto_detect") {
-        sessionStorage.removeItem(TV_SESSION_KEY);
-        document.documentElement.dataset.baoflixTvMode = "0";
       }
 
       notifyTvModeChanged();

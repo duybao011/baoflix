@@ -84,24 +84,6 @@ export function isTvModeActive(options: TvModeOptions = {}) {
   return true;
 }
 
-export function setTvModeSession(enabled: boolean) {
-  if (typeof window === "undefined") return;
-
-  try {
-    if (enabled) {
-      sessionStorage.setItem(TV_SESSION_KEY, "1");
-      document.documentElement.dataset.baoflixTvMode = "1";
-    } else {
-      sessionStorage.removeItem(TV_SESSION_KEY);
-      document.documentElement.dataset.baoflixTvMode = "0";
-    }
-
-    window.dispatchEvent(new Event("baoflix-tv-mode-change"));
-  } catch {
-    // Ignore storage restrictions.
-  }
-}
-
 export function clearTvModeForNormalDevice() {
   if (typeof window === "undefined") return;
 

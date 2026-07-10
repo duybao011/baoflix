@@ -6,7 +6,6 @@ import TvSearchBox from "@/components/TvSearchBox";
 import { getImageUrl, type MovieItem } from "@/lib/kkphim";
 import { readWatchHistory, type WatchHistoryItem } from "@/lib/watchStore";
 import { readCustomMovies, type StoredCustomMovie } from "@/lib/customMoviesClient";
-import { isTvModeActive } from "@/lib/tvMode";
 
 type FavoriteItem = MovieItem;
 type TvDashboardProps = { chineseSeries?: MovieItem[] };
@@ -79,9 +78,7 @@ function focusTvSearch() {
   if (input) {
     input.focus({ preventScroll: true });
     input.scrollIntoView({ behavior: "auto", block: "center", inline: "center" });
-    if (!isTvModeActive()) {
-      input.click();
-    }
+    input.click();
   }
 }
 
@@ -343,7 +340,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
     <div className="flex gap-4" data-tv-scope="tv-home-v5" data-tv-lock="true">
       <Rail />
 
-      <div className="baoflix-tv-page min-w-0 flex-1 space-y-6 pb-6">
+      <main className="baoflix-tv-page min-w-0 flex-1 space-y-6 pb-6">
         <section
           data-tv-section="top-actions"
           className="rounded-3xl border border-white/10 bg-[#070b12] p-4 shadow-[0_20px_80px_rgba(0,0,0,0.28)] min-[1280px]:p-5"
@@ -498,7 +495,7 @@ export default function TvDashboard({ chineseSeries = [] }: TvDashboardProps) {
             </div>
           </section>
         )}
-      </div>
+      </main>
     </div>
   );
 }
