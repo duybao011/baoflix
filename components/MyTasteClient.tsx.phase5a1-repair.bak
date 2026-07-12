@@ -3,6 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import MovieCard from "@/components/MovieCard";
 import type { MovieItem } from "@/lib/kkphim";
+import {
+  readWatchHistory,
+  removeWatchHistoryItem,
+  clearWatchHistory,
+} from "@/lib/watchStore";
 const HISTORY_KEY = "baoflix_history";
 const FAVORITE_KEY = "baoflix_favorites";
 

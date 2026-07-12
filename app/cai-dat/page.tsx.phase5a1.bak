@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { setTvModeSession } from "@/lib/tvMode";
 
+const TV_SESSION_KEY = "baoflix_tv_mode";
 const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
 
 type TvLaunchMode = "manual" | "always_tv" | "auto_detect";
@@ -85,7 +85,20 @@ export default function SettingsPage() {
     try {
       localStorage.setItem(TV_LAUNCH_MODE_KEY, value);
 
-      setTvModeSession(value === "always_tv");
+      if (value === "manual") {
+        sessionStorage.removeItem(TV_SESSION_KEY);
+        document.documentElement.dataset.baoflixTvMode = "0";
+      }
+
+      if (value === "always_tv") {
+        sessionStorage.setItem(TV_SESSION_KEY, "1");
+        document.documentElement.dataset.baoflixTvMode = "1";
+      }
+
+      if (value === "auto_detect") {
+        sessionStorage.removeItem(TV_SESSION_KEY);
+        document.documentElement.dataset.baoflixTvMode = "0";
+      }
 
       notifyTvModeChanged();
     } catch {
@@ -94,9 +107,10 @@ export default function SettingsPage() {
   }
 
   function turnOffTvMode() {
-    setTvModeSession(false);
+    sessionStorage.removeItem(TV_SESSION_KEY);
     localStorage.setItem(TV_LAUNCH_MODE_KEY, "manual");
     setLaunchMode("manual");
+    document.documentElement.dataset.baoflixTvMode = "0";
     notifyTvModeChanged();
   }
 

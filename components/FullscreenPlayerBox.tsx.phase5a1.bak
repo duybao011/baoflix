@@ -59,7 +59,7 @@ export default function FullscreenPlayerBox({
     }, 30);
   }, []);
 
-  const enterFullscreen = useCallback(async () => {
+  async function enterFullscreen() {
     const box = boxRef.current;
 
     if (!box) return;
@@ -79,9 +79,9 @@ export default function FullscreenPlayerBox({
     } catch {
       setCinemaMode(true);
     }
-  }, []);
+  }
 
-  const exitFullscreen = useCallback(async () => {
+  async function exitFullscreen() {
     const doc = document as FullscreenDocument;
 
     try {
@@ -95,9 +95,9 @@ export default function FullscreenPlayerBox({
     }
 
     setCinemaMode(false);
-  }, []);
+  }
 
-  const toggleFullscreen = useCallback(() => {
+  function toggleFullscreen() {
     if (tvImmersive) return;
 
     if (expanded) {
@@ -105,7 +105,7 @@ export default function FullscreenPlayerBox({
     } else {
       void enterFullscreen();
     }
-  }, [enterFullscreen, exitFullscreen, expanded, tvImmersive]);
+  }
 
   useEffect(() => {
     if (!tvImmersive) return;
@@ -167,7 +167,7 @@ export default function FullscreenPlayerBox({
       document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [cinemaMode, isFullscreen, toggleFullscreen, tvImmersive]);
+  }, [cinemaMode, isFullscreen, tvImmersive]);
 
   useEffect(() => {
     function handleFocusPlayer() {

@@ -118,10 +118,7 @@ export default function EpisodePickerModal({
   }));
 
   const selectedServer = servers[selectedServerIndex];
-  const selectedEpisodes = useMemo(
-    () => selectedServer?.server_data ?? [],
-    [selectedServer]
-  );
+  const selectedEpisodes = selectedServer?.server_data ?? [];
   const currentEpisode =
     servers[safeServerIndex]?.server_data?.[safeEpisodeIndex];
 

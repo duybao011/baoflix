@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { isTvModeActive } from "@/lib/tvMode";
 
 const LOC_FOCUS_KEY = "baoflix_tv_loc_focus_after_nav";
 const ROUTE_EVENT_NAME = "baoflix-tv-route-change";
@@ -9,7 +8,16 @@ const ROUTE_EVENT_NAME = "baoflix-tv-route-change";
 type FocusMode = "results" | "filter";
 
 function isTvModeLikelyActive() {
-  return isTvModeActive();
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("tv") === "1") return true;
+    if (sessionStorage.getItem("baoflix_tv_mode") === "1") return true;
+    return /baoflixtv|baoflix tv|android tv|google tv|smart-tv|smarttv|tizen|webos|bravia|shield|roku/i.test(
+      navigator.userAgent
+    );
+  } catch {
+    return false;
+  }
 }
 
 function requestFocusLock(ms = 180) {

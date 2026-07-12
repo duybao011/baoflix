@@ -1,14 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  isDesktopMouseDevice,
-  isTvModeActive,
-  setTvModeSession,
-} from "@/lib/tvMode";
+
+const TV_SESSION_KEY = "baoflix_tv_mode";
+
+function isDesktopMouseDevice() {
+  if (typeof window === "undefined") return false;
+
+  return window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)").matches;
+}
 
 function readTvMode() {
-  return isTvModeActive();
+  try {
+    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function notifyTvModeChanged() {
+  window.dispatchEvent(new Event("baoflix-tv-mode-change"));
 }
 
 export default function TvModeToggleButton() {
@@ -41,13 +52,15 @@ export default function TvModeToggleButton() {
     try {
       const next = !readTvMode();
 
-      setTvModeSession(next);
-
-      if (!next) {
-        localStorage.removeItem("baoflix_tv_mode");
+      if (next) {
+        sessionStorage.setItem(TV_SESSION_KEY, "1");
+      } else {
+        sessionStorage.removeItem(TV_SESSION_KEY);
+        localStorage.removeItem(TV_SESSION_KEY);
       }
 
       setEnabled(next);
+      notifyTvModeChanged();
     } catch {
       // bỏ qua nếu browser chặn storage
     }

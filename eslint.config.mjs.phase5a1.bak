@@ -12,19 +12,12 @@ const eslintConfig = defineConfig([
       // sau khi hydrate. React 19/Next 16 lint rất gắt và biến các pattern cũ
       // thành error, làm chặn Stage 1 TV stability dù app vẫn chạy được.
       // Giữ rule ở mức warning để còn thấy nợ kỹ thuật nhưng không chặn build/lint.
-      // Các màn hình client đọc localStorage/sessionStorage sau hydrate.
-      // Đây là luồng chủ động của app, không phải vòng lặp effect.
-      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/immutability": "warn",
 
-      // TV/session helpers chủ động đồng bộ dataset của documentElement.
-      "react-hooks/immutability": "off",
-
-      // Payload từ KKPhim/my-taste là dữ liệu ngoài chưa có schema ổn định.
-      "@typescript-eslint/no-explicit-any": "off",
-
-      // Ảnh phim đến từ host ngoài và loader động; giữ <img> để tránh
-      // cấu hình domain/optimizer làm vỡ poster trong APK WebView.
-      "@next/next/no-img-element": "off",
+      // API ngoài như KKPhim/my-taste còn nhiều payload động. Refactor sang unknown
+      // nên làm ở đợt cleanup riêng; trước mắt không để rule này chặn test TV.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   // Override default ignores of eslint-config-next.

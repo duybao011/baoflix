@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import MovieDetailTabs from "@/components/MovieDetailTabs";
 import {
   getCustomMovieBySlugClient,

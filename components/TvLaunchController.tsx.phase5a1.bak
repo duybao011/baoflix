@@ -1,29 +1,52 @@
 "use client";
 
 import { useEffect } from "react";
-import {
-  isBaoflixTvShell,
-  isMobileDevice,
-  isTvUserAgent,
-  setTvModeSession,
-} from "@/lib/tvMode";
 
+const TV_SESSION_KEY = "baoflix_tv_mode";
 const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
 
 type TvLaunchMode = "manual" | "always_tv" | "auto_detect";
 
-function isProbablyTvDevice() {
-  if (typeof window === "undefined") return false;
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
 
+  return navigator.userAgent.toLowerCase();
+}
+
+function isBaoflixTvShell() {
+  const userAgent = getUserAgent();
+
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview/.test(userAgent);
+}
+
+function isMobileDevice() {
+  const userAgent = getUserAgent();
+
+  if (!userAgent) return false;
+  if (isBaoflixTvShell()) return false;
+  if (/android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield/.test(userAgent)) {
+    return false;
+  }
+
+  return /iphone|ipad|ipod|android.+mobile|mobile/.test(userAgent);
+}
+
+function isProbablyTvDevice() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") {
+    return false;
+  }
+
+  if (isBaoflixTvShell()) return true;
+
+  const userAgent = getUserAgent();
+  const hasTvAgent = /smart-tv|smarttv|tizen|webos|appletv|google tv|android tv|aft|bravia|crkey|shield/i.test(
+    userAgent
+  );
   const largeScreenNoTouch =
     window.matchMedia("(min-width: 960px)").matches &&
     window.matchMedia("(hover: none), (pointer: coarse)").matches;
 
-  return (
-    isBaoflixTvShell() ||
-    isTvUserAgent() ||
-    (largeScreenNoTouch && !isMobileDevice())
-  );
+  return hasTvAgent || (largeScreenNoTouch && !isMobileDevice());
 }
 
 function readLaunchMode(): TvLaunchMode {
@@ -47,11 +70,15 @@ function readLaunchMode(): TvLaunchMode {
 }
 
 function enableTvMode() {
-  setTvModeSession(true);
+  sessionStorage.setItem(TV_SESSION_KEY, "1");
+  document.documentElement.dataset.baoflixTvMode = "1";
+  window.dispatchEvent(new Event("baoflix-tv-mode-change"));
 }
 
 function disableTvMode() {
-  setTvModeSession(false);
+  sessionStorage.removeItem(TV_SESSION_KEY);
+  document.documentElement.dataset.baoflixTvMode = "0";
+  window.dispatchEvent(new Event("baoflix-tv-mode-change"));
 }
 
 function getTvParam() {
@@ -59,18 +86,6 @@ function getTvParam() {
     return new URLSearchParams(window.location.search).get("tv");
   } catch {
     return null;
-  }
-}
-
-function isTvModeActiveForLaunch() {
-  try {
-    return (
-      isBaoflixTvShell() ||
-      isTvUserAgent() ||
-      sessionStorage.getItem("baoflix_tv_mode") === "1"
-    );
-  } catch {
-    return isBaoflixTvShell() || isTvUserAgent();
   }
 }
 
@@ -114,7 +129,7 @@ function applyTvLaunchMode() {
     }
 
     document.documentElement.dataset.baoflixTvMode =
-      isTvModeActiveForLaunch() ? "1" : "0";
+      sessionStorage.getItem(TV_SESSION_KEY) === "1" ? "1" : "0";
   } catch {
     // bỏ qua nếu browser/WebView chặn storage.
   }

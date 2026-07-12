@@ -21,6 +21,7 @@ type SearchSuggestion = {
 };
 
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
+const TV_SESSION_KEY = "baoflix_tv_mode";
 const TV_KEYBOARD_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
@@ -173,7 +174,7 @@ function SearchForm({ compact, onDone, autoFocus, initialKeyword }: { compact?: 
 
   return <div ref={wrapperRef} onBlur={handleSearchBlur} className={["relative w-full", compact ? "" : "max-w-[560px]"].join(" ")}>
     <form onSubmit={submit} data-tv-row className="flex w-full items-center gap-2">
-      <input type="search" data-tv-header-search-input data-tv-focus-key="header:search-input" value={keyword} autoFocus={autoFocus} readOnly={tvKeyboardEnabled} inputMode={tvKeyboardEnabled ? "none" : "search"} onFocus={() => setFocused(true)} onChange={(event) => { setKeyword(event.target.value); setFocused(true); }} placeholder="Tìm phim..." className={["min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-slate-400 focus:border-red-500", compact ? "h-12 text-base" : "h-11 text-sm"].join(" ")} />
+      <input type="search" data-tv-header-search-input data-tv-focus-key="header:search-input" value={keyword} autoFocus={autoFocus} onFocus={() => setFocused(true)} onChange={(event) => { setKeyword(event.target.value); setFocused(true); }} placeholder="Tìm phim..." className={["min-w-0 flex-1 rounded-2xl border border-white/10 bg-white/10 px-4 text-white outline-none placeholder:text-slate-400 focus:border-red-500", compact ? "h-12 text-base" : "h-11 text-sm"].join(" ")} />
       <button type="submit" data-tv-focus-key="header:search-submit" className={["shrink-0 rounded-2xl bg-red-600 font-black text-white hover:bg-red-500", compact ? "h-12 px-5 text-base" : "h-11 px-5 text-sm"].join(" ")}>Tìm</button>
     </form>
     {tvKeyboardEnabled && focused && <div data-tv-search-keyboard className="mt-2 rounded-2xl border border-white/10 bg-black/35 p-2"><div className="grid gap-1.5">

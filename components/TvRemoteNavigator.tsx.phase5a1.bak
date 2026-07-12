@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { isTvModeActive } from "@/lib/tvMode";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -26,6 +25,7 @@ type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-pl
 type OverlayCommandAction = "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "panel-back" | "confirm-exit" | "activity";
 
 const ROW_THRESHOLD = 22;
+const TV_SESSION_KEY = "baoflix_tv_mode";
 const SEEK_SECONDS = 10;
 const FOCUS_MEMORY_PREFIX = "baoflix_tv_focus:";
 const AREA_FOCUS_PREFIX = "baoflix_tv_area_focus:";
@@ -38,8 +38,29 @@ const DEFAULT_FOCUS_LOCK_MS = 120;
 const FOCUS_LOCK_EVENT_NAME = "baoflix-tv-focus-lock";
 const NAVIGATOR_ACTIVE_FLAG = "__baoflixTvNavigatorActive";
 
+function getUserAgent() {
+  if (typeof navigator === "undefined") return "";
+  return navigator.userAgent.toLowerCase();
+}
+
+function isTvUserAgent() {
+  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview|android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(
+    getUserAgent()
+  );
+}
+
 function isTvRemoteEnabled() {
-  return isTvModeActive();
+  if (typeof window === "undefined") return false;
+
+  try {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("tv") === "0") return false;
+    if (searchParams.get("tv") === "1") return true;
+    if (isTvUserAgent()) return true;
+    return sessionStorage.getItem(TV_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 function getDirectionFromEvent(event: KeyboardEvent): Direction | null {
@@ -210,6 +231,12 @@ function getDefaultFocusable(root: ParentNode) {
   }
 
   return getFocusableElements(root)[0] || null;
+}
+
+function getFirstFocusableInside(selector: string) {
+  const root = document.querySelector<HTMLElement>(selector);
+  if (!root || !isVisibleElement(root)) return null;
+  return getDefaultFocusable(root) || getFocusableElements(root)[0] || null;
 }
 
 function isInsideTvRail(element: Element | null) {

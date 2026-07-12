@@ -26,6 +26,7 @@ type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-pl
 type OverlayCommandAction = "peek" | "hide" | "open-episodes" | "open-sources" | "close-panel" | "panel-back" | "confirm-exit" | "activity";
 
 const ROW_THRESHOLD = 22;
+const TV_SESSION_KEY = "baoflix_tv_mode";
 const SEEK_SECONDS = 10;
 const FOCUS_MEMORY_PREFIX = "baoflix_tv_focus:";
 const AREA_FOCUS_PREFIX = "baoflix_tv_area_focus:";

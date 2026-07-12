@@ -212,23 +212,21 @@ export default function WatchClient({
   const useNormalNativePlayer =
     !tvOverlayEnabled && Boolean(nativeVideoUrl) && !episode?.link_embed;
 
-  const playerIframeSrc = (() => {
-    const linkEmbed = episode?.link_embed;
-
-    if (!linkEmbed) return "";
-    if (!tvOverlayEnabled) return linkEmbed;
+  const playerIframeSrc = useMemo(() => {
+    if (!episode?.link_embed) return "";
+    if (!tvOverlayEnabled) return episode.link_embed;
 
     try {
-      const url = new URL(linkEmbed, window.location.origin);
+      const url = new URL(episode.link_embed, window.location.origin);
       url.searchParams.set("autoplay", "1");
       url.searchParams.set("autoPlay", "1");
       url.searchParams.set("muted", "0");
       url.searchParams.set("playsinline", "1");
       return url.toString();
     } catch {
-      return linkEmbed;
+      return episode.link_embed;
     }
-  })();
+  }, [episode?.link_embed, tvOverlayEnabled]);
 
   function closeEpisodePanel() {
     setEpisodePanelOpen(false);

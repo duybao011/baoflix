@@ -1,30 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
-
-const TV_SESSION_KEY = "baoflix_tv_mode";
-
-function getUserAgent() {
-  if (typeof navigator === "undefined") return "";
-  return navigator.userAgent.toLowerCase();
-}
+import { isTvModeActive } from "@/lib/tvMode";
 
 function isTvLikeRuntime() {
-  if (typeof window === "undefined") return false;
-
-  try {
-    const searchParams = new URLSearchParams(window.location.search);
-
-    if (searchParams.get("tv") === "1") return true;
-    if (document.documentElement.dataset.baoflixTvMode === "1") return true;
-    if (sessionStorage.getItem(TV_SESSION_KEY) === "1") return true;
-  } catch {
-    // Ignore blocked storage / URL access in strict WebViews.
-  }
-
-  return /baoflixtv|baoflix tv|baoflixwebview|baoflix-webview|android tv|google tv|smart-tv|smarttv|tizen|webos|appletv|aft|bravia|crkey|shield|netcast|viera|hisense|vidaa|roku/.test(
-    getUserAgent()
-  );
+  return isTvModeActive();
 }
 
 export default function PwaRegister() {
