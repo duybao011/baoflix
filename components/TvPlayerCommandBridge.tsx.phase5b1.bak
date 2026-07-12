@@ -22,8 +22,6 @@ type NativeBridge = {
   seekForward?: () => void;
   seekBackward?: () => void;
   togglePlay?: () => void;
-  play?: () => void;
-  pause?: () => void;
 };
 
 type NativeSeekDirection = "backward" | "forward";
@@ -146,13 +144,11 @@ function callNativeBridge(command: PlayerCommand) {
         ? Number(command.seconds || 0) < 0
           ? "seek-backward"
           : "seek-forward"
-        : command.action === "toggle-play"
+        : command.action === "toggle-play" ||
+            command.action === "play" ||
+            command.action === "pause"
           ? "toggle-play"
-          : command.action === "play"
-            ? "play"
-            : command.action === "pause"
-              ? "pause"
-              : "focus-player";
+          : "focus-player";
 
   try {
     if (typeof bridge.sendCommand === "function") {
@@ -177,16 +173,6 @@ function callNativeBridge(command: PlayerCommand) {
 
     if (nativeCommand === "toggle-play" && bridge.togglePlay) {
       bridge.togglePlay();
-      return true;
-    }
-
-    if (nativeCommand === "play" && bridge.play) {
-      bridge.play();
-      return true;
-    }
-
-    if (nativeCommand === "pause" && bridge.pause) {
-      bridge.pause();
       return true;
     }
   } catch {
@@ -234,30 +220,27 @@ function emitBridgeHud(command: PlayerCommand) {
 
 function handleIframeOnlyCommand(command: PlayerCommand) {
   const nativeHandled = callNativeBridge(command);
-  const iframe = getVisiblePlayerIframe();
-  const focused = iframe ? focusIframePlayer() : false;
 
-  if (iframe && command.action !== "focus-player") {
+  const focused = focusIframePlayer();
+  const iframe = getVisiblePlayerIframe();
+
+  if (iframe) {
     dispatchIframeKeyboardEvent(iframe, keyForCommand(command));
     sendSafePostMessage(command);
   }
 
-  const handled =
-    nativeHandled ||
-    (command.action === "focus-player" && focused);
+  const handled = nativeHandled || focused || Boolean(iframe);
 
   if (handled) {
     command.handled = true;
     emitBridgeHud(command);
-    return true;
   }
 
-  if (command.action !== "focus-player") {
-    command.handled = true;
+  if (!handled && command.action === "seek") {
     notifyNativeMissing(command);
   }
 
-  return false;
+  return handled;
 }
 
 export default function TvPlayerCommandBridge() {

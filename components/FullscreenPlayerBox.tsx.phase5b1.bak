@@ -11,6 +11,13 @@ type FullscreenDivElement = HTMLDivElement & {
   webkitRequestFullscreen?: () => Promise<void> | void;
 };
 
+type PlayerHudDetail = {
+  type: "seek" | "play" | "pause";
+  delta?: number;
+  currentTime?: number;
+  duration?: number;
+};
+
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
 
 type PlayerCommandDetail = {
@@ -24,8 +31,31 @@ type FullscreenPlayerBoxProps = {
   tvImmersive?: boolean;
 };
 
+function formatTime(value?: number) {
+  if (!value || !Number.isFinite(value) || value < 0) return "0:00";
+
+  const totalSeconds = Math.floor(value);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function emitNativeMissing() {
   window.dispatchEvent(new Event("baoflix-tv-native-missing"));
+}
+
+function emitHud(detail: PlayerHudDetail) {
+  window.dispatchEvent(
+    new CustomEvent("baoflix-tv-player-hud", {
+      detail,
+    })
+  );
 }
 
 export default function FullscreenPlayerBox({
@@ -33,9 +63,11 @@ export default function FullscreenPlayerBox({
   tvImmersive = false,
 }: FullscreenPlayerBoxProps) {
   const boxRef = useRef<FullscreenDivElement | null>(null);
+  const hudTimerRef = useRef<number | null>(null);
 
   const [cinemaMode, setCinemaMode] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [playerHud, setPlayerHud] = useState<PlayerHudDetail | null>(null);
 
   const expanded = tvImmersive || cinemaMode || isFullscreen;
 
@@ -170,6 +202,23 @@ export default function FullscreenPlayerBox({
   }, [cinemaMode, isFullscreen, tvImmersive]);
 
   useEffect(() => {
+    function handlePlayerHud(event: Event) {
+      const detail = (event as CustomEvent<PlayerHudDetail>).detail;
+
+      if (!detail) return;
+
+      if (hudTimerRef.current) {
+        window.clearTimeout(hudTimerRef.current);
+      }
+
+      setPlayerHud(detail);
+
+      hudTimerRef.current = window.setTimeout(() => {
+        setPlayerHud(null);
+        hudTimerRef.current = null;
+      }, 620);
+    }
+
     function handleFocusPlayer() {
       focusPlayerSurface();
     }
@@ -187,27 +236,31 @@ export default function FullscreenPlayerBox({
 
         if (detail.action !== "focus-player") {
           emitNativeMissing();
+
+          if (detail.action === "seek") {
+            emitHud({
+              type: "seek",
+              delta: detail.seconds || 0,
+            });
+          }
         }
       }, 0);
     }
 
+    window.addEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
     window.addEventListener("baoflix-focus-tv-player", handleFocusPlayer);
     window.addEventListener("baoflix-focus-tv-player-surface", handleFocusPlayer);
-    window.addEventListener(
-      "baoflix-tv-player-command",
-      handlePlayerCommand as EventListener
-    );
+    window.addEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
 
     return () => {
+      if (hudTimerRef.current) {
+        window.clearTimeout(hudTimerRef.current);
+      }
+
+      window.removeEventListener("baoflix-tv-player-hud", handlePlayerHud as EventListener);
       window.removeEventListener("baoflix-focus-tv-player", handleFocusPlayer);
-      window.removeEventListener(
-        "baoflix-focus-tv-player-surface",
-        handleFocusPlayer
-      );
-      window.removeEventListener(
-        "baoflix-tv-player-command",
-        handlePlayerCommand as EventListener
-      );
+      window.removeEventListener("baoflix-focus-tv-player-surface", handleFocusPlayer);
+      window.removeEventListener("baoflix-tv-player-command", handlePlayerCommand as EventListener);
     };
   }, [focusPlayerSurface]);
 
@@ -238,6 +291,10 @@ export default function FullscreenPlayerBox({
       >
         {children}
       </div>
+
+      {false && tvImmersive && playerHud && (
+        <div aria-hidden="true" />
+      )}
 
       {!tvImmersive && (
         <button

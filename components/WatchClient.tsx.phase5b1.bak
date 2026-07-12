@@ -8,7 +8,6 @@ import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import TvWatchOverlay from "@/components/TvWatchOverlay";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
-import { findMatchingEpisodeIndex } from "@/lib/episodeMatch";
 import {
   getNormalWatchedKey,
   readWatchedEpisodes,
@@ -39,6 +38,59 @@ function normalizeServerName(name?: string) {
   if (text.includes("vietsub") || text.includes("sub")) return "Vietsub";
 
   return name || "Server";
+}
+
+function normalizeEpisodeIdentity(value?: string) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function getEpisodeNumber(value?: string) {
+  const match = normalizeEpisodeIdentity(value).match(/\d+(?:\.\d+)?/);
+  return match?.[0] || "";
+}
+
+function findMatchingEpisodeIndex(
+  currentEpisode: { name?: string; slug?: string } | undefined,
+  targetEpisodes: { name?: string; slug?: string }[],
+  fallbackIndex: number
+) {
+  if (!targetEpisodes.length) return -1;
+  if (!currentEpisode) {
+    return Math.min(fallbackIndex, targetEpisodes.length - 1);
+  }
+
+  const currentSlug = normalizeEpisodeIdentity(currentEpisode.slug);
+  const currentName = normalizeEpisodeIdentity(currentEpisode.name);
+  const currentNumber = getEpisodeNumber(currentEpisode.name || currentEpisode.slug);
+
+  const bySlug = currentSlug
+    ? targetEpisodes.findIndex(
+        (item) => normalizeEpisodeIdentity(item.slug) === currentSlug
+      )
+    : -1;
+  if (bySlug >= 0) return bySlug;
+
+  const byName = currentName
+    ? targetEpisodes.findIndex(
+        (item) => normalizeEpisodeIdentity(item.name) === currentName
+      )
+    : -1;
+  if (byName >= 0) return byName;
+
+  const byNumber = currentNumber
+    ? targetEpisodes.findIndex(
+        (item) => getEpisodeNumber(item.name || item.slug) === currentNumber
+      )
+    : -1;
+  if (byNumber >= 0) return byNumber;
+
+  return Math.min(fallbackIndex, targetEpisodes.length - 1);
 }
 
 function detectTvOverlayEnabled() {
@@ -227,16 +279,6 @@ export default function WatchClient({
       return episode.link_embed;
     }
   }, [episode?.link_embed, tvOverlayEnabled]);
-
-  function closeEpisodePanel() {
-    setEpisodePanelOpen(false);
-
-    if (!tvOverlayEnabled) return;
-
-    window.setTimeout(() => {
-      window.dispatchEvent(new Event("baoflix-focus-tv-player-surface"));
-    }, 0);
-  }
 
   return (
     <div
@@ -464,7 +506,7 @@ export default function WatchClient({
           safeServerIndex={safeServerIndex}
           safeEpisodeIndex={safeEpisodeIndex}
           watchedEpisodes={watchedEpisodes}
-          onClose={closeEpisodePanel}
+          onClose={() => setEpisodePanelOpen(false)}
         />
       )}
     </div>

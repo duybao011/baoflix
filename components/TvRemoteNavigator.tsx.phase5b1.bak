@@ -621,10 +621,7 @@ function getVisibleSearchKeyboard() {
 
 function focusSearchKeyboard(pathname: string) {
   const keyboard = getVisibleSearchKeyboard();
-  const target = keyboard
-    ? getDefaultFocusable(keyboard) || getFocusableElements(keyboard)[0]
-    : null;
-
+  const target = keyboard ? getFocusableElements(keyboard)[0] : null;
   if (!target) return false;
 
   focusElement(target, pathname);
