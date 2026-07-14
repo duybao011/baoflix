@@ -405,6 +405,7 @@ function CustomMovieWatchContent({
       data-tv-scope="custom-watch-page"
       data-tv-lock="true"
       data-tv-autofocus="true"
+      data-tv-watch-immersive={tvDriveMode ? "true" : "false"}
     >
       <Link
         href={`/ca-nhan/${movie.slug}`}
@@ -509,10 +510,16 @@ function CustomMovieWatchContent({
             <CustomDrivePlayer
               src={episode.link_embed}
               title={`${movie.name} - ${episode.name}`}
-              storageKey={`${watchTimeKey}_drive_estimate`}
+              progressKey={`${watchTimeKey}_drive_native`}
+              movie={movie}
+              currentSeason={currentSeason}
+              seasonIndex={safeSeasonIndex}
+              episodeIndex={safeIndex}
+              watchedEpisodes={watchedEpisodes}
               previousHref={previousHref}
               nextHref={nextHref}
               detailHref={`/ca-nhan/${movie.slug}`}
+              poster={movie.thumb_url || movie.poster_url}
               onOpenEpisodes={() => setEpisodePanelOpen(true)}
             />
           ) : episode?.link_m3u8 ? (

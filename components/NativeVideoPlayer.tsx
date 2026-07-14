@@ -331,7 +331,9 @@ export default function NativeVideoPlayer({
     video.addEventListener("ended", saveProgressNow);
     video.addEventListener("canplay", autoplayQuietly, { once: true });
 
-    if (Hls.isSupported()) {
+    const isHlsSource = /\.m3u8(?:$|[?#])/i.test(src);
+
+    if (isHlsSource && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,

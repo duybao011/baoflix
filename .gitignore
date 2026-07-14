@@ -93,3 +93,7 @@ yarn-error.log*
 pnpm-debug.log*
 
 .vscode
+
+# Local patch backups
+backup/
+.patch-backups/

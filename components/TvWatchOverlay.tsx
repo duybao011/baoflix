@@ -24,6 +24,9 @@ type TvWatchOverlayProps = {
   watchedEpisodes: string[];
   sameEpisodeServerLinks: SameEpisodeServerLink[];
   onOpenEpisodePanel: () => void;
+  routeMode?: "normal" | "custom";
+  customSeasonIndex?: number;
+  detailHref?: string;
 };
 
 type ShowOverlayDetail = {
@@ -192,6 +195,9 @@ export default function TvWatchOverlay({
   watchedEpisodes,
   sameEpisodeServerLinks,
   onOpenEpisodePanel,
+  routeMode = "normal",
+  customSeasonIndex,
+  detailHref,
 }: TvWatchOverlayProps) {
   const [overlayMode, setOverlayModeState] = useState<OverlayMode>("peek");
   const [overlayPanel, setOverlayPanelState] = useState<OverlayPanel>(null);
@@ -211,6 +217,12 @@ export default function TvWatchOverlay({
   const overlayPanelRef = useRef<OverlayPanel>(null);
 
   const currentEpisodes = currentServer?.server_data ?? [];
+  const resolvedSeasonIndex = customSeasonIndex ?? safeServerIndex;
+  const resolvedDetailHref =
+    detailHref ||
+    (routeMode === "custom"
+      ? `/ca-nhan/${movie.slug}`
+      : `/phim/${movie.slug}`);
   const hasMultipleServers = sameEpisodeServerLinks.length > 1;
   const serverName = normalizeServerName(currentServer?.server_name);
   const panelOpen = overlayMode === "panel";
@@ -240,10 +252,20 @@ export default function TvWatchOverlay({
       return {
         episode,
         episodeIndex,
-        href: getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
+        href:
+          routeMode === "custom"
+            ? `/ca-nhan/${movie.slug}/xem?season=${resolvedSeasonIndex}&tap=${episodeIndex}`
+            : getEpisodeUrl(movie.slug, safeServerIndex, episodeIndex),
       };
     });
-  }, [activeChunk, currentEpisodes, movie.slug, safeServerIndex]);
+  }, [
+    activeChunk,
+    currentEpisodes,
+    movie.slug,
+    resolvedSeasonIndex,
+    routeMode,
+    safeServerIndex,
+  ]);
 
   const compactMeta = useMemo(() => {
     return [
@@ -732,7 +754,7 @@ export default function TvWatchOverlay({
               <button
                 type="button"
                 data-tv-focus-key="overlay-exit:detail"
-                onClick={() => exitWatchToDetail(`/phim/${movie.slug}`)}
+                onClick={() => exitWatchToDetail(resolvedDetailHref)}
                 className={[
                   "rounded-xl bg-yellow-300 px-3 py-2 text-[11px] font-black text-black hover:bg-yellow-200",
                   TV_FOCUS_CLASS,
@@ -1045,7 +1067,14 @@ export default function TvWatchOverlay({
                   className="grid max-h-[34vh] grid-cols-4 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-5 min-[1280px]:grid-cols-6"
                 >
                   {episodeItems.map(({ episode, episodeIndex, href }) => {
-                    const watchedKey = getWatchedKey(movie.slug, safeServerIndex, episodeIndex);
+                    const watchedKey =
+                      routeMode === "custom"
+                        ? `custom:${movie.slug}|season:${resolvedSeasonIndex}|episode:${episodeIndex}`
+                        : getWatchedKey(
+                            movie.slug,
+                            safeServerIndex,
+                            episodeIndex
+                          );
                     const isCurrent = episodeIndex === safeEpisodeIndex;
                     const isWatched = watchedEpisodes.includes(watchedKey);
 
