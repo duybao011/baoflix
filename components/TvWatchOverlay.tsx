@@ -628,16 +628,25 @@ export default function TvWatchOverlay({
   useEffect(() => {
     if (overlayMode !== "panel" || overlayPanel !== "episodes") return;
 
+    // Chỉ tự đưa focus về tập đang xem khi chính overlay đang yêu cầu.
+    // Khi người dùng chọn nhóm 25-48, 49-72..., pending đã được tắt nên
+    // không được ép activeChunkIndex quay lại currentChunkIndex.
+    if (!pendingCurrentEpisodeFocusRef.current) return;
+
     if (safeChunkIndex !== currentChunkIndex) {
-      pendingCurrentEpisodeFocusRef.current = true;
       setActiveChunkIndex(currentChunkIndex);
       return;
     }
 
-    if (pendingCurrentEpisodeFocusRef.current) {
-      focusCurrentEpisodeSoon();
-    }
-  }, [overlayMode, overlayPanel, safeChunkIndex, currentChunkIndex, safeEpisodeIndex, episodeItems.length]);
+    focusCurrentEpisodeSoon();
+  }, [
+    overlayMode,
+    overlayPanel,
+    safeChunkIndex,
+    currentChunkIndex,
+    safeEpisodeIndex,
+    episodeItems.length,
+  ]);
 
   useEffect(() => {
     setOverlayPanel(null);
@@ -796,7 +805,7 @@ export default function TvWatchOverlay({
               data-tv-row
               data-tv-row-key="overlay:actions"
               className={[
-                "mt-3 grid grid-cols-4 gap-2.5",
+                "mt-3 grid grid-cols-5 gap-2.5",
                 overlayVisible ? "pointer-events-auto" : "pointer-events-none",
               ].join(" ")}
             
@@ -847,6 +856,19 @@ export default function TvWatchOverlay({
               >
                 Player
               </button>
+
+              <Link
+                href="/cai-dat?tv=1"
+                data-tv-focus-key="overlay:settings"
+                {...hiddenFocusProps}
+                className={[
+                  "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
+                  SURFACE_BUTTON_CLASS,
+                  TV_FOCUS_CLASS,
+                ].join(" ")}
+              >
+                Cài đặt
+              </Link>
 
               <button
                 type="button"
