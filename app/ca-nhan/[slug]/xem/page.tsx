@@ -6,12 +6,14 @@ import Link from "next/link";
 import { Suspense, use, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import HlsPlayer from "@/components/HlsPlayer";
+import CustomDrivePlayer from "@/components/CustomDrivePlayer";
 import FullscreenPlayerBox from "@/components/FullscreenPlayerBox";
 import {
   getCustomMovieBySlugClient,
   StoredCustomMovie,
 } from "@/lib/customMoviesClient";
 import type { Episode } from "@/lib/kkphim";
+import { isTvModeActive } from "@/lib/tvMode";
 import {
   getCustomWatchedKey,
   readWatchedEpisodes,
@@ -244,6 +246,7 @@ function CustomMovieWatchContent({
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [activeSeasonInModal, setActiveSeasonInModal] = useState(0);
   const [activeGroupBySeason, setActiveGroupBySeason] = useState<Record<number, number>>({});
+  const [tvDriveMode, setTvDriveMode] = useState(false);
 
   const movie = movieData.movie;
   const seasons = movieData.episodes ?? [];
@@ -258,6 +261,27 @@ function CustomMovieWatchContent({
     Number.isNaN(tap) || tap < 0 || tap >= episodes.length ? 0 : tap;
 
   const episode = episodes[safeIndex];
+
+  useEffect(() => {
+    function refreshTvDriveMode() {
+      setTvDriveMode(
+        Boolean(episode?.link_embed) &&
+          isTvModeActive({ allowSessionOnDesktop: false })
+      );
+    }
+
+    refreshTvDriveMode();
+
+    window.addEventListener("baoflix-tv-mode-change", refreshTvDriveMode);
+    window.addEventListener("storage", refreshTvDriveMode);
+    window.addEventListener("focus", refreshTvDriveMode);
+
+    return () => {
+      window.removeEventListener("baoflix-tv-mode-change", refreshTvDriveMode);
+      window.removeEventListener("storage", refreshTvDriveMode);
+      window.removeEventListener("focus", refreshTvDriveMode);
+    };
+  }, [episode?.link_embed]);
 
   const currentWatchedKey = getCustomWatchedKey(
     movie.slug,
@@ -480,14 +504,16 @@ function CustomMovieWatchContent({
       </section>
 
       <div className="baoflix-player-fill mt-5">
-        <FullscreenPlayerBox>
+        <FullscreenPlayerBox tvImmersive={tvDriveMode}>
           {episode?.link_embed ? (
-            <iframe
+            <CustomDrivePlayer
               src={episode.link_embed}
-              allowFullScreen
-              allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
-              className="h-full w-full"
               title={`${movie.name} - ${episode.name}`}
+              storageKey={`${watchTimeKey}_drive_estimate`}
+              previousHref={previousHref}
+              nextHref={nextHref}
+              detailHref={`/ca-nhan/${movie.slug}`}
+              onOpenEpisodes={() => setEpisodePanelOpen(true)}
             />
           ) : episode?.link_m3u8 ? (
             <HlsPlayer src={episode.link_m3u8} storageKey={watchTimeKey} autoResume />
@@ -551,7 +577,7 @@ function CustomMovieWatchContent({
           data-tv-scope="custom-episode-panel"
           data-tv-lock="true"
           data-tv-modal="custom-episode-panel"
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6"
+          className="fixed inset-0 z-[140] flex items-end justify-center overflow-hidden bg-black/70 p-0 backdrop-blur-sm md:items-center md:p-6"
         >
           <section className="flex max-h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-[#0b0f19] shadow-2xl md:max-h-[86dvh] md:rounded-3xl">
             <div className="shrink-0 border-b border-white/10 p-5">
