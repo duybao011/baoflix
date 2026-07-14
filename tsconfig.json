@@ -41,6 +41,12 @@
     "backup",
     "backup/**/*",
     ".patch-backups",
-    ".patch-backups/**/*"
+    ".patch-backups/**/*",
+    "baoflix_drive_relay_public",
+    "baoflix_drive_relay_public/**/*",
+    "worker",
+    "worker/**/*",
+    "cloudflare-worker",
+    "cloudflare-worker/**/*"
   ]
 }

@@ -45,15 +45,16 @@ function extractDriveFileId(url: string) {
 }
 
 function buildDirectCandidates(fileId: string) {
-  if (!fileId) return [];
+  const relayBase = String(
+    process.env.NEXT_PUBLIC_DRIVE_RELAY_URL || ""
+  )
+    .trim()
+    .replace(/\/+$/, "");
+
+  if (!fileId || !relayBase) return [];
 
   return [
-    `https://drive.usercontent.google.com/download?id=${encodeURIComponent(
-      fileId
-    )}&export=download&confirm=t`,
-    `https://drive.google.com/uc?export=download&id=${encodeURIComponent(
-      fileId
-    )}`,
+    `${relayBase}/video/${encodeURIComponent(fileId)}`,
   ];
 }
 
@@ -301,7 +302,7 @@ export default function CustomDrivePlayer({
 
     setMode("iframe");
     setFallbackReason(
-      "Drive không cho phát trực tiếp bằng video native. Đã chuyển sang iframe dự phòng."
+      "Drive Relay không trả về video native. Đã chuyển sang iframe dự phòng."
     );
   }
 

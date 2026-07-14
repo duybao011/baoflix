@@ -97,3 +97,8 @@ pnpm-debug.log*
 # Local patch backups
 backup/
 .patch-backups/
+
+# Local workers and patch backups
+baoflix_drive_relay_public/
+worker/
+cloudflare-worker/
