@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { setTvModeSession } from "@/lib/tvMode";
+import SupabaseAccountPanel from "@/components/SupabaseAccountPanel";
 
 const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
 
@@ -162,6 +163,8 @@ export default function SettingsPage() {
           </Link>
         </div>
       </section>
+
+      <SupabaseAccountPanel />
 
       <section className="mt-6 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
         <h2 className="text-2xl font-black">Chế độ mở TV</h2>

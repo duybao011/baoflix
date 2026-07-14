@@ -5,6 +5,69 @@ import { slugify } from "@/lib/slugify";
 
 export const CUSTOM_MOVIES_KEY = "baoflix_custom_movies";
 
+export const CUSTOM_MOVIES_CHANGE_EVENT =
+  "baoflix-custom-movies-change";
+
+export const CUSTOM_MOVIES_PENDING_DELETES_KEY =
+  "baoflix_custom_movies_pending_deletes";
+
+export type CustomMoviesChangeDetail = {
+  type: "save" | "delete";
+  slug?: string;
+};
+
+export function readPendingCustomMovieDeletions(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_MOVIES_PENDING_DELETES_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+
+    return Array.isArray(list)
+      ? list.filter((item): item is string => typeof item === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberPendingCustomMovieDeletion(slug: string) {
+  const cleanSlug = slug.trim();
+  if (!cleanSlug) return;
+
+  const next = Array.from(
+    new Set([...readPendingCustomMovieDeletions(), cleanSlug])
+  );
+
+  localStorage.setItem(
+    CUSTOM_MOVIES_PENDING_DELETES_KEY,
+    JSON.stringify(next)
+  );
+}
+
+export function clearPendingCustomMovieDeletions(slugs: string[]) {
+  if (slugs.length === 0) return;
+
+  const removing = new Set(slugs);
+  const next = readPendingCustomMovieDeletions().filter(
+    (slug) => !removing.has(slug)
+  );
+
+  localStorage.setItem(
+    CUSTOM_MOVIES_PENDING_DELETES_KEY,
+    JSON.stringify(next)
+  );
+}
+
+function notifyCustomMoviesChanged(detail: CustomMoviesChangeDetail) {
+  if (typeof window === "undefined") return;
+
+  window.dispatchEvent(
+    new CustomEvent<CustomMoviesChangeDetail>(
+      CUSTOM_MOVIES_CHANGE_EVENT,
+      { detail }
+    )
+  );
+}
+
 export type StoredCustomMovie = MovieDetailResponse & {
   source: "local";
   createdAt: string;
@@ -112,8 +175,12 @@ export function readCustomMovies(): StoredCustomMovie[] {
   }
 }
 
-export function saveCustomMovies(movies: StoredCustomMovie[]) {
+export function saveCustomMovies(
+  movies: StoredCustomMovie[],
+  detail: CustomMoviesChangeDetail = { type: "save" }
+) {
   localStorage.setItem(CUSTOM_MOVIES_KEY, JSON.stringify(movies));
+  notifyCustomMoviesChanged(detail);
 }
 
 export function getCustomMovieBySlugClient(slug: string) {
@@ -122,7 +189,10 @@ export function getCustomMovieBySlugClient(slug: string) {
 
 export function deleteCustomMovie(slug: string) {
   const next = readCustomMovies().filter((item) => item.movie.slug !== slug);
-  saveCustomMovies(next);
+
+  rememberPendingCustomMovieDeletion(slug);
+  saveCustomMovies(next, { type: "delete", slug });
+
   return next;
 }
 
