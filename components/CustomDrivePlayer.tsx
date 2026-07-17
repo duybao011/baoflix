@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import NativeVideoPlayer from "@/components/NativeVideoPlayer";
 import TvWatchOverlay from "@/components/TvWatchOverlay";
-import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
+import type { EpisodeServer, EpisodeSubtitle, MovieDetail } from "@/lib/kkphim";
+import {
+  buildSubtitleFetchUrl,
+  convertSubtitleTextToVtt,
+  type ResolvedSubtitleTrack,
+} from "@/lib/subtitleTools";
 import { isTvModeActive } from "@/lib/tvMode";
 
 type CustomDrivePlayerProps = {
@@ -19,6 +24,7 @@ type CustomDrivePlayerProps = {
   nextHref?: string;
   detailHref: string;
   poster?: string;
+  subtitles?: EpisodeSubtitle[];
   onOpenEpisodes: () => void;
 };
 
@@ -31,6 +37,7 @@ type StoredDriveEstimate = {
 
 const PROBE_TIMEOUT_MS = 8000;
 const SAVE_INTERVAL_SECONDS = 5;
+const EMPTY_SUBTITLES: EpisodeSubtitle[] = [];
 
 function extractDriveFileId(url: string) {
   const value = String(url || "").trim();
@@ -128,6 +135,7 @@ export default function CustomDrivePlayer({
   nextHref = "",
   detailHref,
   poster,
+  subtitles = EMPTY_SUBTITLES,
   onOpenEpisodes,
 }: CustomDrivePlayerProps) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
@@ -141,6 +149,10 @@ export default function CustomDrivePlayer({
   const [iframeSrc, setIframeSrc] = useState(src);
   const [fallbackReason, setFallbackReason] = useState("");
   const [estimateSeconds, setEstimateSeconds] = useState(0);
+  const [resolvedSubtitleTracks, setResolvedSubtitleTracks] = useState<
+    ResolvedSubtitleTrack[]
+  >([]);
+  const [subtitleLoadError, setSubtitleLoadError] = useState("");
 
   const fileId = useMemo(() => extractDriveFileId(src), [src]);
   const directCandidates = useMemo(
@@ -148,6 +160,83 @@ export default function CustomDrivePlayer({
     [fileId]
   );
   const activeCandidate = directCandidates[candidateIndex] || "";
+
+  useEffect(() => {
+    let cancelled = false;
+    const objectUrls: string[] = [];
+
+    async function loadSubtitleTracks() {
+      setResolvedSubtitleTracks([]);
+      setSubtitleLoadError("");
+
+      if (!tvMode || subtitles.length === 0) return;
+
+      const relayBase = String(
+        process.env.NEXT_PUBLIC_DRIVE_RELAY_URL || ""
+      )
+        .trim()
+        .replace(/\/+$/, "");
+
+      const results = await Promise.allSettled(
+        subtitles
+          .filter((track) => String(track?.url || "").trim())
+          .map(async (track) => {
+            const fetchUrl = buildSubtitleFetchUrl(track, relayBase);
+            if (!fetchUrl) throw new Error("Không tạo được link phụ đề.");
+
+            const response = await fetch(fetchUrl, {
+              cache: "force-cache",
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+
+            const vttText = convertSubtitleTextToVtt(
+              await response.text(),
+              track.url
+            );
+            const objectUrl = URL.createObjectURL(
+              new Blob([vttText], {
+                type: "text/vtt;charset=utf-8",
+              })
+            );
+
+            objectUrls.push(objectUrl);
+
+            return {
+              label: track.label || "Phụ đề",
+              lang: track.lang || "vi",
+              url: objectUrl,
+              default: Boolean(track.default),
+            } satisfies ResolvedSubtitleTrack;
+          })
+      );
+
+      if (cancelled) return;
+
+      const loaded = results.flatMap((result) =>
+        result.status === "fulfilled" ? [result.value] : []
+      );
+
+      setResolvedSubtitleTracks(loaded);
+
+      if (results.some((result) => result.status === "rejected")) {
+        setSubtitleLoadError(
+          loaded.length
+            ? "Một số track phụ đề không tải được."
+            : "Không tải được phụ đề ASS/SRT/VTT."
+        );
+      }
+    }
+
+    void loadSubtitleTracks();
+
+    return () => {
+      cancelled = true;
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [subtitles, tvMode]);
 
   useEffect(() => {
     function refreshTvMode() {
@@ -347,6 +436,7 @@ export default function CustomDrivePlayer({
           poster={poster}
           progressKey={progressKey}
           tvMode={tvMode}
+          subtitleTracks={resolvedSubtitleTracks}
         />
       ) : (
         <iframe
@@ -363,6 +453,12 @@ export default function CustomDrivePlayer({
           ].join(" ")}
           title={title}
         />
+      )}
+
+      {tvMode && subtitleLoadError && (
+        <div className="pointer-events-none absolute left-1/2 top-[18%] z-20 max-w-[70vw] -translate-x-1/2 rounded-xl border border-yellow-300/20 bg-black/75 px-4 py-2 text-center text-xs font-bold text-yellow-100 shadow-xl backdrop-blur">
+          {subtitleLoadError}
+        </div>
       )}
 
       {tvMode && mode === "probing" && (
@@ -406,6 +502,7 @@ export default function CustomDrivePlayer({
           routeMode="custom"
           customSeasonIndex={seasonIndex}
           detailHref={detailHref}
+          hasSubtitles={resolvedSubtitleTracks.length > 0}
         />
       )}
     </div>

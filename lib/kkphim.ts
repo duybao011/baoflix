@@ -34,12 +34,20 @@ export type MovieDetail = MovieItem & {
   director?: string[] | string;
 };
 
+export type EpisodeSubtitle = {
+  label: string;
+  lang: string;
+  url: string;
+  default?: boolean;
+};
+
 export type Episode = {
   name: string;
   slug?: string;
   filename?: string;
   link_embed?: string;
   link_m3u8?: string;
+  subtitles?: EpisodeSubtitle[];
 };
 
 export type EpisodeServer = {

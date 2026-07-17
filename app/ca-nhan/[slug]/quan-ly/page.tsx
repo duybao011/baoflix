@@ -13,6 +13,7 @@ import {
   type EpisodeLinkCheck,
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
+import type { EpisodeSubtitle } from "@/lib/kkphim";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -21,6 +22,7 @@ type PageProps = {
 type EpisodeDraft = {
   name: string;
   link: string;
+  subtitleLink: string;
 };
 
 function parseBulkEpisodes(raw: string): EpisodeDraft[] {
@@ -34,13 +36,15 @@ function parseBulkEpisodes(raw: string): EpisodeDraft[] {
 
         return {
           name: parts[0]?.trim() || "",
-          link: parts.slice(1).join("|").trim(),
+          link: parts[1]?.trim() || "",
+          subtitleLink: parts.slice(2).join("|").trim(),
         };
       }
 
       return {
         name: "",
         link: line,
+        subtitleLink: "",
       };
     })
     .filter((item) => item.link);
@@ -50,6 +54,21 @@ function getEpisodeLinkValue(episode: { link_embed?: string; link_m3u8?: string 
   return episode.link_m3u8 || episode.link_embed || "";
 }
 
+function buildDefaultSubtitle(url: string): EpisodeSubtitle[] {
+  const cleanUrl = String(url || "").trim();
+
+  return cleanUrl
+    ? [
+        {
+          label: "Tiếng Việt",
+          lang: "vi",
+          url: cleanUrl,
+          default: true,
+        },
+      ]
+    : [];
+}
+
 export default function ManageCustomMoviePage({ params }: PageProps) {
   const { slug } = use(params);
 
@@ -57,6 +76,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
   const [seasonName, setSeasonName] = useState("Mùa 1");
   const [episodeName, setEpisodeName] = useState("");
   const [episodeLink, setEpisodeLink] = useState("");
+  const [episodeSubtitleLink, setEpisodeSubtitleLink] = useState("");
   const [bulkEpisodesText, setBulkEpisodesText] = useState("");
   const [status, setStatus] = useState("");
   const [linkChecks, setLinkChecks] = useState<Record<string, EpisodeLinkCheck>>({});
@@ -156,6 +176,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
     const cleanSeasonName = seasonName.trim() || "Mùa 1";
     const cleanEpisodeName = episodeName.trim();
     const cleanLink = episodeLink.trim();
+    const cleanSubtitleLink = episodeSubtitleLink.trim();
 
     if (!cleanLink) {
       alert("Dán link tập phim đã fen.");
@@ -175,6 +196,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
       slug: slugify(finalEpisodeName),
       filename: `${movie.name} - ${cleanSeasonName} - ${finalEpisodeName}`,
       ...normalizeEpisodeLink(cleanLink),
+      subtitles: buildDefaultSubtitle(cleanSubtitleLink),
     });
 
     saveUpdatedMovie(
@@ -184,6 +206,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
 
     setEpisodeName("");
     setEpisodeLink("");
+    setEpisodeSubtitleLink("");
   }
 
   function addBulkEpisodes() {
@@ -209,6 +232,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
         slug: slugify(finalEpisodeName),
         filename: `${movie.name} - ${cleanSeasonName} - ${finalEpisodeName}`,
         ...normalizeEpisodeLink(draft.link),
+        subtitles: buildDefaultSubtitle(draft.subtitleLink),
       });
     });
 
@@ -227,6 +251,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
       name?: string;
       link_embed?: string;
       link_m3u8?: string;
+      subtitles?: EpisodeSubtitle[];
     }
   ) {
     const cloned: StoredCustomMovie = JSON.parse(JSON.stringify(movieData));
@@ -248,6 +273,10 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
 
     if (typeof nextValue.link_m3u8 === "string") {
       episode.link_m3u8 = nextValue.link_m3u8;
+    }
+
+    if (Array.isArray(nextValue.subtitles)) {
+      episode.subtitles = nextValue.subtitles;
     }
 
     saveUpdatedMovie(cloned, "Đã cập nhật tập.");
@@ -415,7 +444,7 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
             </span>
           </label>
 
-          <div className="grid gap-4 md:grid-cols-[1fr_2fr_auto]">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_2fr_2fr_auto]">
             <label className="grid gap-2">
               <span className="text-sm font-bold">Tên tập</span>
 
@@ -438,6 +467,21 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
               />
             </label>
 
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">
+                Link phụ đề ASS / SRT / VTT
+              </span>
+
+              <input
+                value={episodeSubtitleLink}
+                onChange={(event) =>
+                  setEpisodeSubtitleLink(event.target.value)
+                }
+                placeholder="Google Drive public, có thể để trống"
+                className="rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-white outline-none"
+              />
+            </label>
+
             <div className="flex items-end">
               <button
                 type="button"
@@ -456,15 +500,16 @@ export default function ManageCustomMoviePage({ params }: PageProps) {
               value={bulkEpisodesText}
               onChange={(event) => setBulkEpisodesText(event.target.value)}
               rows={7}
-              placeholder={`Tập 04 | https://drive.google.com/file/d/xxx/view
-Tập 05 | https://drive.google.com/file/d/yyy/view
-Tập 06 | https://drive.google.com/file/d/zzz/view`}
+              placeholder={`Tập 04 | https://drive.google.com/file/d/video04/view | https://drive.google.com/file/d/sub04/view
+Tập 05 | https://drive.google.com/file/d/video05/view | https://drive.google.com/file/d/sub05/view
+Tập 06 | https://drive.google.com/file/d/video06/view`}
               className="rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-white outline-none"
             />
 
             <span className="text-xs text-slate-400">
-              Mỗi dòng một tập. Có thể dùng dạng <b>Tên tập | Link</b>. Nếu chỉ
-              dán link, app tự đặt tên tập tiếp theo.
+              Mỗi dòng một tập. Dùng dạng{" "}
+              <b>Tên tập | Link video | Link phụ đề</b>. Cột phụ đề có thể
+              để trống; hỗ trợ ASS, SRT và VTT trên Google Drive.
             </span>
           </label>
 
@@ -540,7 +585,14 @@ Tập 06 | https://drive.google.com/file/d/zzz/view`}
                               href={`/ca-nhan/${movie.slug}/xem?season=${seasonIndex}&tap=${episodeIndex}`}
                               className="font-bold hover:text-red-300"
                             >
-                              {episodeIndex + 1}. {episode.name}
+                              <span>
+                                {episodeIndex + 1}. {episode.name}
+                              </span>
+                              {episode.subtitles?.length ? (
+                                <span className="ml-2 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-2 py-0.5 text-[10px] font-black text-yellow-200">
+                                  CC
+                                </span>
+                              ) : null}
                             </Link>
 
                             <span className="text-xs text-slate-500">
@@ -609,6 +661,25 @@ Tập 06 | https://drive.google.com/file/d/zzz/view`}
                                   link_m3u8: event.currentTarget.value,
                                 })
                               }
+                              className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
+                            />
+                          </label>
+
+                          <label className="grid gap-2">
+                            <span className="text-xs font-bold text-slate-400">
+                              Phụ đề ASS / SRT / VTT
+                            </span>
+
+                            <input
+                              defaultValue={episode.subtitles?.[0]?.url || ""}
+                              onBlur={(event) =>
+                                updateEpisode(seasonIndex, episodeIndex, {
+                                  subtitles: buildDefaultSubtitle(
+                                    event.currentTarget.value
+                                  ),
+                                })
+                              }
+                              placeholder="Link Google Drive public; để trống để tắt"
                               className="rounded-xl border border-white/10 bg-[#10131d] px-3 py-2 text-sm text-white outline-none"
                             />
                           </label>

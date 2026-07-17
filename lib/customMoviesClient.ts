@@ -1,6 +1,6 @@
 "use client";
 
-import type { MovieDetailResponse } from "@/lib/kkphim";
+import type { EpisodeSubtitle, MovieDetailResponse } from "@/lib/kkphim";
 import { slugify } from "@/lib/slugify";
 
 export const CUSTOM_MOVIES_KEY = "baoflix_custom_movies";
@@ -335,6 +335,23 @@ export function importCustomMoviesJson(raw: string) {
   return next;
 }
 
+function buildDefaultEpisodeSubtitles(
+  url: string
+): EpisodeSubtitle[] {
+  const cleanUrl = String(url || "").trim();
+
+  return cleanUrl
+    ? [
+        {
+          label: "Tiếng Việt",
+          lang: "vi",
+          url: cleanUrl,
+          default: true,
+        },
+      ]
+    : [];
+}
+
 function parseSeasonsFromText(name: string, episodesText: string) {
   const lines = episodesText
     .split("\n")
@@ -349,6 +366,7 @@ function parseSeasonsFromText(name: string, episodesText: string) {
       filename: string;
       link_embed: string;
       link_m3u8: string;
+      subtitles?: EpisodeSubtitle[];
     }[];
   }[] = [];
 
@@ -360,6 +378,7 @@ function parseSeasonsFromText(name: string, episodesText: string) {
       filename: string;
       link_embed: string;
       link_m3u8: string;
+      subtitles?: EpisodeSubtitle[];
     }[],
   };
 
@@ -386,11 +405,13 @@ function parseSeasonsFromText(name: string, episodesText: string) {
 
     let episodeName = `Tập ${String(index).padStart(2, "0")}`;
     let linkRaw = line;
+    let subtitleRaw = "";
 
     if (line.includes("|")) {
       const parts = line.split("|");
       episodeName = parts[0]?.trim() || episodeName;
-      linkRaw = parts.slice(1).join("|").trim();
+      linkRaw = parts[1]?.trim() || "";
+      subtitleRaw = parts.slice(2).join("|").trim();
     }
 
     const isHls = /\.m3u8(\?|$)/i.test(linkRaw);
@@ -402,6 +423,7 @@ function parseSeasonsFromText(name: string, episodesText: string) {
       filename: `${name} - ${currentSeason.server_name} - ${episodeName}`,
       link_embed: link,
       link_m3u8: isHls ? linkRaw : "",
+      subtitles: buildDefaultEpisodeSubtitles(subtitleRaw),
     });
   });
 

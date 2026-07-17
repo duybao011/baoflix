@@ -2,8 +2,9 @@
 
 import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ResolvedSubtitleTrack } from "@/lib/subtitleTools";
 
-type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player" | "cycle-subtitle";
 
 type PlayerCommandDetail = {
   action: PlayerCommandAction;
@@ -17,6 +18,7 @@ type NativeVideoPlayerProps = {
   subtitle?: string;
   poster?: string;
   progressKey?: string;
+  subtitleTracks?: ResolvedSubtitleTrack[];
   /**
    * true: TV remote overlay điều khiển video, không hiện browser controls.
    * false: desktop/mobile dùng browser controls bình thường.
@@ -25,6 +27,7 @@ type NativeVideoPlayerProps = {
 };
 
 const VIDEO_PROGRESS_KEY = "baoflix_video_progress_v1";
+const EMPTY_SUBTITLE_TRACKS: ResolvedSubtitleTrack[] = [];
 
 type StoredVideoProgress = {
   currentTime: number;
@@ -79,10 +82,11 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function emitHud(detail: {
-  type: "seek" | "play" | "pause";
+  type: "seek" | "play" | "pause" | "subtitle";
   delta?: number;
   currentTime?: number;
   duration?: number;
+  label?: string;
 }) {
   window.dispatchEvent(
     new CustomEvent("baoflix-tv-player-hud", {
@@ -112,6 +116,7 @@ export default function NativeVideoPlayer({
   subtitle,
   poster,
   progressKey,
+  subtitleTracks = EMPTY_SUBTITLE_TRACKS,
   tvMode = false,
 }: NativeVideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -120,6 +125,7 @@ export default function NativeVideoPlayer({
   const restoreDoneRef = useRef(false);
   const lastProgressSaveRef = useRef(0);
   const [error, setError] = useState<string>("");
+  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);
 
   const attemptPlay = useCallback(
     async ({
@@ -200,6 +206,94 @@ export default function NativeVideoPlayer({
     });
   }, [tvMode]);
 
+  const applySubtitleMode = useCallback((index: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    Array.from(video.textTracks).forEach((track, trackIndex) => {
+      track.mode = trackIndex === index ? "showing" : "disabled";
+    });
+  }, []);
+
+  const cycleSubtitle = useCallback(() => {
+    if (!subtitleTracks.length) {
+      emitHud({ type: "subtitle", label: "Không có phụ đề" });
+      return;
+    }
+
+    const nextIndex =
+      activeSubtitleIndex >= subtitleTracks.length - 1
+        ? -1
+        : activeSubtitleIndex + 1;
+
+    setActiveSubtitleIndex(nextIndex);
+    window.setTimeout(() => applySubtitleMode(nextIndex), 0);
+
+    if (progressKey) {
+      try {
+        localStorage.setItem(
+          `${progressKey}:subtitle-choice`,
+          String(nextIndex)
+        );
+      } catch {}
+    }
+
+    emitHud({
+      type: "subtitle",
+      label:
+        nextIndex < 0
+          ? "Phụ đề: Tắt"
+          : `Phụ đề: ${subtitleTracks[nextIndex]?.label || "Bật"}`,
+    });
+  }, [
+    activeSubtitleIndex,
+    applySubtitleMode,
+    progressKey,
+    subtitleTracks,
+  ]);
+
+  useEffect(() => {
+    let nextIndex = subtitleTracks.findIndex((track) => track.default);
+    if (nextIndex < 0 && subtitleTracks.length) nextIndex = 0;
+
+    if (progressKey) {
+      try {
+        const stored = localStorage.getItem(
+          `${progressKey}:subtitle-choice`
+        );
+        if (stored !== null) {
+          const parsed = Number(stored);
+          if (
+            Number.isInteger(parsed) &&
+            parsed >= -1 &&
+            parsed < subtitleTracks.length
+          ) {
+            nextIndex = parsed;
+          }
+        }
+      } catch {}
+    }
+
+    setActiveSubtitleIndex(nextIndex);
+
+    const sync = () => applySubtitleMode(nextIndex);
+    const video = videoRef.current;
+    sync();
+
+    const timers = [
+      window.setTimeout(sync, 50),
+      window.setTimeout(sync, 250),
+      window.setTimeout(sync, 800),
+    ];
+
+    video?.addEventListener("loadedmetadata", sync);
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      video?.removeEventListener("loadedmetadata", sync);
+    };
+  }, [applySubtitleMode, progressKey, subtitleTracks]);
+
   const handleCommand = useCallback(
     (detail: PlayerCommandDetail) => {
       if (!tvMode) return;
@@ -208,6 +302,12 @@ export default function NativeVideoPlayer({
 
       if (detail.action === "focus-player") {
         // Chỉ trả focus về bề mặt remote. Không được tự play lại khi user đã pause.
+        focusRemoteSurface();
+        return;
+      }
+
+      if (detail.action === "cycle-subtitle") {
+        cycleSubtitle();
         focusRemoteSurface();
         return;
       }
@@ -240,7 +340,7 @@ export default function NativeVideoPlayer({
         pauseVideo();
       }
     },
-    [pauseVideo, playVideo, seekVideo, tvMode]
+    [cycleSubtitle, pauseVideo, playVideo, seekVideo, tvMode]
   );
 
   useEffect(() => {
@@ -535,7 +635,18 @@ export default function NativeVideoPlayer({
           if (!tvMode) return;
           userPausedRef.current = true;
         }}
-      />
+      >
+        {subtitleTracks.map((track, index) => (
+          <track
+            key={`${track.lang}-${track.label}-${track.url}-${index}`}
+            kind="subtitles"
+            src={track.url}
+            srcLang={track.lang || "vi"}
+            label={track.label || `Phụ đề ${index + 1}`}
+            default={Boolean(track.default && index === 0)}
+          />
+        ))}
+      </video>
 
       {error && (
         <div className="pointer-events-none absolute left-1/2 top-[12%] max-w-[70vw] -translate-x-1/2 rounded-2xl bg-black/72 px-4 py-3 text-center text-sm font-bold text-yellow-100 shadow-2xl backdrop-blur">

@@ -371,19 +371,20 @@ export default function CustomMovieForm() {
             onChange={(event) => setEpisodesText(event.target.value)}
             rows={12}
             placeholder={`# Mùa 1
-Tập 01 | https://drive.google.com/file/d/xxx/view
-Tập 02 | https://drive.google.com/file/d/yyy/view
+Tập 01 | https://drive.google.com/file/d/video01/view | https://drive.google.com/file/d/sub01/view
+Tập 02 | https://drive.google.com/file/d/video02/view | https://drive.google.com/file/d/sub02/view
 
 # Mùa 2
-Tập 01 | https://drive.google.com/file/d/zzz/view
-Tập 02 | https://drive.google.com/file/d/abc/view`}
+Tập 01 | https://drive.google.com/file/d/video03/view | https://drive.google.com/file/d/sub03/view
+Tập 02 | https://drive.google.com/file/d/video04/view`}
             className="rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-white outline-none"
           />
 
           <span className="text-xs text-slate-400">
             Mỗi mùa bắt đầu bằng <b># Tên mùa</b>. Mỗi tập nhập dạng{" "}
-            <b>Tên tập | Link video</b>. Nếu chỉ dán link, app tự đặt Tập 01,
-            Tập 02...
+            <b>Tên tập | Link video | Link phụ đề</b>. Phụ đề hỗ trợ link
+            Drive chứa ASS, SRT hoặc VTT. Có thể bỏ trống cột phụ đề. Nếu chỉ
+            dán link video, app tự đặt Tập 01, Tập 02...
           </span>
         </label>
 

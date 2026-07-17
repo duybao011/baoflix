@@ -520,6 +520,7 @@ function CustomMovieWatchContent({
               nextHref={nextHref}
               detailHref={`/ca-nhan/${movie.slug}`}
               poster={movie.thumb_url || movie.poster_url}
+              subtitles={episode.subtitles}
               onOpenEpisodes={() => setEpisodePanelOpen(true)}
             />
           ) : episode?.link_m3u8 ? (

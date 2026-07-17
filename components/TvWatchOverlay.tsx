@@ -27,6 +27,7 @@ type TvWatchOverlayProps = {
   routeMode?: "normal" | "custom";
   customSeasonIndex?: number;
   detailHref?: string;
+  hasSubtitles?: boolean;
 };
 
 type ShowOverlayDetail = {
@@ -40,13 +41,14 @@ type OverlayCommandDetail = {
 };
 
 type PlayerHudDetail = {
-  type: "seek" | "play" | "pause" | "toggle";
+  type: "seek" | "play" | "pause" | "toggle" | "subtitle";
   delta?: number;
   currentTime?: number;
   duration?: number;
+  label?: string;
 };
 
-type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player";
+type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player" | "cycle-subtitle";
 type OverlayMode = "hidden" | "peek" | "panel" | "confirm-exit";
 type OverlayPanel = "episodes" | "sources" | null;
 
@@ -169,6 +171,7 @@ function getHudLabel(hud: PlayerHudDetail) {
 
   if (hud.type === "pause") return "Tạm dừng";
   if (hud.type === "play") return "Phát";
+  if (hud.type === "subtitle") return hud.label || "Phụ đề";
   return "Phát / tạm dừng";
 }
 
@@ -198,6 +201,7 @@ export default function TvWatchOverlay({
   routeMode = "normal",
   customSeasonIndex,
   detailHref,
+  hasSubtitles = false,
 }: TvWatchOverlayProps) {
   const [overlayMode, setOverlayModeState] = useState<OverlayMode>("peek");
   const [overlayPanel, setOverlayPanelState] = useState<OverlayPanel>(null);
@@ -508,6 +512,11 @@ export default function TvWatchOverlay({
   function handleTogglePlay() {
     showPeek({ focus: false });
     dispatchPlayerCommand("toggle-play");
+  }
+
+  function handleSubtitleCycle() {
+    showPeek({ focus: false });
+    dispatchPlayerCommand("cycle-subtitle");
   }
 
   function handleFocusPlayer() {
@@ -851,18 +860,36 @@ export default function TvWatchOverlay({
 
               <button
                 type="button"
-                data-tv-focus-key="overlay:sources"
+                data-tv-focus-key={
+                  routeMode === "custom"
+                    ? "overlay:subtitles"
+                    : "overlay:sources"
+                }
                 {...hiddenFocusProps}
-                onClick={() => openPanel("sources")}
-                disabled={!hasMultipleServers}
+                onClick={
+                  routeMode === "custom"
+                    ? handleSubtitleCycle
+                    : () => openPanel("sources")
+                }
+                disabled={
+                  routeMode === "custom"
+                    ? !hasSubtitles
+                    : !hasMultipleServers
+                }
                 className={[
                   "flex min-h-[40px] items-center justify-center rounded-2xl px-3 text-[11px] font-black min-[1280px]:min-h-[44px] min-[1280px]:text-[12px]",
                   SURFACE_BUTTON_CLASS,
-                  !hasMultipleServers ? "opacity-40" : "",
+                  routeMode === "custom"
+                    ? !hasSubtitles
+                      ? "opacity-40"
+                      : ""
+                    : !hasMultipleServers
+                      ? "opacity-40"
+                      : "",
                   TV_FOCUS_CLASS,
                 ].join(" ")}
               >
-                Nguồn
+                {routeMode === "custom" ? "Phụ đề" : "Nguồn"}
               </button>
 
               <button
