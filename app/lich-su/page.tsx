@@ -103,6 +103,8 @@ function SelectBox({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       data-tv-focus-key={focusKey}
+      data-tv-select-cycle="true"
+      title="Trên TV: bấm OK để mở hoặc chuyển lựa chọn"
       className={[
         "h-9 rounded-lg border border-white/10 bg-[#10131d] px-2.5 text-[12px] font-bold text-white outline-none min-[1280px]:h-10",
         TV_FOCUS_CLASS,
