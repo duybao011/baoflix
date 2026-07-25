@@ -10,8 +10,6 @@ const FOCUSABLE_SELECTOR = [
   "input:not([disabled])",
   "select:not([disabled])",
   "textarea:not([disabled])",
-  "[role='button']:not([aria-disabled='true'])",
-  "[data-tv-focus]",
   "[tabindex]:not([tabindex='-1'])",
 ].join(",");
 
@@ -133,28 +131,11 @@ function isTextDeleteBackspace(event: KeyboardEvent) {
   );
 }
 
-function prepareTvFocusableElement(element: HTMLElement) {
-  if (element.hasAttribute("data-tv-focus") && element.tabIndex < 0) {
-    element.tabIndex = 0;
-  }
-}
-
 function isVisibleElement(element: HTMLElement) {
   const rect = element.getBoundingClientRect();
   const style = window.getComputedStyle(element);
 
-  if (element.closest("[inert]")) return false;
   if (element.getAttribute("aria-hidden") === "true") return false;
-  if (element.closest("[aria-hidden='true']")) return false;
-  if (element.hasAttribute("disabled")) return false;
-  if (element.getAttribute("aria-disabled") === "true") return false;
-  if (
-    element.closest(
-      "[data-tv-overlay='watch'][data-tv-overlay-visible='false']"
-    )
-  ) {
-    return false;
-  }
   if (style.display === "none") return false;
   if (style.visibility === "hidden") return false;
   if (style.opacity === "0") return false;
@@ -164,14 +145,9 @@ function isVisibleElement(element: HTMLElement) {
 
 function getFocusableElements(root: ParentNode = document) {
   return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter((element) => {
-      prepareTvFocusableElement(element);
-      return true;
-    })
     .filter(isVisibleElement)
     .filter((element) => element.tabIndex !== -1)
-    .filter((element) => !element.hasAttribute("data-tv-skip"))
-    .filter((element) => !element.closest("[data-tv-skip]"));
+    .filter((element) => !element.hasAttribute("data-tv-skip"));
 }
 
 function getActiveScope(element: Element | null) {
@@ -954,78 +930,10 @@ function focusOverlaySeekButton(direction: SeekDirection, pathname: string) {
   }, 60);
 }
 
-function isRemoteActivatableInput(
-  element: Element | null
-): element is HTMLInputElement {
-  if (!(element instanceof HTMLInputElement)) return false;
-
-  return ["button", "checkbox", "radio", "reset", "submit"].includes(
-    element.type
-  );
-}
-
-function cycleTvSelectOption(select: HTMLSelectElement, direction = 1) {
-  const availableOptions = Array.from(select.options)
-    .map((option, index) => ({ option, index }))
-    .filter(({ option }) => !option.disabled && !option.hidden);
-
-  if (availableOptions.length === 0) return false;
-
-  const currentIndex = availableOptions.findIndex(
-    ({ index }) => index === select.selectedIndex
-  );
-  const startIndex =
-    currentIndex >= 0 ? currentIndex : direction >= 0 ? -1 : 0;
-  const nextIndex =
-    (startIndex + direction + availableOptions.length) %
-    availableOptions.length;
-  const nextOption = availableOptions[nextIndex];
-
-  if (!nextOption) return false;
-
-  select.selectedIndex = nextOption.index;
-  select.dispatchEvent(new Event("input", { bubbles: true }));
-  select.dispatchEvent(new Event("change", { bubbles: true }));
-  select.focus({ preventScroll: true });
-
-  return true;
-}
-
-function activateTvSelect(event: KeyboardEvent, select: HTMLSelectElement) {
-  event.preventDefault();
-  event.stopPropagation();
-
-  const showPicker = (
-    select as HTMLSelectElement & { showPicker?: () => void }
-  ).showPicker;
-
-  if (typeof showPicker === "function") {
-    try {
-      showPicker.call(select);
-      return;
-    } catch {
-      // Nhiều TV WebView chưa hỗ trợ showPicker dù API có tồn tại.
-    }
-  }
-
-  cycleTvSelectOption(select, event.shiftKey ? -1 : 1);
-}
-
 function clickActiveElement(event: KeyboardEvent) {
   const active = document.activeElement;
-
-  if (active instanceof HTMLSelectElement) {
-    activateTvSelect(event, active);
-    return;
-  }
-
-  if (
-    active instanceof HTMLAnchorElement ||
-    active instanceof HTMLButtonElement ||
-    isRemoteActivatableInput(active)
-  ) {
+  if (active instanceof HTMLAnchorElement || active instanceof HTMLButtonElement) {
     event.preventDefault();
-    event.stopPropagation();
     active.click();
   }
 }
@@ -1750,12 +1658,7 @@ export default function TvRemoteNavigator() {
         if (handlePlaybackShortcut(event, direction)) return;
       }
 
-      if (
-        isActivationKey(event) &&
-        (!isTextInput(activeElement) ||
-          activeElement instanceof HTMLSelectElement ||
-          isRemoteActivatableInput(activeElement))
-      ) {
+      if (isActivationKey(event) && !isTextInput(activeElement)) {
         clickActiveElement(event);
         return;
       }

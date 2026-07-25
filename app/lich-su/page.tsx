@@ -87,6 +87,66 @@ function getSourceLabel(item: HistoryItem) {
   return item.serverName || "Server";
 }
 
+function isHistorySelectActivationKey(
+  event: React.KeyboardEvent<HTMLSelectElement>
+) {
+  const nativeEvent = event.nativeEvent as KeyboardEvent;
+
+  return (
+    event.key === "Enter" ||
+    event.key === "NumpadEnter" ||
+    event.key === " " ||
+    event.key === "Spacebar" ||
+    event.key === "OK" ||
+    event.key === "Accept" ||
+    nativeEvent.keyCode === 13 ||
+    nativeEvent.keyCode === 23 ||
+    nativeEvent.keyCode === 66
+  );
+}
+
+function handleHistorySelectKeyDown(
+  event: React.KeyboardEvent<HTMLSelectElement>
+) {
+  if (!isHistorySelectActivationKey(event)) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+
+  if (event.repeat) return;
+
+  const select = event.currentTarget as HTMLSelectElement & {
+    showPicker?: () => void;
+  };
+
+  if (typeof select.showPicker === "function") {
+    try {
+      select.showPicker();
+      return;
+    } catch {
+      // TV WebView có thể khai báo showPicker nhưng không cho gọi.
+    }
+  }
+
+  const options = Array.from(select.options)
+    .map((option, index) => ({ option, index }))
+    .filter(({ option }) => !option.disabled && !option.hidden);
+
+  if (!options.length) return;
+
+  const current = options.findIndex(
+    ({ index }) => index === select.selectedIndex
+  );
+  const next = options[(Math.max(current, 0) + 1) % options.length];
+
+  if (!next) return;
+
+  select.selectedIndex = next.index;
+  select.dispatchEvent(new Event("input", { bubbles: true }));
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  select.focus({ preventScroll: true });
+}
+
 function SelectBox({
   value,
   onChange,
@@ -102,6 +162,7 @@ function SelectBox({
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      onKeyDown={handleHistorySelectKeyDown}
       data-tv-focus-key={focusKey}
       data-tv-select-cycle="true"
       title="Trên TV: bấm OK để mở hoặc chuyển lựa chọn"
