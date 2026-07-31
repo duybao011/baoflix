@@ -83,18 +83,40 @@ function getActiveElementTag() {
   return active.tagName.toLowerCase();
 }
 
-function shouldLetTextInputHandle(event: KeyboardEvent) {
+function shouldLetEditableHandle(event: KeyboardEvent) {
   const active = document.activeElement;
 
   if (!(active instanceof HTMLElement)) return false;
 
-  const tagName = active.tagName.toLowerCase();
-  const isTextInput =
-    tagName === "input" || tagName === "textarea" || active.isContentEditable;
+  if (event.isComposing || event.key === "Process" || event.keyCode === 229) {
+    return true;
+  }
 
-  if (!isTextInput) return false;
+  if (active.isContentEditable) return true;
 
-  return event.key === "ArrowLeft" || event.key === "ArrowRight";
+  if (active instanceof HTMLTextAreaElement) {
+    return !active.readOnly && !active.disabled;
+  }
+
+  if (active instanceof HTMLInputElement) {
+    const nonTextTypes = new Set([
+      "button",
+      "checkbox",
+      "color",
+      "file",
+      "hidden",
+      "image",
+      "radio",
+      "range",
+      "reset",
+      "submit",
+    ]);
+
+    if (nonTextTypes.has(active.type)) return false;
+    return !active.readOnly && !active.disabled;
+  }
+
+  return false;
 }
 
 function dispatchSyntheticKey(key: string, keyCode = 0, repeat = 0) {
@@ -123,6 +145,14 @@ function dispatchSyntheticKey(key: string, keyCode = 0, repeat = 0) {
   document.dispatchEvent(syntheticEvent);
 }
 
+function shouldUseLegacyAndroidKeyCode(event: KeyboardEvent) {
+  const key = String(event.key || "");
+
+  // Bàn phím máy tính có event.key rõ ràng ("b", "r", "u"...).
+  // Chỉ fallback sang keyCode khi TV/WebView không cung cấp tên phím.
+  return key === "" || key === "Unidentified";
+}
+
 function getMappedKeyFromKeyboardEvent(event: KeyboardEvent) {
   const alias = WEB_KEY_ALIASES[event.key];
 
@@ -132,6 +162,8 @@ function getMappedKeyFromKeyboardEvent(event: KeyboardEvent) {
       keyCode: getAndroidKeyCode(event),
     };
   }
+
+  if (!shouldUseLegacyAndroidKeyCode(event)) return null;
 
   const keyCode = getAndroidKeyCode(event);
   const mappedKey = ANDROID_TV_KEY_TO_WEB_KEY[keyCode];
@@ -160,7 +192,7 @@ export default function TvRemoteKeyBridge() {
       const remoteEvent = event as RemoteKeyboardEvent;
 
       if (remoteEvent.__baoflixSyntheticRemoteKey) return;
-      if (shouldLetTextInputHandle(event)) return;
+      if (shouldLetEditableHandle(event)) return;
 
       if (WEB_KEYS_ALREADY_OK.has(event.key)) return;
 
