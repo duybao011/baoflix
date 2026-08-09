@@ -35,7 +35,9 @@ type StoredDriveEstimate = {
   updatedAt: string;
 };
 
-const PROBE_TIMEOUT_MS = 8000;
+const PROBE_TIMEOUT_MS = 3500;
+const DRIVE_RELAY_COOLDOWN_MS = 5 * 60 * 1000;
+const DRIVE_RELAY_FAIL_UNTIL_KEY = "baoflix_drive_relay_fail_until";
 const SAVE_INTERVAL_SECONDS = 5;
 const EMPTY_SUBTITLES: EpisodeSubtitle[] = [];
 
@@ -119,6 +121,40 @@ function saveEstimate(storageKey: string, seconds: number) {
     );
   } catch {
     // Bỏ qua lỗi storage trên WebView hạn chế.
+  }
+}
+
+function isDriveRelayCoolingDown() {
+  try {
+    const failUntil = Number(
+      sessionStorage.getItem(DRIVE_RELAY_FAIL_UNTIL_KEY) || 0
+    );
+    if (!Number.isFinite(failUntil) || failUntil <= Date.now()) {
+      sessionStorage.removeItem(DRIVE_RELAY_FAIL_UNTIL_KEY);
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function rememberDriveRelayTimeout() {
+  try {
+    sessionStorage.setItem(
+      DRIVE_RELAY_FAIL_UNTIL_KEY,
+      String(Date.now() + DRIVE_RELAY_COOLDOWN_MS)
+    );
+  } catch {
+    // Bỏ qua storage bị chặn.
+  }
+}
+
+function clearDriveRelayTimeout() {
+  try {
+    sessionStorage.removeItem(DRIVE_RELAY_FAIL_UNTIL_KEY);
+  } catch {
+    // Bỏ qua storage bị chặn.
   }
 }
 
@@ -275,6 +311,15 @@ export default function CustomDrivePlayer({
       return;
     }
 
+    // BAOFLIX_PERF_PHASE1: relay vừa timeout thì đừng bắt tập kế tiếp chờ lại.
+    if (isDriveRelayCoolingDown()) {
+      setMode("iframe");
+      setFallbackReason(
+        "Drive Relay vừa phản hồi chậm, tạm dùng iframe để vào phim nhanh hơn."
+      );
+      return;
+    }
+
     setMode("probing");
   }, [directCandidates.length, fileId, src, tvMode]);
 
@@ -282,7 +327,7 @@ export default function CustomDrivePlayer({
     if (!tvMode || mode !== "probing" || !activeCandidate) return;
 
     const timeout = window.setTimeout(() => {
-      tryNextCandidate("Nguồn direct tải quá lâu.");
+      tryNextCandidate("Nguồn direct tải quá lâu.", true);
     }, PROBE_TIMEOUT_MS);
 
     return () => window.clearTimeout(timeout);
@@ -380,7 +425,10 @@ export default function CustomDrivePlayer({
     };
   }, [mode, src, tvMode]);
 
-  function tryNextCandidate(reason: string) {
+  function tryNextCandidate(
+    reason: string,
+    rememberTimeout = false
+  ) {
     const nextIndex = candidateIndex + 1;
 
     if (nextIndex < directCandidates.length) {
@@ -388,6 +436,8 @@ export default function CustomDrivePlayer({
       setFallbackReason(reason);
       return;
     }
+
+    if (rememberTimeout) rememberDriveRelayTimeout();
 
     setMode("iframe");
     setFallbackReason(
@@ -398,6 +448,7 @@ export default function CustomDrivePlayer({
   function handleProbeReady() {
     if (!activeCandidate) return;
 
+    clearDriveRelayTimeout();
     setNativeSrc(activeCandidate);
     setMode("native");
     setFallbackReason("");

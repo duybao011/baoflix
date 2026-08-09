@@ -56,8 +56,12 @@ function normalizeRemoteMovie(row: RemoteMovieRow): StoredCustomMovie | null {
 }
 
 function writeCustomMoviesCache(movies: StoredCustomMovie[]) {
-  localStorage.setItem(CUSTOM_MOVIES_KEY, JSON.stringify(movies));
+  const nextValue = JSON.stringify(movies);
+  const currentValue = localStorage.getItem(CUSTOM_MOVIES_KEY);
 
+  if (currentValue === nextValue) return;
+
+  localStorage.setItem(CUSTOM_MOVIES_KEY, nextValue);
   window.dispatchEvent(
     new CustomEvent("baoflix-custom-movies-synced", {
       detail: {
@@ -133,20 +137,17 @@ function mergeMovies(
   const merged = new Map<string, StoredCustomMovie>();
   const remoteTimes = new Map<string, number>();
   const localSlugs = new Set(localMovies.map((item) => item.movie.slug));
+  const moviesToUpload: StoredCustomMovie[] = [];
   let downloadedCount = 0;
   let uploadedCount = 0;
 
   remoteRows.forEach((row) => {
     const movie = normalizeRemoteMovie(row);
     if (!movie) return;
-
     merged.set(movie.movie.slug, movie);
     remoteTimes.set(
       movie.movie.slug,
-      Math.max(
-        getTimestamp(row.updated_at),
-        getTimestamp(movie.updatedAt)
-      )
+      Math.max(getTimestamp(row.updated_at), getTimestamp(movie.updatedAt))
     );
   });
 
@@ -156,6 +157,7 @@ function mergeMovies(
 
     if (!remoteMovie) {
       merged.set(slug, localMovie);
+      moviesToUpload.push(localMovie);
       uploadedCount += 1;
       return;
     }
@@ -165,8 +167,8 @@ function mergeMovies(
 
     if (localTime >= remoteTime) {
       merged.set(slug, localMovie);
-
       if (localTime > remoteTime) {
+        moviesToUpload.push(localMovie);
         uploadedCount += 1;
       }
     } else {
@@ -175,15 +177,14 @@ function mergeMovies(
   });
 
   remoteRows.forEach((row) => {
-    if (!localSlugs.has(row.slug)) {
-      downloadedCount += 1;
-    }
+    if (!localSlugs.has(row.slug)) downloadedCount += 1;
   });
 
   return {
     movies: Array.from(merged.values()).sort(
       (a, b) => getTimestamp(b.updatedAt) - getTimestamp(a.updatedAt)
     ),
+    moviesToUpload,
     uploadedCount,
     downloadedCount,
   };
@@ -230,12 +231,15 @@ export async function syncCustomMoviesBidirectional(): Promise<
   const deletedCount = await deletePendingRemoteMovies(user.id, localMovies);
   const remoteRows = await fetchRemoteRows(user.id);
 
-  const { movies, uploadedCount, downloadedCount } = mergeMovies(
-    localMovies,
-    remoteRows
-  );
+  const {
+    movies,
+    moviesToUpload,
+    uploadedCount,
+    downloadedCount,
+  } = mergeMovies(localMovies, remoteRows);
 
-  await upsertRemoteMovies(user.id, movies);
+  // BAOFLIX_PERF_PHASE1: chỉ upload bản local thực sự mới hơn/không tồn tại.
+  await upsertRemoteMovies(user.id, moviesToUpload);
   writeCustomMoviesCache(movies);
 
   return {

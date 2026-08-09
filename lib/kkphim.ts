@@ -239,8 +239,8 @@ function filterAnimationSubtype(
   return result;
 }
 
-const ANIMATION_AGGREGATE_SOURCE_PAGES = 12;
-const ANIMATION_SOURCE_LIMIT = 64;
+const ANIMATION_AGGREGATE_SOURCE_PAGES = 5;
+const ANIMATION_SOURCE_LIMIT = 48;
 
 function uniqueMovies(items: MovieItem[]) {
   const map = new Map<string, MovieItem>();
@@ -337,8 +337,8 @@ async function getAggregatedAnimationBySubtype(
    Multi-tag filter merge
 ========================= */
 
-const MULTI_FILTER_SOURCE_PAGES = 6;
-const MULTI_FILTER_SOURCE_LIMIT = 48;
+const MULTI_FILTER_SOURCE_PAGES = 3;
+const MULTI_FILTER_SOURCE_LIMIT = 40;
 
 function parseMultiFilterValue(value?: string) {
   return String(value || "")
@@ -437,16 +437,15 @@ async function getAggregatedMultiFilterMovies(
   const categorySlugs = parseMultiFilterValue(filters.category);
   const countrySlugs = parseMultiFilterValue(filters.country);
 
-  const categoryQueries = categorySlugs.length ? categorySlugs : [undefined];
-  const countryQueries = countrySlugs.length ? countrySlugs : [undefined];
-
+  // BAOFLIX_PERF_PHASE1: query từng nhóm độc lập, không nhân category × country.
+  const sourcePageCount = Math.max(
+    2,
+    Math.min(MULTI_FILTER_SOURCE_PAGES, page + 1)
+  );
   const sourcePages = Array.from(
-    {
-      length: Math.max(3, Math.min(MULTI_FILTER_SOURCE_PAGES, page + 2)),
-    },
+    { length: sourcePageCount },
     (_, index) => index + 1
   );
-
   const sourceLimit = Math.max(limit, MULTI_FILTER_SOURCE_LIMIT);
 
   const baseFilters: Partial<FilterValues> = {
@@ -458,56 +457,49 @@ async function getAggregatedMultiFilterMovies(
 
   const tasks: Promise<MovieListResult>[] = [];
 
-  categoryQueries.forEach((categorySlug) => {
-    countryQueries.forEach((countrySlug) => {
+  if (type && type !== "tat-ca") {
+    categorySlugs.forEach((categorySlug) => {
       sourcePages.forEach((sourcePage) => {
-        const comboFilters: Partial<FilterValues> = {
-          ...baseFilters,
-          category: categorySlug,
-          country: countrySlug,
-        };
-
-        if (type === "hoat-hinh") {
-          tasks.push(
-            getMoviesByList("hoat-hinh", sourcePage, sourceLimit, comboFilters)
-          );
-          return;
-        }
-
-        if (type && type !== "tat-ca") {
-          tasks.push(
-            getMoviesByList(type, sourcePage, sourceLimit, comboFilters)
-          );
-          return;
-        }
-
-        if (categorySlug) {
-          tasks.push(
-            getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
-              ...baseFilters,
-              country: countrySlug,
-            })
-          );
-          return;
-        }
-
-        if (countrySlug) {
-          tasks.push(
-            getMoviesByCountry(countrySlug, sourcePage, sourceLimit, {
-              ...baseFilters,
-            })
-          );
-        }
+        tasks.push(
+          getMoviesByList(type, sourcePage, sourceLimit, {
+            ...baseFilters,
+            category: categorySlug,
+          })
+        );
       });
     });
-  });
 
-  if (!tasks.length) {
-    return getLatestMovieListResult(page, limit);
+    countrySlugs.forEach((countrySlug) => {
+      sourcePages.forEach((sourcePage) => {
+        tasks.push(
+          getMoviesByList(type, sourcePage, sourceLimit, {
+            ...baseFilters,
+            country: countrySlug,
+          })
+        );
+      });
+    });
+  } else {
+    categorySlugs.forEach((categorySlug) => {
+      sourcePages.forEach((sourcePage) => {
+        tasks.push(
+          getMoviesByGenre(categorySlug, sourcePage, sourceLimit, baseFilters)
+        );
+      });
+    });
+
+    countrySlugs.forEach((countrySlug) => {
+      sourcePages.forEach((sourcePage) => {
+        tasks.push(
+          getMoviesByCountry(countrySlug, sourcePage, sourceLimit, baseFilters)
+        );
+      });
+    });
   }
 
-  const results = await Promise.allSettled(tasks);
+  if (!tasks.length) return getLatestMovieListResult(page, limit);
 
+  const results = await Promise.allSettled(tasks);
   const mergedItems = uniqueMovies(
     results.flatMap((result) => {
       if (result.status !== "fulfilled") return [];

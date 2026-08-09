@@ -132,24 +132,50 @@ function SearchForm({ compact, onDone, autoFocus, initialKeyword }: { compact?: 
     window.addEventListener("mousedown", handleClickOutside);
     return () => window.removeEventListener("mousedown", handleClickOutside);
   }, []);
+  // BAOFLIX_PERF_PHASE1: debounce + abort search suggestion.
   useEffect(() => {
     const q = keyword.trim();
-    if (q.length < 2) { setSuggestions([]); setLoadingSuggest(false); return; }
+
+    if (!focused || q.length < 3) {
+      setSuggestions([]);
+      setLoadingSuggest(false);
+      return;
+    }
+
     let cancelled = false;
+    const controller = new AbortController();
+
     async function fetchSuggestions() {
       try {
         setLoadingSuggest(true);
-        const res = await fetch(`/api/search-suggest?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+        const res = await fetch(
+          `/api/search-suggest?q=${encodeURIComponent(q)}`,
+          { signal: controller.signal }
+        );
         if (!res.ok) throw new Error("Không lấy được gợi ý");
+
         const data = await res.json();
-        const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+        const items = Array.isArray(data?.items)
+          ? data.items
+          : Array.isArray(data)
+            ? data
+            : [];
+
         if (!cancelled) setSuggestions(items.slice(0, 5));
-      } catch { if (!cancelled) setSuggestions([]); }
-      finally { if (!cancelled) setLoadingSuggest(false); }
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      } finally {
+        if (!cancelled) setLoadingSuggest(false);
+      }
     }
-    const timer = window.setTimeout(fetchSuggestions, 250);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [keyword]);
+
+    const timer = window.setTimeout(fetchSuggestions, 450);
+    return () => {
+      cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [keyword, focused]);
 
   const filteredHistory = history.filter((item) => !keyword.trim() || item.toLowerCase().includes(keyword.trim().toLowerCase()));
   function goSearch(value: string) {
@@ -189,7 +215,9 @@ function SearchForm({ compact, onDone, autoFocus, initialKeyword }: { compact?: 
 }
 
 function NavButton({ item, onClick }: { item: NavItem; onClick?: () => void }) {
-  return <Link href={item.href} onClick={onClick} prefetch={false} data-tv-focus-key={`nav:${item.href}:${item.label}`} className={["rounded-2xl border px-4 py-2.5 text-sm font-bold transition", item.highlight ? "border-red-500/40 bg-red-600/15 text-red-100 hover:bg-red-600" : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"].join(" ")}>{item.label}</Link>;
+  const router = useRouter();
+  function prefetchRoute() { router.prefetch(item.href); }
+  return <Link href={item.href} onClick={onClick} prefetch={false} onMouseEnter={prefetchRoute} onFocus={prefetchRoute} data-tv-focus-key={`nav:${item.href}:${item.label}`} className={["rounded-2xl border px-4 py-2.5 text-sm font-bold transition", item.highlight ? "border-red-500/40 bg-red-600/15 text-red-100 hover:bg-red-600" : "border-white/10 bg-white/5 text-slate-100 hover:bg-white/10"].join(" ")}>{item.label}</Link>;
 }
 
 export default function Header() {
