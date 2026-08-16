@@ -548,6 +548,9 @@ export default function NativeVideoPlayer({
   useEffect(() => {
     if (!progressKey) return;
 
+    // Giữ một string đã được narrow ổn định cho callback chạy về sau.
+    const activeProgressKey = progressKey;
+
     function handleSyncedProgress(event: Event) {
       const video = videoRef.current;
       if (!video) return;
@@ -558,12 +561,12 @@ export default function NativeVideoPlayer({
 
       if (
         Array.isArray(detail?.keys) &&
-        !detail.keys.includes(progressKey)
+        !detail.keys.includes(activeProgressKey)
       ) {
         return;
       }
 
-      const saved = readVideoProgress(progressKey);
+      const saved = readVideoProgress(activeProgressKey);
       if (!saved) return;
 
       const savedUpdatedAt = String(saved.updatedAt || "");
