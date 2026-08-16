@@ -1,10 +1,10 @@
-\"use client\";
+"use client";
 
 // BAOFLIX_PERSONAL_HISTORY_SYNC
 
-import { useEffect, useRef } from \"react\";
-import { getSupabaseClient } from \"@/lib/supabaseClient\";
-import { isTvModeActive } from \"@/lib/tvMode\";
+import { useEffect, useRef } from "react";
+import { getSupabaseClient } from "@/lib/supabaseClient";
+import { isTvModeActive } from "@/lib/tvMode";
 import {
   applySyncedWatchState,
   normalizeWatchHistory,
@@ -12,18 +12,18 @@ import {
   readWatchedEpisodes,
   WATCH_STORE_CHANGE_EVENT,
   type WatchHistoryItem,
-} from \"@/lib/watchStore\";
+} from "@/lib/watchStore";
 
-const TABLE = \"watch_history_sync\";
-const SYNC_GROUP = \"personal\";
+const TABLE = "watch_history_sync";
+const SYNC_GROUP = "personal";
 const MIN_SYNC_INTERVAL_MS = 5000;
 const PERIODIC_SYNC_MS = 60000;
 
 function isTvSession() {
-  if (typeof window === \"undefined\") return false;
+  if (typeof window === "undefined") return false;
 
   return (
-    window.location.pathname === \"/tv\" ||
+    window.location.pathname === "/tv" ||
     isTvModeActive({ allowSessionOnDesktop: true })
   );
 }
@@ -35,8 +35,8 @@ function normalizeRemoteHistory(value: unknown): WatchHistoryItem[] {
     (item): item is WatchHistoryItem =>
       Boolean(
         item &&
-          typeof item === \"object\" &&
-          typeof (item as WatchHistoryItem).slug === \"string\"
+          typeof item === "object" &&
+          typeof (item as WatchHistoryItem).slug === "string"
       )
   );
 }
@@ -46,7 +46,7 @@ function normalizeRemoteWatched(value: unknown) {
 
   return value.filter(
     (item): item is string =>
-      typeof item === \"string\" && Boolean(item)
+      typeof item === "string" && Boolean(item)
   );
 }
 
@@ -106,9 +106,9 @@ export default function WatchHistoryCloudSync() {
 
         const { data, error } = await supabase
           .from(TABLE)
-          .select(\"history,watched_episodes\")
-          .eq(\"user_id\", user.id)
-          .eq(\"sync_group\", SYNC_GROUP)
+          .select("history,watched_episodes")
+          .eq("user_id", user.id)
+          .eq("sync_group", SYNC_GROUP)
           .maybeSingle();
 
         if (error) throw error;
@@ -154,7 +154,7 @@ export default function WatchHistoryCloudSync() {
                 watched_episodes: mergedWatched,
                 updated_at: new Date().toISOString(),
               },
-              { onConflict: \"user_id,sync_group\" }
+              { onConflict: "user_id,sync_group" }
             );
 
           if (upsertError) throw upsertError;
@@ -163,7 +163,7 @@ export default function WatchHistoryCloudSync() {
         lastCompletedRef.current = Date.now();
       } catch (error) {
         console.warn(
-          \"[BảoFlix] History sync thất bại:\",
+          "[BảoFlix] History sync thất bại:",
           error
         );
       } finally {
@@ -196,10 +196,10 @@ export default function WatchHistoryCloudSync() {
       WATCH_STORE_CHANGE_EVENT,
       handleLocalChange
     );
-    window.addEventListener(\"focus\", handleFocus);
-    window.addEventListener(\"online\", handleOnline);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("online", handleOnline);
     window.addEventListener(
-      \"baoflix-tv-mode-change\",
+      "baoflix-tv-mode-change",
       handleTvModeChange
     );
 
@@ -210,9 +210,9 @@ export default function WatchHistoryCloudSync() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === \"SIGNED_IN\") {
+      if (event === "SIGNED_IN") {
         schedule(100, true);
-      } else if (event === \"TOKEN_REFRESHED\") {
+      } else if (event === "TOKEN_REFRESHED") {
         schedule(500, false);
       }
     });
@@ -233,10 +233,10 @@ export default function WatchHistoryCloudSync() {
         WATCH_STORE_CHANGE_EVENT,
         handleLocalChange
       );
-      window.removeEventListener(\"focus\", handleFocus);
-      window.removeEventListener(\"online\", handleOnline);
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("online", handleOnline);
       window.removeEventListener(
-        \"baoflix-tv-mode-change\",
+        "baoflix-tv-mode-change",
         handleTvModeChange
       );
     };
