@@ -4,6 +4,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import PwaRegister from "@/components/PwaRegister";
 import CustomMoviesCloudSync from "@/components/CustomMoviesCloudSync";
+import WatchHistoryCloudSync from "@/components/WatchHistoryCloudSync";
+// BAOFLIX_PERSONAL_HISTORY_SYNC
 import MobileBackButton from "@/components/MobileBackButton";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import TvModeFloatingButton from "@/components/TvModeFloatingButton";
@@ -41,6 +43,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <PwaRegister />
         <CustomMoviesCloudSync />
+        <WatchHistoryCloudSync />
         <TvLaunchController />
         <TvRemoteKeyBridge />
         <TvPlayerCommandBridge />

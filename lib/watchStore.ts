@@ -4,6 +4,8 @@ import type { MovieDetail } from "@/lib/kkphim";
 
 export const HISTORY_KEY = "baoflix_history";
 export const WATCHED_KEY = "baoflix_watched_episodes";
+export const WATCH_STORE_CHANGE_EVENT = "baoflix-watch-store-change";
+// BAOFLIX_PERSONAL_HISTORY_SYNC
 
 export type WatchHistoryItem = {
   slug: string;
@@ -51,6 +53,14 @@ export function readJson<T>(key: string, fallback: T): T {
 
 export function writeJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
+
+  if (key === HISTORY_KEY || key === WATCHED_KEY) {
+    window.dispatchEvent(
+      new CustomEvent(WATCH_STORE_CHANGE_EVENT, {
+        detail: { key },
+      })
+    );
+  }
 }
 
 export function getNormalWatchedKey(
@@ -145,6 +155,53 @@ export function normalizeWatchHistory(items: WatchHistoryItem[]) {
   return Array.from(map.values()).sort(
     (a, b) => getTimeValue(b) - getTimeValue(a)
   );
+}
+
+export function applySyncedWatchState(
+  history: WatchHistoryItem[],
+  watchedEpisodes: string[]
+) {
+  const nextHistory = normalizeWatchHistory(history).slice(0, 200);
+  const nextWatched = Array.from(
+    new Set(watchedEpisodes.filter(Boolean))
+  ).slice(0, 5000);
+
+  const oldHistory = readJson<WatchHistoryItem[]>(
+    HISTORY_KEY,
+    []
+  );
+  const oldWatched = readJson<string[]>(
+    WATCHED_KEY,
+    []
+  );
+
+  let changed = false;
+
+  if (
+    JSON.stringify(oldHistory) !== JSON.stringify(nextHistory)
+  ) {
+    localStorage.setItem(
+      HISTORY_KEY,
+      JSON.stringify(nextHistory)
+    );
+    changed = true;
+  }
+
+  if (
+    JSON.stringify(oldWatched) !== JSON.stringify(nextWatched)
+  ) {
+    localStorage.setItem(
+      WATCHED_KEY,
+      JSON.stringify(nextWatched)
+    );
+    changed = true;
+  }
+
+  if (changed) {
+    window.dispatchEvent(new Event("storage"));
+  }
+
+  return changed;
 }
 
 export function readWatchHistory() {
