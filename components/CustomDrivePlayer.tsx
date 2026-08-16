@@ -40,6 +40,7 @@ const DRIVE_RELAY_COOLDOWN_MS = 5 * 60 * 1000;
 const DRIVE_RELAY_FAIL_UNTIL_KEY = "baoflix_drive_relay_fail_until";
 const SAVE_INTERVAL_SECONDS = 5;
 const EMPTY_SUBTITLES: EpisodeSubtitle[] = [];
+// BAOFLIX_CUSTOM_DRIVE_PERSONAL_PROGRESS
 
 function extractDriveFileId(url: string) {
   const value = String(url || "").trim();
@@ -205,7 +206,7 @@ export default function CustomDrivePlayer({
       setResolvedSubtitleTracks([]);
       setSubtitleLoadError("");
 
-      if (!tvMode || subtitles.length === 0) return;
+      if (subtitles.length === 0 || directCandidates.length === 0) return;
 
       const relayBase = String(
         process.env.NEXT_PUBLIC_DRIVE_RELAY_URL || ""
@@ -272,7 +273,7 @@ export default function CustomDrivePlayer({
       cancelled = true;
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [subtitles, tvMode]);
+  }, [directCandidates.length, subtitles]);
 
   useEffect(() => {
     function refreshTvMode() {
@@ -298,11 +299,6 @@ export default function CustomDrivePlayer({
     setNativeSrc("");
     setFallbackReason("");
 
-    if (!tvMode) {
-      setMode("iframe");
-      return;
-    }
-
     if (!fileId || directCandidates.length === 0) {
       setMode("iframe");
       setFallbackReason(
@@ -324,14 +320,14 @@ export default function CustomDrivePlayer({
   }, [directCandidates.length, fileId, src, tvMode]);
 
   useEffect(() => {
-    if (!tvMode || mode !== "probing" || !activeCandidate) return;
+    if (mode !== "probing" || !activeCandidate) return;
 
     const timeout = window.setTimeout(() => {
       tryNextCandidate("Nguồn direct tải quá lâu.", true);
     }, PROBE_TIMEOUT_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [activeCandidate, mode, tvMode]);
+  }, [activeCandidate, mode]);
 
   useEffect(() => {
     const saved = readEstimate(progressKey);
@@ -462,7 +458,7 @@ export default function CustomDrivePlayer({
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      {tvMode && mode === "probing" && activeCandidate && (
+      {mode === "probing" && activeCandidate && (
         <video
           key={activeCandidate}
           src={activeCandidate}
