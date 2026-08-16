@@ -27,6 +27,11 @@ type NativeVideoPlayerProps = {
 };
 
 const VIDEO_PROGRESS_KEY = "baoflix_video_progress_v1";
+const PLAYBACK_PROGRESS_CHANGE_EVENT = "baoflix-playback-progress-change";
+const PLAYBACK_PROGRESS_URGENT_EVENT = "baoflix-playback-progress-urgent";
+const PLAYBACK_PROGRESS_SYNCED_EVENT = "baoflix-playback-progress-synced";
+const NATIVE_PLAYER_FATAL_EVENT = "baoflix-native-player-fatal";
+// BAOFLIX_PLAYBACK_PROGRESS_SYNC
 const EMPTY_SUBTITLE_TRACKS: ResolvedSubtitleTrack[] = [];
 
 type StoredVideoProgress = {
@@ -69,6 +74,15 @@ function saveVideoProgress(progressKey: string | undefined, progress: StoredVide
     localStorage.setItem(
       VIDEO_PROGRESS_KEY,
       JSON.stringify(Object.fromEntries(trimmedEntries))
+    );
+
+    window.dispatchEvent(
+      new CustomEvent(PLAYBACK_PROGRESS_CHANGE_EVENT, {
+        detail: {
+          progressKey,
+          updatedAt: progress.updatedAt,
+        },
+      })
     );
   } catch {
     // Ignore storage errors in restricted TV WebViews.
@@ -124,6 +138,8 @@ export default function NativeVideoPlayer({
   const autoplayDoneRef = useRef(false);
   const restoreDoneRef = useRef(false);
   const lastProgressSaveRef = useRef(0);
+  const playerSourceStartedAtRef = useRef(Date.now());
+  const lastRestoredProgressUpdatedAtRef = useRef("");
   const [error, setError] = useState<string>("");
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);
 
@@ -353,6 +369,8 @@ export default function NativeVideoPlayer({
     autoplayDoneRef.current = false;
     restoreDoneRef.current = false;
     lastProgressSaveRef.current = 0;
+    playerSourceStartedAtRef.current = Date.now();
+    lastRestoredProgressUpdatedAtRef.current = "";
 
     video.controls = !tvMode;
     video.autoplay = tvMode;
@@ -377,6 +395,8 @@ export default function NativeVideoPlayer({
         ? currentVideo.duration
         : 0;
       const savedTime = Number(saved?.currentTime || 0);
+      lastRestoredProgressUpdatedAtRef.current =
+        String(saved?.updatedAt || "");
 
       if (savedTime > 8 && (!duration || savedTime < duration - 8)) {
         try {
@@ -426,9 +446,16 @@ export default function NativeVideoPlayer({
     }
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
+    function saveProgressUrgent() {
+      saveProgressNow();
+      window.dispatchEvent(
+        new Event(PLAYBACK_PROGRESS_URGENT_EVENT)
+      );
+    }
+
     video.addEventListener("timeupdate", saveProgressThrottled);
-    video.addEventListener("pause", saveProgressNow);
-    video.addEventListener("ended", saveProgressNow);
+    video.addEventListener("pause", saveProgressUrgent);
+    video.addEventListener("ended", saveProgressUrgent);
     video.addEventListener("canplay", autoplayQuietly, { once: true });
 
     const isHlsSource = /\.m3u8(?:$|[?#])/i.test(src);
@@ -474,7 +501,15 @@ export default function NativeVideoPlayer({
           return;
         }
 
-        setError("Không phát được HLS bằng player native. Hãy thử đổi nguồn.");
+        setError("Không phát được HLS bằng player native. Đang thử player dự phòng...");
+        window.dispatchEvent(
+          new CustomEvent(NATIVE_PLAYER_FATAL_EVENT, {
+            detail: {
+              progressKey,
+              src,
+            },
+          })
+        );
       });
 
       hls.on(Hls.Events.FRAG_LOADED, () => {
@@ -487,8 +522,8 @@ export default function NativeVideoPlayer({
         saveProgressNow();
         video.removeEventListener("loadedmetadata", handleLoadedMetadata);
         video.removeEventListener("timeupdate", saveProgressThrottled);
-        video.removeEventListener("pause", saveProgressNow);
-        video.removeEventListener("ended", saveProgressNow);
+        video.removeEventListener("pause", saveProgressUrgent);
+        video.removeEventListener("ended", saveProgressUrgent);
         video.removeEventListener("canplay", autoplayQuietly);
         hls.destroy();
       };
@@ -502,13 +537,95 @@ export default function NativeVideoPlayer({
       saveProgressNow();
       video.removeEventListener("loadedmetadata", handleLoadedMetadata);
       video.removeEventListener("timeupdate", saveProgressThrottled);
-      video.removeEventListener("pause", saveProgressNow);
-      video.removeEventListener("ended", saveProgressNow);
+      video.removeEventListener("pause", saveProgressUrgent);
+      video.removeEventListener("ended", saveProgressUrgent);
       video.removeEventListener("canplay", autoplayQuietly);
       video.removeAttribute("src");
       video.load();
     };
   }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
+
+  useEffect(() => {
+    if (!progressKey) return;
+
+    function handleSyncedProgress(event: Event) {
+      const video = videoRef.current;
+      if (!video) return;
+
+      const detail = (
+        event as CustomEvent<{ keys?: string[] }>
+      ).detail;
+
+      if (
+        Array.isArray(detail?.keys) &&
+        !detail.keys.includes(progressKey)
+      ) {
+        return;
+      }
+
+      const saved = readVideoProgress(progressKey);
+      if (!saved) return;
+
+      const savedUpdatedAt = String(saved.updatedAt || "");
+      const savedStamp = Date.parse(savedUpdatedAt);
+      const restoredStamp = Date.parse(
+        lastRestoredProgressUpdatedAtRef.current || ""
+      );
+
+      if (!Number.isFinite(savedStamp)) return;
+      if (
+        Number.isFinite(restoredStamp) &&
+        savedStamp <= restoredStamp
+      ) {
+        return;
+      }
+
+      const savedTime = Number(saved.currentTime || 0);
+      const duration = Number.isFinite(video.duration)
+        ? video.duration
+        : Number(saved.duration || 0);
+
+      if (
+        savedTime <= 8 ||
+        (duration > 0 && savedTime >= duration - 8)
+      ) {
+        lastRestoredProgressUpdatedAtRef.current = savedUpdatedAt;
+        return;
+      }
+
+      const difference = Math.abs(video.currentTime - savedTime);
+      if (difference < 4) {
+        lastRestoredProgressUpdatedAtRef.current = savedUpdatedAt;
+        return;
+      }
+
+      const withinStartupWindow =
+        Date.now() - playerSourceStartedAtRef.current < 12000;
+
+      if (!withinStartupWindow && !video.paused) {
+        return;
+      }
+
+      try {
+        video.currentTime = savedTime;
+        lastRestoredProgressUpdatedAtRef.current = savedUpdatedAt;
+      } catch {
+        // Stream chưa seek được; loadedmetadata/local restore vẫn là fallback.
+      }
+    }
+
+    window.addEventListener(
+      PLAYBACK_PROGRESS_SYNCED_EVENT,
+      handleSyncedProgress as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        PLAYBACK_PROGRESS_SYNCED_EVENT,
+        handleSyncedProgress as EventListener
+      );
+    };
+  }, [progressKey]);
 
   useEffect(() => {
     if (!tvMode) return;

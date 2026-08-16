@@ -54,6 +54,7 @@ export default function WatchClient({
   const [episodePanelOpen, setEpisodePanelOpen] = useState(false);
   const [watchedEpisodes, setWatchedEpisodes] = useState<string[]>([]);
   const [tvOverlayEnabled, setTvOverlayEnabled] = useState(false);
+  const [personalNativeFailed, setPersonalNativeFailed] = useState(false);
 
   useEffect(() => {
     function refreshTvOverlay() {
@@ -121,6 +122,31 @@ export default function WatchClient({
     safeServerIndex,
     safeEpisodeIndex
   );
+
+  useEffect(() => {
+    setPersonalNativeFailed(false);
+
+    function handleNativeFatal(event: Event) {
+      const detail = (
+        event as CustomEvent<{ progressKey?: string }>
+      ).detail;
+
+      if (detail?.progressKey !== currentWatchedKey) return;
+      setPersonalNativeFailed(true);
+    }
+
+    window.addEventListener(
+      "baoflix-native-player-fatal",
+      handleNativeFatal as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "baoflix-native-player-fatal",
+        handleNativeFatal as EventListener
+      );
+    };
+  }, [currentWatchedKey]);
 
   useEffect(() => {
     const next = saveWatchedEpisode(currentWatchedKey);
@@ -209,8 +235,12 @@ export default function WatchClient({
   const posterUrl = movie.thumb_url || movie.poster_url;
   const nativeVideoUrl = episode?.link_m3u8;
   const useTvNativePlayer = tvOverlayEnabled && Boolean(nativeVideoUrl);
+  // BAOFLIX_PLAYBACK_PROGRESS_SYNC:
+  // PC/điện thoại ưu tiên HLS native khi có để đọc/seek currentTime chính xác.
   const useNormalNativePlayer =
-    !tvOverlayEnabled && Boolean(nativeVideoUrl) && !episode?.link_embed;
+    !tvOverlayEnabled &&
+    Boolean(nativeVideoUrl) &&
+    !personalNativeFailed;
 
   const playerIframeSrc = (() => {
     const linkEmbed = episode?.link_embed;
@@ -349,6 +379,14 @@ export default function WatchClient({
                 progressKey={currentWatchedKey}
                 tvMode
               />
+            ) : useNormalNativePlayer && nativeVideoUrl ? (
+              <NativeVideoPlayer
+                src={nativeVideoUrl}
+                title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
+                subtitle={normalizeServerName(currentServer?.server_name)}
+                poster={posterUrl}
+                progressKey={currentWatchedKey}
+              />
             ) : episode?.link_embed ? (
               <iframe
                 src={playerIframeSrc}
@@ -362,14 +400,6 @@ export default function WatchClient({
                   tvOverlayEnabled ? "pointer-events-none" : "",
                 ].join(" ")}
                 title={`${movie.name} - ${episode.name}`}
-              />
-            ) : useNormalNativePlayer && nativeVideoUrl ? (
-              <NativeVideoPlayer
-                src={nativeVideoUrl}
-                title={`${movie.name} - ${episode?.name || `Tập ${safeEpisodeIndex + 1}`}`}
-                subtitle={normalizeServerName(currentServer?.server_name)}
-                poster={posterUrl}
-                progressKey={currentWatchedKey}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-center text-slate-400">
