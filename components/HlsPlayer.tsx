@@ -26,6 +26,8 @@ const PLAYBACK_PROGRESS_URGENT_EVENT =
   "baoflix-playback-progress-urgent";
 const PLAYBACK_PROGRESS_SYNCED_EVENT =
   "baoflix-playback-progress-synced";
+const LOCAL_PROGRESS_SAVE_INTERVAL_MS = 10_000;
+// BAOFLIX_CUSTOM_MOVIE_LAG_FIX
 
 function emitPlaybackEvent(type: "playing" | "paused") {
   try {
@@ -289,7 +291,10 @@ export default function HlsPlayer({
     function saveTimeThrottled() {
       const now = Date.now();
 
-      if (now - lastSaveRef.current < 3000) {
+      if (
+        now - lastSaveRef.current <
+        LOCAL_PROGRESS_SAVE_INTERVAL_MS
+      ) {
         return;
       }
 

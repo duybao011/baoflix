@@ -36,6 +36,8 @@ type StoredDriveEstimate = {
 };
 
 const PROBE_TIMEOUT_MS = 3500;
+const PERSONAL_PROBE_TIMEOUT_MS = 1800;
+// BAOFLIX_CUSTOM_MOVIE_LAG_FIX
 const DRIVE_RELAY_COOLDOWN_MS = 5 * 60 * 1000;
 const DRIVE_RELAY_FAIL_UNTIL_KEY = "baoflix_drive_relay_fail_until";
 const SAVE_INTERVAL_SECONDS = 5;
@@ -206,7 +208,7 @@ export default function CustomDrivePlayer({
       setResolvedSubtitleTracks([]);
       setSubtitleLoadError("");
 
-      if (subtitles.length === 0 || directCandidates.length === 0) return;
+      if (mode !== "native" || subtitles.length === 0) return;
 
       const relayBase = String(
         process.env.NEXT_PUBLIC_DRIVE_RELAY_URL || ""
@@ -273,7 +275,7 @@ export default function CustomDrivePlayer({
       cancelled = true;
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [directCandidates.length, subtitles]);
+  }, [mode, subtitles]);
 
   useEffect(() => {
     function refreshTvMode() {
@@ -324,10 +326,10 @@ export default function CustomDrivePlayer({
 
     const timeout = window.setTimeout(() => {
       tryNextCandidate("Nguồn direct tải quá lâu.", true);
-    }, PROBE_TIMEOUT_MS);
+    }, tvMode ? PROBE_TIMEOUT_MS : PERSONAL_PROBE_TIMEOUT_MS);
 
     return () => window.clearTimeout(timeout);
-  }, [activeCandidate, mode]);
+  }, [activeCandidate, mode, tvMode]);
 
   useEffect(() => {
     const saved = readEstimate(progressKey);
@@ -485,7 +487,7 @@ export default function CustomDrivePlayer({
           tvMode={tvMode}
           subtitleTracks={resolvedSubtitleTracks}
         />
-      ) : (
+      ) : mode === "iframe" ? (
         <iframe
           ref={iframeRef}
           src={iframeSrc}
@@ -500,6 +502,10 @@ export default function CustomDrivePlayer({
           ].join(" ")}
           title={title}
         />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center bg-black text-sm text-slate-400">
+          Đang kiểm tra nguồn phát...
+        </div>
       )}
 
       {tvMode && subtitleLoadError && (
