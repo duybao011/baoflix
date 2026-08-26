@@ -82,9 +82,11 @@ export default function MyTasteClient() {
   const topCategory = topCategories[0];
 
   useEffect(() => {
-    async function loadTasteMovies() {
-      setLoading(true);
+    // BAOFLIX_V9_MY_TASTE_ABORT
+    let cancelled = false;
+    const controller = new AbortController();
 
+    async function loadTasteMovies() {
       const params = new URLSearchParams();
 
       if (topCountry?.slug) params.set("country", topCountry.slug);
@@ -96,18 +98,35 @@ export default function MyTasteClient() {
         return;
       }
 
+      setLoading(true);
+
       try {
-        const res = await fetch(`/api/my-taste?${params.toString()}`);
+        const res = await fetch(
+          `/api/my-taste?${params.toString()}`,
+          { signal: controller.signal }
+        );
+
+        if (!res.ok) {
+          throw new Error("Không lấy được gợi ý theo gu.");
+        }
+
         const data = await res.json();
-        setMovies(data.items || []);
+        if (!cancelled) {
+          setMovies(Array.isArray(data?.items) ? data.items : []);
+        }
       } catch {
-        setMovies([]);
+        if (!cancelled) setMovies([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    loadTasteMovies();
+    void loadTasteMovies();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [topCountry?.slug, topCategory?.slug]);
 
   return (

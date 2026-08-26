@@ -463,7 +463,9 @@ export function createCustomMovieFromForm(input: {
 }) {
   const now = new Date().toISOString();
   const name = input.name.trim();
-  const slug = input.slug?.trim() || slugify(name);
+  // BAOFLIX_V9_CUSTOM_SLUG_SAVE
+  // Normalize cả slug nhập tay để caller ngoài form cũng không lưu route bẩn.
+  const slug = slugify(input.slug?.trim() || name);
 
   const seasons = parseSeasonsFromText(name, input.episodesText);
   const totalEpisodes = countEpisodes(seasons);

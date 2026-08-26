@@ -83,8 +83,17 @@ export default function CustomMovieForm() {
   const [episodesText, setEpisodesText] = useState("");
   const [copyStatus, setCopyStatus] = useState<CopyStatus>(null);
 
-  const autoSlug = useMemo(() => slugify(name), [name]);
-  const finalSlug = slug.trim() || autoSlug;
+  // BAOFLIX_V9_CUSTOM_SLUG_FORM
+  // Không gọi slugify("") trong render vì slugify có fallback theo thời gian.
+  const autoSlug = useMemo(
+    () => (name.trim() ? slugify(name) : ""),
+    [name]
+  );
+  const normalizedManualSlug = useMemo(
+    () => (slug.trim() ? slugify(slug) : ""),
+    [slug]
+  );
+  const finalSlug = normalizedManualSlug || autoSlug;
   const posterFileName = getPosterFileName(finalSlug);
   const thumbFileName = getThumbFileName(finalSlug);
   const posterPath = getPosterPath(finalSlug);

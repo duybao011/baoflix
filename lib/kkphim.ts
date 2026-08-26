@@ -179,6 +179,7 @@ function getEpisodeNumber(value?: string) {
   return Number(numberMatch[0]);
 }
 
+// BAOFLIX_V9_ANIMATION_CLASSIFICATION
 function isSingleAnimation(movie: MovieItem) {
   const total = getEpisodeNumber(movie.episode_total);
   const current = String(movie.episode_current || "").toLowerCase();
@@ -187,6 +188,9 @@ function isSingleAnimation(movie: MovieItem) {
   if (type === "single") return true;
   if (type === "series") return false;
 
+  // episode_total rõ ràng đáng tin hơn cách viết episode_current.
+  // Ví dụ episode_total="1", episode_current="Tập 1" vẫn là phim lẻ.
+  if (total === 1) return true;
   if (total > 1) return false;
 
   if (current.includes("full")) return true;
@@ -196,8 +200,7 @@ function isSingleAnimation(movie: MovieItem) {
   if (current.includes("tập")) return false;
   if (current.includes("/") && !current.includes("1/1")) return false;
 
-  // Metadata không đủ thì không đoán unknown thành phim lẻ.
-  return total === 1;
+  return false;
 }
 
 function isSeriesAnimation(movie: MovieItem) {
@@ -208,6 +211,7 @@ function isSeriesAnimation(movie: MovieItem) {
   if (type === "series") return true;
   if (type === "single") return false;
 
+  if (total === 1) return false;
   if (total > 1) return true;
   if (current.includes("tập")) return true;
   if (current.includes("/") && !current.includes("1/1")) return true;
@@ -462,23 +466,51 @@ async function getAggregatedMultiFilterMovies(
   function buildTasks(sourcePage: number) {
     const tasks: Promise<MovieListResult>[] = [];
 
+    // BAOFLIX_V9_MULTI_FILTER_REQUESTS
+    // Không nhân chéo category x country. Chọn phía ít lựa chọn hơn làm nguồn,
+    // rồi applyLocalMultiTagFilter() giữ AND giữa hai nhóm điều kiện.
     if (categorySlugs.length && countrySlugs.length) {
-      categorySlugs.forEach((categorySlug) => {
-        countrySlugs.forEach((countrySlug) => {
+      const useCategorySources =
+        categorySlugs.length <= countrySlugs.length;
+
+      if (useCategorySources) {
+        categorySlugs.forEach((categorySlug) => {
           if (type && type !== "tat-ca") {
             tasks.push(getMoviesByList(type, sourcePage, sourceLimit, {
               ...baseFilters,
               category: categorySlug,
-              country: countrySlug,
             }));
           } else {
-            tasks.push(getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
+            tasks.push(
+              getMoviesByGenre(
+                categorySlug,
+                sourcePage,
+                sourceLimit,
+                baseFilters
+              )
+            );
+          }
+        });
+      } else {
+        countrySlugs.forEach((countrySlug) => {
+          if (type && type !== "tat-ca") {
+            tasks.push(getMoviesByList(type, sourcePage, sourceLimit, {
               ...baseFilters,
               country: countrySlug,
             }));
+          } else {
+            tasks.push(
+              getMoviesByCountry(
+                countrySlug,
+                sourcePage,
+                sourceLimit,
+                baseFilters
+              )
+            );
           }
         });
-      });
+      }
+
       return tasks;
     }
 
@@ -515,8 +547,8 @@ async function getAggregatedMultiFilterMovies(
   let mergedItems: MovieItem[] = [];
   let finalItems: MovieItem[] = [];
   let hasMoreSourcePages = true;
-  const targetCount = (page + 1) * limit;
-  const minimumSourcePages = page + 1;
+  // Đủ current page + 1 item là đủ biết còn trang sau.
+  const targetCount = page * limit + 1;
 
   while (hasMoreSourcePages) {
     const results = await Promise.allSettled(buildTasks(sourcePage));
@@ -552,7 +584,7 @@ async function getAggregatedMultiFilterMovies(
       Number(result.pagination?.totalPages || 0) > sourcePage
     );
 
-    if (sourcePage >= minimumSourcePages && finalItems.length >= targetCount) break;
+    if (finalItems.length >= targetCount) break;
     if (!hasMoreSourcePages) break;
     sourcePage += 1;
   }
