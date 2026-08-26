@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import MovieCard from "@/components/MovieCard";
 import type { MovieItem } from "@/lib/kkphim";
-const HISTORY_KEY = "baoflix_history";
-const FAVORITE_KEY = "baoflix_favorites";
+import { FAVORITES_CHANGE_EVENT, readFavorites } from "@/lib/favoritesStore";
+import { readWatchHistory, WATCH_STORE_CHANGE_EVENT } from "@/lib/watchStore";
 
 type Taxonomy = {
   name: string;
@@ -17,15 +17,6 @@ type LocalMovie = {
   country?: Taxonomy[];
   category?: Taxonomy[];
 };
-
-function readJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
 
 function findTopTaxonomy(items: LocalMovie[], key: "country" | "category") {
   const map = new Map<string, { name: string; slug: string; count: number }>();
@@ -52,8 +43,23 @@ export default function MyTasteClient() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setHistory(readJson<LocalMovie[]>(HISTORY_KEY, []));
-    setFavorites(readJson<LocalMovie[]>(FAVORITE_KEY, []));
+    function refresh() {
+      setHistory(readWatchHistory());
+      setFavorites(readFavorites());
+    }
+
+    refresh();
+    window.addEventListener(WATCH_STORE_CHANGE_EVENT, refresh);
+    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(WATCH_STORE_CHANGE_EVENT, refresh);
+      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const combined = useMemo(() => {

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
+  CUSTOM_MOVIES_CHANGE_EVENT,
   readCustomMovies,
   type StoredCustomMovie,
 } from "@/lib/customMoviesClient";
@@ -39,10 +40,14 @@ export default function LocalCustomSearchResults({
       setMovies(readCustomMovies());
     }
 
+    window.addEventListener(CUSTOM_MOVIES_CHANGE_EVENT, refresh);
+    window.addEventListener("baoflix-custom-movies-synced", refresh);
     window.addEventListener("storage", refresh);
     window.addEventListener("focus", refresh);
 
     return () => {
+      window.removeEventListener(CUSTOM_MOVIES_CHANGE_EVENT, refresh);
+      window.removeEventListener("baoflix-custom-movies-synced", refresh);
       window.removeEventListener("storage", refresh);
       window.removeEventListener("focus", refresh);
     };

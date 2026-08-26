@@ -1,22 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isMobileDevice } from "@/lib/tvMode";
 
 export default function TvModeFloatingButton() {
   const pathname = usePathname();
+  const [showOnDevice, setShowOnDevice] = useState(false);
 
-  const hiddenPaths = [
-    "/tv",
-    "/xem",
-    "/ca-nhan",
-  ];
+  useEffect(() => {
+    setShowOnDevice(!isMobileDevice());
+  }, []);
 
+  const hiddenPaths = ["/tv", "/xem", "/ca-nhan"];
   const shouldHide = hiddenPaths.some((path) => pathname.startsWith(path));
 
-  if (shouldHide) {
-    return null;
-  }
+  if (shouldHide || !showOnDevice) return null;
 
   return (
     <Link

@@ -26,6 +26,13 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   } catch {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
+        <LocalCustomMovieRouteSync
+          slug={slug}
+          mode="watch"
+          serverIndex={Number(query.server || 0)}
+          episodeIndex={Number(query.tap || 0)}
+        />
+
         <h1 className="text-2xl font-black">Không tải được phim</h1>
 
         <p className="mt-2 text-slate-400">

@@ -69,28 +69,35 @@ export default function SearchBox() {
   useEffect(() => {
     if (trimmedKeyword.length < 2) {
       setSuggestions([]);
+      setLoading(false);
       return;
     }
 
+    let cancelled = false;
+    const controller = new AbortController();
+
     const timer = window.setTimeout(async () => {
       try {
-        setLoading(true);
-
+        if (!cancelled) setLoading(true);
         const res = await fetch(
-          `/api/search-suggest?q=${encodeURIComponent(trimmedKeyword)}`
+          `/api/search-suggest?q=${encodeURIComponent(trimmedKeyword)}`,
+          { signal: controller.signal }
         );
-
+        if (!res.ok) throw new Error("Không lấy được gợi ý tìm kiếm.");
         const data = await res.json();
-
-        setSuggestions(data.items || []);
+        if (!cancelled) {
+          setSuggestions(Array.isArray(data?.items) ? data.items : []);
+        }
       } catch {
-        setSuggestions([]);
+        if (!cancelled) setSuggestions([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, 350);
 
     return () => {
+      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [trimmedKeyword]);

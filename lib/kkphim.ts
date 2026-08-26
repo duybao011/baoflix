@@ -196,7 +196,8 @@ function isSingleAnimation(movie: MovieItem) {
   if (current.includes("tập")) return false;
   if (current.includes("/") && !current.includes("1/1")) return false;
 
-  return total <= 1;
+  // Metadata không đủ thì không đoán unknown thành phim lẻ.
+  return total === 1;
 }
 
 function isSeriesAnimation(movie: MovieItem) {
@@ -442,22 +443,13 @@ function getMultiFilterTitle(
 async function getAggregatedMultiFilterMovies(
   filters: FilterValues = {}
 ): Promise<MovieListResult> {
-  const page = Number(filters.page || 1);
-  const limit = Number(filters.limit || 36);
-
+  const page = Math.max(1, Number(filters.page || 1));
+  const limit = Math.max(1, Number(filters.limit || 36));
   const type = filters.type || "tat-ca";
   const subtype = filters.subtype || "tat-ca";
   const year = filters.year || "tat-ca";
-
   const categorySlugs = parseMultiFilterValue(filters.category);
   const countrySlugs = parseMultiFilterValue(filters.country);
-
-  // Fetch ít nhất tới page hiện tại; fixed 3 pages làm page 4+ bị sai.
-  const sourcePageCount = Math.max(2, page + 1);
-  const sourcePages = Array.from(
-    { length: sourcePageCount },
-    (_, index) => index + 1
-  );
   const sourceLimit = Math.max(limit, MULTI_FILTER_SOURCE_LIMIT);
 
   const baseFilters: Partial<FilterValues> = {
@@ -467,105 +459,105 @@ async function getAggregatedMultiFilterMovies(
     year: year !== "tat-ca" ? year : undefined,
   };
 
-  const tasks: Promise<MovieListResult>[] = [];
+  function buildTasks(sourcePage: number) {
+    const tasks: Promise<MovieListResult>[] = [];
 
-  if (categorySlugs.length && countrySlugs.length) {
-    categorySlugs.forEach((categorySlug) => {
-      countrySlugs.forEach((countrySlug) => {
-        sourcePages.forEach((sourcePage) => {
+    if (categorySlugs.length && countrySlugs.length) {
+      categorySlugs.forEach((categorySlug) => {
+        countrySlugs.forEach((countrySlug) => {
           if (type && type !== "tat-ca") {
-            tasks.push(
-              getMoviesByList(type, sourcePage, sourceLimit, {
-                ...baseFilters,
-                category: categorySlug,
-                country: countrySlug,
-              })
-            );
+            tasks.push(getMoviesByList(type, sourcePage, sourceLimit, {
+              ...baseFilters,
+              category: categorySlug,
+              country: countrySlug,
+            }));
           } else {
-            tasks.push(
-              getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
-                ...baseFilters,
-                country: countrySlug,
-              })
-            );
+            tasks.push(getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
+              ...baseFilters,
+              country: countrySlug,
+            }));
           }
         });
       });
-    });
-  } else if (type && type !== "tat-ca") {
-    categorySlugs.forEach((categorySlug) => {
-      sourcePages.forEach((sourcePage) => {
-        tasks.push(
-          getMoviesByList(type, sourcePage, sourceLimit, {
-            ...baseFilters,
-            category: categorySlug,
-          })
-        );
-      });
-    });
+      return tasks;
+    }
 
-    countrySlugs.forEach((countrySlug) => {
-      sourcePages.forEach((sourcePage) => {
-        tasks.push(
-          getMoviesByList(type, sourcePage, sourceLimit, {
-            ...baseFilters,
-            country: countrySlug,
-          })
-        );
+    if (type && type !== "tat-ca") {
+      categorySlugs.forEach((categorySlug) => {
+        tasks.push(getMoviesByList(type, sourcePage, sourceLimit, {
+          ...baseFilters,
+          category: categorySlug,
+        }));
       });
-    });
-  } else {
-    categorySlugs.forEach((categorySlug) => {
-      sourcePages.forEach((sourcePage) => {
-        tasks.push(
-          getMoviesByGenre(categorySlug, sourcePage, sourceLimit, baseFilters)
-        );
+      countrySlugs.forEach((countrySlug) => {
+        tasks.push(getMoviesByList(type, sourcePage, sourceLimit, {
+          ...baseFilters,
+          country: countrySlug,
+        }));
       });
-    });
+      return tasks;
+    }
 
-    countrySlugs.forEach((countrySlug) => {
-      sourcePages.forEach((sourcePage) => {
-        tasks.push(
-          getMoviesByCountry(countrySlug, sourcePage, sourceLimit, baseFilters)
-        );
-      });
+    categorySlugs.forEach((categorySlug) => {
+      tasks.push(getMoviesByGenre(categorySlug, sourcePage, sourceLimit, baseFilters));
     });
+    countrySlugs.forEach((countrySlug) => {
+      tasks.push(getMoviesByCountry(countrySlug, sourcePage, sourceLimit, baseFilters));
+    });
+    return tasks;
   }
 
-  if (!tasks.length) return getLatestMovieListResult(page, limit);
+  if (!categorySlugs.length && !countrySlugs.length) {
+    return getLatestMovieListResult(page, limit);
+  }
 
-  const results = await Promise.allSettled(tasks);
-  const mergedItems = uniqueMovies(
-    results.flatMap((result) => {
-      if (result.status !== "fulfilled") return [];
-      return result.value.items || [];
-    })
-  );
+  let sourcePage = 1;
+  let mergedItems: MovieItem[] = [];
+  let finalItems: MovieItem[] = [];
+  let hasMoreSourcePages = true;
+  const targetCount = (page + 1) * limit;
+  const minimumSourcePages = page + 1;
 
-  const locallyFilteredItems = applyLocalMultiTagFilter(
-    mergedItems,
-    categorySlugs,
-    countrySlugs
-  );
+  while (hasMoreSourcePages) {
+    const results = await Promise.allSettled(buildTasks(sourcePage));
+    const fulfilled = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : []
+    );
 
-  const subtypeFilteredItems =
-    type === "hoat-hinh" && subtype !== "tat-ca"
-      ? filterAnimationSubtype(
-          {
+    if (!fulfilled.length) break;
+
+    mergedItems = uniqueMovies([
+      ...mergedItems,
+      ...fulfilled.flatMap((result) => result.items || []),
+    ]);
+
+    const locallyFiltered = applyLocalMultiTagFilter(
+      mergedItems,
+      categorySlugs,
+      countrySlugs
+    );
+
+    const subtypeFiltered =
+      type === "hoat-hinh" && subtype !== "tat-ca"
+        ? filterAnimationSubtype({
             title: "Hoạt hình",
-            items: locallyFilteredItems,
+            items: locallyFiltered,
             pagination: {},
-          },
-          subtype
-        ).items
-      : locallyFilteredItems;
+          }, subtype).items
+        : locallyFiltered;
 
-  const sortedItems = sortLocalMoviesByFilter(subtypeFilteredItems, filters);
-  const paginated = paginateLocalMovies(sortedItems, page, limit);
-  const hasMoreSourcePages = results.some((result) => {
-    if (result.status !== "fulfilled") return false;
-    return Number(result.value.pagination?.totalPages || 0) > sourcePageCount;
-  });
+    finalItems = sortLocalMoviesByFilter(subtypeFiltered, filters);
+
+    hasMoreSourcePages = fulfilled.some((result) =>
+      Number(result.pagination?.totalPages || 0) > sourcePage
+    );
+
+    if (sourcePage >= minimumSourcePages && finalItems.length >= targetCount) break;
+    if (!hasMoreSourcePages) break;
+    sourcePage += 1;
+  }
+
+  const paginated = paginateLocalMovies(finalItems, page, limit);
 
   return {
     title: getMultiFilterTitle(categorySlugs, countrySlugs, type),

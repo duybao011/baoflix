@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  checkEpisodeLink,
   createCustomMovieFromForm,
+  getCustomMovieBySlugClient,
   upsertCustomMovie,
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
@@ -29,6 +31,39 @@ function getPosterPath(slug: string) {
 
 function getThumbPath(slug: string) {
   return `${CUSTOM_POSTER_DIR}/${getThumbFileName(slug)}`;
+}
+
+function validateEpisodeLines(episodesText: string) {
+  const errors: string[] = [];
+
+  episodesText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .forEach((line, rawIndex) => {
+      if (line.startsWith("#")) return;
+
+      const parts = line.includes("|") ? line.split("|") : [];
+      const label = parts.length > 0
+        ? parts[0]?.trim() || `Dòng ${rawIndex + 1}`
+        : `Dòng ${rawIndex + 1}`;
+      const videoUrl = parts.length > 0 ? parts[1]?.trim() || "" : line;
+      const subtitleUrl = parts.length > 2 ? parts.slice(2).join("|").trim() : "";
+
+      const videoCheck = checkEpisodeLink(videoUrl);
+      if (!videoCheck.ok) {
+        errors.push(`${label}: video - ${videoCheck.message}`);
+      }
+
+      if (subtitleUrl) {
+        const subtitleCheck = checkEpisodeLink(subtitleUrl);
+        if (!subtitleCheck.ok) {
+          errors.push(`${label}: phụ đề - ${subtitleCheck.message}`);
+        }
+      }
+    });
+
+  return errors;
 }
 
 export default function CustomMovieForm() {
@@ -94,6 +129,25 @@ export default function CustomMovieForm() {
     if (!episodesText.trim()) {
       alert("Nhập ít nhất 1 tập phim.");
       return;
+    }
+
+    const episodeErrors = validateEpisodeLines(episodesText);
+    if (episodeErrors.length > 0) {
+      alert([
+        "Có link tập/phụ đề chưa hợp lệ:",
+        "",
+        ...episodeErrors.slice(0, 8),
+        episodeErrors.length > 8 ? `... và ${episodeErrors.length - 8} lỗi khác.` : "",
+      ].filter(Boolean).join("\n"));
+      return;
+    }
+
+    const existing = getCustomMovieBySlugClient(finalSlug);
+    if (existing) {
+      const shouldOverwrite = window.confirm(
+        `Slug "${finalSlug}" đã tồn tại (${existing.movie.name}).\n\nGhi đè phim cũ bằng dữ liệu mới?`
+      );
+      if (!shouldOverwrite) return;
     }
 
     const movie = createCustomMovieFromForm({

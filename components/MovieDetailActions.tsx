@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import FavoriteButton from "@/components/FavoriteButton";
 import type { EpisodeServer, MovieDetail } from "@/lib/kkphim";
+import { findEpisodeMatch } from "@/lib/episodeMatch";
 import {
   getNormalWatchedKey,
   readWatchHistory,
@@ -68,19 +69,25 @@ function getLatestEpisodeInfo(
 function getWatchedEpisodeIndexes(
   movieSlug: string,
   servers: EpisodeServer[],
-  watchedKeys: string[]
+  watchedKeys: string[],
+  canonicalServerIndex: number
 ) {
   const watchedKeySet = new Set(watchedKeys);
   const watchedEpisodeIndexes = new Set<number>();
+  const canonicalEpisodes = servers[canonicalServerIndex]?.server_data ?? [];
+
+  if (!canonicalEpisodes.length) return watchedEpisodeIndexes;
 
   servers.forEach((server, serverIndex) => {
     const episodes = server.server_data ?? [];
 
-    episodes.forEach((_, episodeIndex) => {
+    episodes.forEach((episode, episodeIndex) => {
       const key = getNormalWatchedKey(movieSlug, serverIndex, episodeIndex);
+      if (!watchedKeySet.has(key)) return;
 
-      if (watchedKeySet.has(key)) {
-        watchedEpisodeIndexes.add(episodeIndex);
+      const match = findEpisodeMatch(episode, canonicalEpisodes, episodeIndex);
+      if (match.matched && match.index >= 0) {
+        watchedEpisodeIndexes.add(match.index);
       }
     });
   });
@@ -259,8 +266,13 @@ export default function MovieDetailActions({ movie, servers }: Props) {
   );
 
   const watchedEpisodeIndexes = useMemo(() => {
-    return getWatchedEpisodeIndexes(movie.slug, servers, watchedEpisodes);
-  }, [movie.slug, servers, watchedEpisodes]);
+    return getWatchedEpisodeIndexes(
+      movie.slug,
+      servers,
+      watchedEpisodes,
+      latestInfo?.serverIndex ?? 0
+    );
+  }, [movie.slug, servers, watchedEpisodes, latestInfo?.serverIndex]);
 
   const totalEpisodes = latestInfo?.totalEpisodes ?? 0;
   const watchedCount = Math.min(watchedEpisodeIndexes.size, totalEpisodes);

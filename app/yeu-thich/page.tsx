@@ -3,8 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { MovieItem, Taxonomy } from "@/lib/kkphim";
 import CompactMovieCard from "@/components/CompactMovieCard";
-
-const KEY = "baoflix_favorites";
+import {
+  FAVORITES_CHANGE_EVENT,
+  readFavorites,
+  removeFavorite as removeFavoriteStore,
+} from "@/lib/favoritesStore";
 const TV_FOCUS_CLASS =
   "focus-visible:scale-[1.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-300/80 focus-visible:ring-offset-2 focus-visible:ring-offset-black";
 
@@ -95,12 +98,20 @@ export default function FavoritesPage() {
   const [sort, setSort] = useState("latest");
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      setMovies(raw ? JSON.parse(raw) : []);
-    } catch {
-      setMovies([]);
+    function refresh() {
+      setMovies(readFavorites());
     }
+
+    refresh();
+    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const years = useMemo(() => {
@@ -191,9 +202,7 @@ export default function FavoritesPage() {
   }
 
   function removeFavorite(slug: string) {
-    const next = movies.filter((movie) => movie.slug !== slug);
-    setMovies(next);
-    localStorage.setItem(KEY, JSON.stringify(next));
+    setMovies(removeFavoriteStore(slug));
   }
 
   return (

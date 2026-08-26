@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-const HISTORY_KEY = "baoflix_history";
-const FAVORITE_KEY = "baoflix_favorites";
-const WATCHED_KEY = "baoflix_watched_episodes";
+import {
+  readWatchHistory,
+  readWatchedEpisodes,
+  WATCH_STORE_CHANGE_EVENT,
+} from "@/lib/watchStore";
+import { FAVORITES_CHANGE_EVENT, readFavorites } from "@/lib/favoritesStore";
 const SEARCH_HISTORY_KEY = "baoflix_search_history";
 
 type Taxonomy = {
@@ -24,6 +27,10 @@ type DashboardMovie = {
   serverIndex?: number;
   serverName?: string;
   watchedAt?: string;
+  href?: string;
+  isCustom?: boolean;
+  seasonIndex?: number;
+  seasonName?: string;
   country?: Taxonomy[];
   category?: Taxonomy[];
 };
@@ -35,6 +42,14 @@ function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function getHistoryHref(item: DashboardMovie) {
+  if (item.href) return item.href;
+  if (item.isCustom) {
+    return `/ca-nhan/${item.slug}/xem?season=${item.seasonIndex ?? 0}&tap=${item.episodeIndex ?? 0}`;
+  }
+  return `/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex ?? 0}`;
 }
 
 function countTaxonomy(items: DashboardMovie[], key: "country" | "category") {
@@ -94,10 +109,25 @@ export default function PersonalDashboard() {
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   useEffect(() => {
-    setHistory(readJson<DashboardMovie[]>(HISTORY_KEY, []));
-    setFavorites(readJson<DashboardMovie[]>(FAVORITE_KEY, []));
-    setWatched(readJson<string[]>(WATCHED_KEY, []));
-    setSearchHistory(readJson<string[]>(SEARCH_HISTORY_KEY, []));
+    function refresh() {
+      setHistory(readWatchHistory());
+      setFavorites(readFavorites());
+      setWatched(readWatchedEpisodes());
+      setSearchHistory(readJson<string[]>(SEARCH_HISTORY_KEY, []));
+    }
+
+    refresh();
+    window.addEventListener(WATCH_STORE_CHANGE_EVENT, refresh);
+    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(WATCH_STORE_CHANGE_EVENT, refresh);
+      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const combinedMovies = useMemo(() => {
@@ -219,7 +249,7 @@ export default function PersonalDashboard() {
             {recentWatching.map((item) => (
               <Link
                 key={`${item.slug}-${item.serverIndex ?? 0}-${item.episodeIndex ?? 0}`}
-                href={`/xem/${item.slug}?server=${item.serverIndex ?? 0}&tap=${item.episodeIndex ?? 0}`}
+                href={getHistoryHref(item)}
                 className="rounded-2xl border border-white/10 bg-black/20 p-4 hover:bg-white/10"
               >
                 <h4 className="line-clamp-1 font-bold">{item.name}</h4>

@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { MovieItem } from "@/lib/kkphim";
-
-const FAVORITE_KEY = "baoflix_favorites";
+import {
+  FAVORITES_CHANGE_EVENT,
+  isFavorite,
+  toggleFavorite as toggleFavoriteStore,
+} from "@/lib/favoritesStore";
 const IMAGE_BASE = "https://phimimg.com";
 const PLACEHOLDER_IMAGE = "/placeholder.svg";
 
@@ -26,15 +29,6 @@ function getCardImageUrl(url?: string) {
   return `${IMAGE_BASE}/${rawUrl.replace(/^\/+/, "")}`;
 }
 
-function readFavorites(): MovieItem[] {
-  try {
-    const raw = localStorage.getItem(FAVORITE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
 export default function MovieCard({
   movie,
   tvDefault = false,
@@ -46,20 +40,24 @@ export default function MovieCard({
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const list = readFavorites();
-    setSaved(list.some((item) => item.slug === movie.slug));
+    function refresh() {
+      setSaved(isFavorite(movie.slug));
+    }
+
+    refresh();
+    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, [movie.slug]);
 
   function toggleFavorite() {
-    const list = readFavorites();
-    const exists = list.some((item) => item.slug === movie.slug);
-
-    const next = exists
-      ? list.filter((item) => item.slug !== movie.slug)
-      : [movie, ...list];
-
-    localStorage.setItem(FAVORITE_KEY, JSON.stringify(next));
-    setSaved(!exists);
+    setSaved(toggleFavoriteStore(movie).saved);
   }
 
   function handleImageError(event: React.SyntheticEvent<HTMLImageElement>) {

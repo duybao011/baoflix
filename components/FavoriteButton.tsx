@@ -1,31 +1,35 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MovieItem } from "@/lib/kkphim";
-
-const KEY = "baoflix_favorites";
+import type { MovieItem } from "@/lib/kkphim";
+import {
+  FAVORITES_CHANGE_EVENT,
+  isFavorite,
+  toggleFavorite as toggleFavoriteStore,
+} from "@/lib/favoritesStore";
 
 export default function FavoriteButton({ movie }: { movie: MovieItem }) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem(KEY);
-    const list: MovieItem[] = raw ? JSON.parse(raw) : [];
-    setSaved(list.some((item) => item.slug === movie.slug));
+    function refresh() {
+      setSaved(isFavorite(movie.slug));
+    }
+
+    refresh();
+    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
+    window.addEventListener("storage", refresh);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("focus", refresh);
+    };
   }, [movie.slug]);
 
   function toggleFavorite() {
-    const raw = localStorage.getItem(KEY);
-    const list: MovieItem[] = raw ? JSON.parse(raw) : [];
-
-    const exists = list.some((item) => item.slug === movie.slug);
-
-    const next = exists
-      ? list.filter((item) => item.slug !== movie.slug)
-      : [movie, ...list];
-
-    localStorage.setItem(KEY, JSON.stringify(next));
-    setSaved(!exists);
+    setSaved(toggleFavoriteStore(movie).saved);
   }
 
   return (

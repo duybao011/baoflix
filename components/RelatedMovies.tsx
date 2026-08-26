@@ -1,5 +1,12 @@
 import MovieGrid from "@/components/MovieGrid";
-import { getMoviesByCountry, getMoviesByGenre, getMoviesByYear, MovieDetail, MovieItem, MovieListResult } from "@/lib/kkphim";
+import {
+  getMoviesByCountry,
+  getMoviesByGenre,
+  getMoviesByYear,
+  MovieDetail,
+  MovieItem,
+  MovieListResult,
+} from "@/lib/kkphim";
 
 function addUniqueMovies(target: MovieItem[], source: MovieItem[], currentSlug: string) {
   const existingSlugs = new Set(target.map((movie) => movie.slug));
@@ -25,27 +32,33 @@ export default async function RelatedMovies({ movie }: { movie: MovieDetail }) {
   const year = movie.year ? String(movie.year) : "";
   const relatedMovies: MovieItem[] = [];
 
-  if (countrySlug) {
-    const result = await safeRelatedResult(countrySlug, () => getMoviesByCountry(countrySlug, 1, 24));
-    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
+  if (categorySlug && countrySlug) {
+    const combined = await safeRelatedResult(`${categorySlug}+${countrySlug}`, () =>
+      getMoviesByGenre(categorySlug, 1, 24, { country: countrySlug })
+    );
+    addUniqueMovies(relatedMovies, combined?.items || [], movie.slug);
   }
 
-  if (categorySlug && relatedMovies.length < 18) {
-    const result = await safeRelatedResult(categorySlug, () => getMoviesByGenre(categorySlug, 1, 24));
-    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
-  }
+  if (relatedMovies.length < 18) {
+    const [categoryResult, countryResult, yearResult] = await Promise.all([
+      categorySlug
+        ? safeRelatedResult(categorySlug, () => getMoviesByGenre(categorySlug, 1, 24))
+        : Promise.resolve(null),
+      countrySlug
+        ? safeRelatedResult(countrySlug, () => getMoviesByCountry(countrySlug, 1, 24))
+        : Promise.resolve(null),
+      year
+        ? safeRelatedResult(year, () => getMoviesByYear(year, 1, 24))
+        : Promise.resolve(null),
+    ]);
 
-  if (year && relatedMovies.length < 18) {
-    const result = await safeRelatedResult(year, () => getMoviesByYear(year, 1, 24));
-    addUniqueMovies(relatedMovies, result?.items || [], movie.slug);
+    addUniqueMovies(relatedMovies, categoryResult?.items || [], movie.slug);
+    addUniqueMovies(relatedMovies, countryResult?.items || [], movie.slug);
+    addUniqueMovies(relatedMovies, yearResult?.items || [], movie.slug);
   }
 
   const movies = relatedMovies.slice(0, 18);
   if (!movies.length) return null;
 
-  return (
-    <section>
-      <MovieGrid title="Có thể fen sẽ thích" movies={movies} />
-    </section>
-  );
+  return <section><MovieGrid title="Có thể fen sẽ thích" movies={movies} /></section>;
 }
