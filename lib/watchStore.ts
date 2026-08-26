@@ -3,6 +3,7 @@
 import type { MovieDetail } from "@/lib/kkphim";
 
 export const HISTORY_KEY = "baoflix_history";
+export const HISTORY_TOMBSTONES_KEY = "baoflix_history_tombstones_v1";
 export const WATCHED_KEY = "baoflix_watched_episodes";
 export const WATCH_STORE_CHANGE_EVENT = "baoflix-watch-store-change";
 // BAOFLIX_PERSONAL_HISTORY_SYNC
@@ -54,7 +55,11 @@ export function readJson<T>(key: string, fallback: T): T {
 export function writeJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value));
 
-  if (key === HISTORY_KEY || key === WATCHED_KEY) {
+  if (
+    key === HISTORY_KEY ||
+    key === HISTORY_TOMBSTONES_KEY ||
+    key === WATCHED_KEY
+  ) {
     window.dispatchEvent(
       new CustomEvent(WATCH_STORE_CHANGE_EVENT, {
         detail: { key },
@@ -94,6 +99,76 @@ export function saveWatchedEpisode(key: string) {
   writeJson(WATCHED_KEY, next);
 
   return next;
+}
+
+export type WatchHistoryTombstones = Record<string, string>;
+
+export function readWatchHistoryTombstones(): WatchHistoryTombstones {
+  const value = readJson<unknown>(HISTORY_TOMBSTONES_KEY, {});
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const next: WatchHistoryTombstones = {};
+  Object.entries(value as Record<string, unknown>).forEach(([slug, deletedAt]) => {
+    if (!slug || typeof deletedAt !== "string") return;
+    if (!Number.isFinite(Date.parse(deletedAt))) return;
+    next[slug] = deletedAt;
+  });
+  return next;
+}
+
+function writeWatchHistoryTombstones(value: WatchHistoryTombstones) {
+  const ordered = Object.fromEntries(
+    Object.entries(value)
+      .sort(([, a], [, b]) => Date.parse(b) - Date.parse(a))
+      .slice(0, 200)
+  );
+  writeJson(HISTORY_TOMBSTONES_KEY, ordered);
+  return ordered;
+}
+
+export function rememberWatchHistoryDeletion(slug: string, deletedAt = new Date().toISOString()) {
+  const cleanSlug = slug.trim();
+  if (!cleanSlug) return readWatchHistoryTombstones();
+
+  const current = readWatchHistoryTombstones();
+  const oldTime = Date.parse(current[cleanSlug] || "");
+  const nextTime = Date.parse(deletedAt);
+
+  if (!Number.isFinite(nextTime)) return current;
+  if (Number.isFinite(oldTime) && oldTime >= nextTime) return current;
+
+  return writeWatchHistoryTombstones({ ...current, [cleanSlug]: deletedAt });
+}
+
+export function clearWatchHistoryDeletion(slug: string) {
+  const current = readWatchHistoryTombstones();
+  if (!current[slug]) return current;
+
+  const next = { ...current };
+  delete next[slug];
+  return writeWatchHistoryTombstones(next);
+}
+
+export function resolveWatchHistoryWithTombstones(
+  items: WatchHistoryItem[],
+  tombstones: WatchHistoryTombstones
+) {
+  const history = normalizeWatchHistory(items);
+  const nextTombstones = { ...tombstones };
+  const visible: WatchHistoryItem[] = [];
+
+  history.forEach((item) => {
+    const deletedTime = Date.parse(nextTombstones[item.slug] || "");
+    const watchedTime = getTimeValue(item);
+
+    if (Number.isFinite(deletedTime) && deletedTime >= watchedTime) return;
+    if (Number.isFinite(deletedTime) && watchedTime > deletedTime) {
+      delete nextTombstones[item.slug];
+    }
+    visible.push(item);
+  });
+
+  return { history: visible, tombstones: nextTombstones };
 }
 
 function getHistoryGroupKey(item: WatchHistoryItem) {
@@ -159,7 +234,8 @@ export function normalizeWatchHistory(items: WatchHistoryItem[]) {
 
 export function applySyncedWatchState(
   history: WatchHistoryItem[],
-  watchedEpisodes: string[]
+  watchedEpisodes: string[],
+  tombstones: WatchHistoryTombstones = readWatchHistoryTombstones()
 ) {
   const nextHistory = normalizeWatchHistory(history).slice(0, 200);
   const nextWatched = Array.from(
@@ -174,6 +250,7 @@ export function applySyncedWatchState(
     WATCHED_KEY,
     []
   );
+  const oldTombstones = readWatchHistoryTombstones();
 
   let changed = false;
 
@@ -197,6 +274,11 @@ export function applySyncedWatchState(
     changed = true;
   }
 
+  if (JSON.stringify(oldTombstones) !== JSON.stringify(tombstones)) {
+    localStorage.setItem(HISTORY_TOMBSTONES_KEY, JSON.stringify(tombstones));
+    changed = true;
+  }
+
   if (changed) {
     window.dispatchEvent(new Event("storage"));
   }
@@ -216,6 +298,15 @@ export function readWatchHistory() {
 }
 
 export function clearWatchHistory() {
+  const history = readWatchHistory();
+  const deletedAt = new Date().toISOString();
+  const tombstones = { ...readWatchHistoryTombstones() };
+
+  history.forEach((item) => {
+    tombstones[item.slug] = deletedAt;
+  });
+
+  writeWatchHistoryTombstones(tombstones);
   writeJson(HISTORY_KEY, []);
 }
 
@@ -228,6 +319,7 @@ export function removeWatchHistoryItem(input: {
   // Vì lịch sử đã gộp theo slug, xóa 1 phim là xóa luôn mọi biến thể normal/custom cùng slug.
   const next = history.filter((item) => item.slug !== input.slug);
 
+  rememberWatchHistoryDeletion(input.slug);
   writeJson(HISTORY_KEY, next);
 
   return next;
@@ -271,6 +363,7 @@ export function saveNormalWatchHistory(input: {
     ...history.filter((old) => old.slug !== item.slug),
   ]).slice(0, 200);
 
+  clearWatchHistoryDeletion(item.slug);
   writeJson(HISTORY_KEY, next);
 
   return next;
@@ -314,6 +407,7 @@ export function saveCustomWatchHistory(input: {
     ...history.filter((old) => old.slug !== item.slug),
   ]).slice(0, 200);
 
+  clearWatchHistoryDeletion(item.slug);
   writeJson(HISTORY_KEY, next);
 
   return next;

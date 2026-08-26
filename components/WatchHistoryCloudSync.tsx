@@ -8,12 +8,18 @@ import { getSupabaseClient } from "@/lib/supabaseClient";
 import { isTvModeActive } from "@/lib/tvMode";
 import {
   applySyncedWatchState,
-  normalizeWatchHistory,
   readWatchHistory,
+  readWatchHistoryTombstones,
   readWatchedEpisodes,
+  resolveWatchHistoryWithTombstones,
   WATCH_STORE_CHANGE_EVENT,
   type WatchHistoryItem,
+  type WatchHistoryTombstones,
 } from "@/lib/watchStore";
+import {
+  ensureLocalStateForUser,
+  switchLocalStateToAnonymous,
+} from "@/lib/accountLocalState";
 
 const TABLE = "watch_history_sync";
 const SYNC_GROUP = "personal";
@@ -24,6 +30,8 @@ const PLAYBACK_PROGRESS_URGENT_EVENT =
   "baoflix-playback-progress-urgent";
 const PLAYBACK_PROGRESS_SYNCED_EVENT =
   "baoflix-playback-progress-synced";
+const HISTORY_DELETE_PROGRESS_PREFIX =
+  "__baoflix_history_deleted__:";
 
 const MIN_SYNC_INTERVAL_MS = 5000;
 const PERIODIC_SYNC_MS = 60000;
@@ -164,7 +172,55 @@ function mergeProgressMaps(
         ([, a], [, b]) =>
           progressTimestamp(b) - progressTimestamp(a)
       )
-      .slice(0, 120)
+      .slice(0, 400)
+  );
+}
+
+function mergeTombstones(a: WatchHistoryTombstones, b: WatchHistoryTombstones) {
+  const merged: WatchHistoryTombstones = { ...a };
+
+  Object.entries(b).forEach(([slug, deletedAt]) => {
+    const oldTime = Date.parse(merged[slug] || "");
+    const nextTime = Date.parse(deletedAt || "");
+    if (!Number.isFinite(nextTime)) return;
+    if (!Number.isFinite(oldTime) || nextTime > oldTime) merged[slug] = deletedAt;
+  });
+
+  return merged;
+}
+
+function tombstonesToProgressMap(tombstones: WatchHistoryTombstones): ProgressMap {
+  return Object.fromEntries(
+    Object.entries(tombstones).map(([slug, deletedAt]) => [
+      `${HISTORY_DELETE_PROGRESS_PREFIX}${encodeURIComponent(slug)}`,
+      {
+        currentTime: 0,
+        duration: 0,
+        updatedAt: deletedAt,
+        title: "BảoFlix history tombstone",
+        subtitle: slug,
+      } satisfies StoredVideoProgress,
+    ])
+  );
+}
+
+function tombstonesFromProgressMap(map: ProgressMap): WatchHistoryTombstones {
+  const result: WatchHistoryTombstones = {};
+
+  Object.entries(map).forEach(([key, value]) => {
+    if (!key.startsWith(HISTORY_DELETE_PROGRESS_PREFIX)) return;
+    try {
+      const slug = decodeURIComponent(key.slice(HISTORY_DELETE_PROGRESS_PREFIX.length));
+      if (slug) result[slug] = value.updatedAt;
+    } catch {}
+  });
+
+  return result;
+}
+
+function withoutHistoryDeleteMarkers(map: ProgressMap): ProgressMap {
+  return Object.fromEntries(
+    Object.entries(map).filter(([key]) => !key.startsWith(HISTORY_DELETE_PROGRESS_PREFIX))
   );
 }
 
@@ -265,6 +321,8 @@ export default function WatchHistoryCloudSync() {
         if (userError) throw userError;
         if (!user) return;
 
+        ensureLocalStateForUser(user.id);
+
         const { data, error } = await supabase
           .from(TABLE)
           .select(
@@ -286,26 +344,35 @@ export default function WatchHistoryCloudSync() {
 
         const localHistory = readWatchHistory();
         const localWatched = readWatchedEpisodes();
-        const localProgress = readLocalProgressMap();
-
-        const mergedHistory = normalizeWatchHistory([
-          ...localHistory,
-          ...remoteHistory,
-        ]).slice(0, 200);
-
-        const mergedWatched = mergeWatched(
-          localWatched,
-          remoteWatched
+        const localTombstones = readWatchHistoryTombstones();
+        const localProgress = mergeProgressMaps(
+          readLocalProgressMap(),
+          tombstonesToProgressMap(localTombstones)
         );
 
-        const mergedProgress = mergeProgressMaps(
-          localProgress,
-          remoteProgress
+        const mergedWatched = mergeWatched(localWatched, remoteWatched);
+        let mergedProgress = mergeProgressMaps(localProgress, remoteProgress);
+
+        const mergedTombstones = mergeTombstones(
+          localTombstones,
+          tombstonesFromProgressMap(mergedProgress)
+        );
+
+        const resolvedHistory = resolveWatchHistoryWithTombstones(
+          [...localHistory, ...remoteHistory],
+          mergedTombstones
+        );
+        const mergedHistory = resolvedHistory.history.slice(0, 200);
+
+        mergedProgress = mergeProgressMaps(
+          withoutHistoryDeleteMarkers(mergedProgress),
+          tombstonesToProgressMap(resolvedHistory.tombstones)
         );
 
         applySyncedWatchState(
           mergedHistory,
-          mergedWatched
+          mergedWatched,
+          resolvedHistory.tombstones
         );
         applySyncedProgressMap(mergedProgress);
 
@@ -415,9 +482,14 @@ export default function WatchHistoryCloudSync() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        ensureLocalStateForUser(session.user.id);
+        lastCompletedRef.current = 0;
         schedule(100, true);
+      } else if (event === "SIGNED_OUT") {
+        switchLocalStateToAnonymous();
+        lastCompletedRef.current = 0;
       } else if (event === "TOKEN_REFRESHED") {
         schedule(500, false);
       }

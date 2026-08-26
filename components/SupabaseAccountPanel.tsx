@@ -6,6 +6,7 @@ import type { User } from "@supabase/supabase-js";
 import { getSupabaseClient } from "@/lib/supabaseClient";
 import { readCustomMovies } from "@/lib/customMoviesClient";
 import { syncCustomMoviesBidirectional } from "@/lib/customMoviesRemote";
+import { switchLocalStateToAnonymous } from "@/lib/accountLocalState";
 
 export default function SupabaseAccountPanel() {
   const [user, setUser] = useState<User | null>(null);
@@ -133,6 +134,7 @@ export default function SupabaseAccountPanel() {
         return;
       }
 
+      switchLocalStateToAnonymous();
       setUser(null);
       setEmail("");
       setPassword("");

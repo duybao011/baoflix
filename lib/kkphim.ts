@@ -289,47 +289,63 @@ async function getAggregatedAnimationBySubtype(
   );
 
   const totalSourcePages = Number(firstResult.pagination?.totalPages || 1);
+  const targetCount = Math.max(1, page) * Math.max(1, limit);
 
-  const sourcePagesToFetch = Math.min(
-    totalSourcePages,
-    ANIMATION_AGGREGATE_SOURCE_PAGES
-  );
-
-  const otherResults = await Promise.allSettled(
-    Array.from({ length: Math.max(0, sourcePagesToFetch - 1) }, (_, index) => {
-      const sourcePage = index + 2;
-
-      return getMoviesByList(
-        "hoat-hinh",
-        sourcePage,
-        ANIMATION_SOURCE_LIMIT,
-        filters
-      );
-    })
-  );
-
-  const allItems = uniqueMovies([
-    ...(firstResult.items || []),
-    ...otherResults.flatMap((result) => {
-      if (result.status !== "fulfilled") return [];
-      return result.value.items || [];
-    }),
-  ]);
-
-  const filteredResult = filterAnimationSubtype(
-    {
-      ...firstResult,
-      items: allItems,
-    },
+  let sourcePage = 2;
+  let allItems = uniqueMovies(firstResult.items || []);
+  let filteredResult = filterAnimationSubtype(
+    { ...firstResult, items: allItems },
     subtype
   );
 
+  while (
+    sourcePage <= totalSourcePages &&
+    (sourcePage <= ANIMATION_AGGREGATE_SOURCE_PAGES ||
+      filteredResult.items.length < targetCount)
+  ) {
+    const batchPages = Array.from(
+      { length: Math.min(3, totalSourcePages - sourcePage + 1) },
+      (_, index) => sourcePage + index
+    );
+
+    const batch = await Promise.allSettled(
+      batchPages.map((sourcePageNumber) =>
+        getMoviesByList(
+          "hoat-hinh",
+          sourcePageNumber,
+          ANIMATION_SOURCE_LIMIT,
+          filters
+        )
+      )
+    );
+
+    allItems = uniqueMovies([
+      ...allItems,
+      ...batch.flatMap((result) =>
+        result.status === "fulfilled" ? result.value.items || [] : []
+      ),
+    ]);
+
+    filteredResult = filterAnimationSubtype(
+      { ...firstResult, items: allItems },
+      subtype
+    );
+
+    sourcePage += batchPages.length;
+  }
+
   const paginated = paginateLocalMovies(filteredResult.items, page, limit);
+  const hasMoreSourcePages = sourcePage <= totalSourcePages;
 
   return {
     ...filteredResult,
     items: paginated.items,
-    pagination: paginated.pagination,
+    pagination: {
+      ...paginated.pagination,
+      totalPages: hasMoreSourcePages
+        ? Math.max(paginated.pagination.totalPages || 1, page + 1)
+        : paginated.pagination.totalPages,
+    },
   };
 }
 
@@ -337,7 +353,6 @@ async function getAggregatedAnimationBySubtype(
    Multi-tag filter merge
 ========================= */
 
-const MULTI_FILTER_SOURCE_PAGES = 3;
 const MULTI_FILTER_SOURCE_LIMIT = 40;
 
 function parseMultiFilterValue(value?: string) {
@@ -364,7 +379,7 @@ function matchAnyTaxonomy(
 
   const list = movie[key] || [];
 
-  if (!list.length) return true;
+  if (!list.length) return false;
 
   return list.some((item) => selectedSlugs.includes(item.slug));
 }
@@ -437,11 +452,8 @@ async function getAggregatedMultiFilterMovies(
   const categorySlugs = parseMultiFilterValue(filters.category);
   const countrySlugs = parseMultiFilterValue(filters.country);
 
-  // BAOFLIX_PERF_PHASE1: query từng nhóm độc lập, không nhân category × country.
-  const sourcePageCount = Math.max(
-    2,
-    Math.min(MULTI_FILTER_SOURCE_PAGES, page + 1)
-  );
+  // Fetch ít nhất tới page hiện tại; fixed 3 pages làm page 4+ bị sai.
+  const sourcePageCount = Math.max(2, page + 1);
   const sourcePages = Array.from(
     { length: sourcePageCount },
     (_, index) => index + 1
@@ -457,7 +469,30 @@ async function getAggregatedMultiFilterMovies(
 
   const tasks: Promise<MovieListResult>[] = [];
 
-  if (type && type !== "tat-ca") {
+  if (categorySlugs.length && countrySlugs.length) {
+    categorySlugs.forEach((categorySlug) => {
+      countrySlugs.forEach((countrySlug) => {
+        sourcePages.forEach((sourcePage) => {
+          if (type && type !== "tat-ca") {
+            tasks.push(
+              getMoviesByList(type, sourcePage, sourceLimit, {
+                ...baseFilters,
+                category: categorySlug,
+                country: countrySlug,
+              })
+            );
+          } else {
+            tasks.push(
+              getMoviesByGenre(categorySlug, sourcePage, sourceLimit, {
+                ...baseFilters,
+                country: countrySlug,
+              })
+            );
+          }
+        });
+      });
+    });
+  } else if (type && type !== "tat-ca") {
     categorySlugs.forEach((categorySlug) => {
       sourcePages.forEach((sourcePage) => {
         tasks.push(
@@ -527,11 +562,20 @@ async function getAggregatedMultiFilterMovies(
 
   const sortedItems = sortLocalMoviesByFilter(subtypeFilteredItems, filters);
   const paginated = paginateLocalMovies(sortedItems, page, limit);
+  const hasMoreSourcePages = results.some((result) => {
+    if (result.status !== "fulfilled") return false;
+    return Number(result.value.pagination?.totalPages || 0) > sourcePageCount;
+  });
 
   return {
     title: getMultiFilterTitle(categorySlugs, countrySlugs, type),
     items: paginated.items,
-    pagination: paginated.pagination,
+    pagination: {
+      ...paginated.pagination,
+      totalPages: hasMoreSourcePages
+        ? Math.max(paginated.pagination.totalPages || 1, page + 1)
+        : paginated.pagination.totalPages,
+    },
   };
 }
 

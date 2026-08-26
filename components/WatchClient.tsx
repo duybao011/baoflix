@@ -149,16 +149,67 @@ export default function WatchClient({
   }, [currentWatchedKey]);
 
   useEffect(() => {
-    const next = saveWatchedEpisode(currentWatchedKey);
-    setWatchedEpisodes(next);
+    let historySaved = false;
+    let watchedSaved = readWatchedEpisodes().includes(currentWatchedKey);
+    let visibleSeconds = 0;
 
-    saveNormalWatchHistory({
-      movie,
-      serverIndex: safeServerIndex,
-      episodeIndex: safeEpisodeIndex,
-      serverName: currentServer?.server_name,
-      episodeName: episode?.name,
-    });
+    function saveHistoryOnce() {
+      if (historySaved) return;
+      historySaved = true;
+      saveNormalWatchHistory({
+        movie,
+        serverIndex: safeServerIndex,
+        episodeIndex: safeEpisodeIndex,
+        serverName: currentServer?.server_name,
+        episodeName: episode?.name,
+      });
+    }
+
+    function markWatchedOnce() {
+      if (watchedSaved) return;
+      watchedSaved = true;
+      setWatchedEpisodes(saveWatchedEpisode(currentWatchedKey));
+    }
+
+    function handleProgress(event: Event) {
+      const detail = (
+        event as CustomEvent<{
+          progressKey?: string;
+          currentTime?: number;
+          duration?: number;
+          ended?: boolean;
+        }>
+      ).detail;
+
+      if (detail?.progressKey !== currentWatchedKey) return;
+      const currentTime = Number(detail.currentTime || 0);
+      const duration = Number(detail.duration || 0);
+
+      if (currentTime >= 5) saveHistoryOnce();
+      if (detail.ended || (duration > 0 && currentTime / duration >= 0.9)) {
+        saveHistoryOnce();
+        markWatchedOnce();
+      }
+    }
+
+    const fallbackTimer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      visibleSeconds += 3;
+      if (visibleSeconds >= 12) saveHistoryOnce();
+    }, 3000);
+
+    window.addEventListener(
+      "baoflix-playback-progress-change",
+      handleProgress as EventListener
+    );
+
+    return () => {
+      window.clearInterval(fallbackTimer);
+      window.removeEventListener(
+        "baoflix-playback-progress-change",
+        handleProgress as EventListener
+      );
+    };
   }, [
     currentWatchedKey,
     movie,

@@ -111,7 +111,7 @@ function saveCloudProgress(
           Date.parse(a.updatedAt || "")
         );
       })
-      .slice(0, 120);
+      .slice(0, 400);
 
     const nextMap = Object.fromEntries(trimmed);
 
@@ -125,6 +125,9 @@ function saveCloudProgress(
         detail: {
           progressKey: storageKey,
           updatedAt: nextMap[storageKey]?.updatedAt,
+          currentTime,
+          duration,
+          ended: duration > 0 && currentTime >= duration - 1,
         },
       })
     );

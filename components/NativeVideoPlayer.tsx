@@ -69,7 +69,7 @@ function saveVideoProgress(progressKey: string | undefined, progress: StoredVide
       .sort(([, a], [, b]) => {
         return Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || "");
       })
-      .slice(0, 120);
+      .slice(0, 400);
 
     localStorage.setItem(
       VIDEO_PROGRESS_KEY,
@@ -81,6 +81,11 @@ function saveVideoProgress(progressKey: string | undefined, progress: StoredVide
         detail: {
           progressKey,
           updatedAt: progress.updatedAt,
+          currentTime: progress.currentTime,
+          duration: progress.duration,
+          ended:
+            progress.duration > 0 &&
+            progress.currentTime >= progress.duration - 1,
         },
       })
     );
@@ -138,7 +143,7 @@ export default function NativeVideoPlayer({
   const autoplayDoneRef = useRef(false);
   const restoreDoneRef = useRef(false);
   const lastProgressSaveRef = useRef(0);
-  const playerSourceStartedAtRef = useRef(Date.now());
+  const playerSourceStartedAtRef = useRef(0);
   const lastRestoredProgressUpdatedAtRef = useRef("");
   const [error, setError] = useState<string>("");
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);

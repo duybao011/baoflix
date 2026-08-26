@@ -76,19 +76,27 @@ export type StoredCustomMovie = MovieDetailResponse & {
 
 export function driveToPreviewUrl(url: string) {
   const raw = url.trim();
-
   if (!raw) return "";
 
-  const fileMatch = raw.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  try {
+    const parsed = new URL(raw);
+    const hostname = parsed.hostname.toLowerCase();
+    const isGoogleDrive =
+      hostname === "drive.google.com" || hostname.endsWith(".drive.google.com");
 
-  if (fileMatch?.[1]) {
-    return `https://drive.google.com/file/d/${fileMatch[1]}/preview`;
-  }
+    if (!isGoogleDrive) return raw;
 
-  const idMatch = raw.match(/[?&]id=([^&]+)/);
+    const fileMatch = parsed.pathname.match(/\/file\/d\/([^/?#]+)/i);
+    if (fileMatch?.[1]) {
+      return `https://drive.google.com/file/d/${fileMatch[1]}/preview`;
+    }
 
-  if (idMatch?.[1]) {
-    return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
+    const id = parsed.searchParams.get("id")?.trim();
+    if (id) {
+      return `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
+    }
+  } catch {
+    return raw;
   }
 
   return raw;

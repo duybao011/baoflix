@@ -1,6 +1,7 @@
 "use client";
 
 import { getSupabaseClient } from "@/lib/supabaseClient";
+import { ensureLocalStateForUser } from "@/lib/accountLocalState";
 import {
   CUSTOM_MOVIES_KEY,
   clearPendingCustomMovieDeletions,
@@ -226,6 +227,8 @@ export async function syncCustomMoviesBidirectional(): Promise<
   if (!user) {
     return null;
   }
+
+  ensureLocalStateForUser(user.id);
 
   const localMovies = readCustomMovies();
   const deletedCount = await deletePendingRemoteMovies(user.id, localMovies);

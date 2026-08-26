@@ -23,12 +23,15 @@ export async function GET(request: Request) {
   const results: any[] = [];
 
   try {
-    if (country) {
+    if (country && category) {
+      const combinedResult = await getMoviesByCountry(country, 1, 24, {
+        category,
+      });
+      results.push(...(combinedResult.items || []));
+    } else if (country) {
       const countryResult = await getMoviesByCountry(country, 1, 24);
       results.push(...(countryResult.items || []));
-    }
-
-    if (category) {
+    } else if (category) {
       const categoryResult = await getMoviesByGenre(category, 1, 24);
       results.push(...(categoryResult.items || []));
     }
