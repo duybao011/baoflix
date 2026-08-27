@@ -769,6 +769,12 @@ export default function NativeVideoPlayer({
             srcLang={track.lang || "vi"}
             label={track.label || `Phụ đề ${index + 1}`}
             default={Boolean(track.default && index === 0)}
+            // BAOFLIX_V11_TRACK_ONLOAD_SYNC
+            onLoad={() => {
+              window.setTimeout(() => {
+                applySubtitleMode(activeSubtitleIndex);
+              }, 0);
+            }}
           />
         ))}
       </video>

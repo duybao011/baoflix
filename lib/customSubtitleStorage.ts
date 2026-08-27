@@ -180,6 +180,31 @@ export async function uploadCustomSubtitle(input: {
     throw new Error("Upload thành công nhưng không lấy được public URL.");
   }
 
+  // BAOFLIX_V11_VERIFY_PUBLIC_SUBTITLE
+  // getPublicUrl() chỉ tạo URL; nó không xác nhận bucket thật sự đang public.
+  try {
+    const verifyResponse = await fetch(publicUrl, {
+      cache: "no-store",
+    });
+
+    if (!verifyResponse.ok) {
+      throw new Error(`HTTP ${verifyResponse.status}`);
+    }
+  } catch (error) {
+    await supabase.storage
+      .from(CUSTOM_SUBTITLE_BUCKET)
+      .remove([storagePath])
+      .catch(() => undefined);
+
+    const reason =
+      error instanceof Error ? error.message : "fetch failed";
+
+    throw new Error(
+      `File đã upload nhưng public URL không đọc được (${reason}). ` +
+      `Kiểm tra bucket "${CUSTOM_SUBTITLE_BUCKET}" phải bật Public.`
+    );
+  }
+
   rememberPendingUpload(storagePath);
 
   return {

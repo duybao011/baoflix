@@ -37,6 +37,9 @@ type StoredDriveEstimate = {
 
 const PROBE_TIMEOUT_MS = 3500;
 const PERSONAL_PROBE_TIMEOUT_MS = 1800;
+// BAOFLIX_V11_SUBTITLE_NATIVE_PRIORITY
+const SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS = 8000;
+const SUBTITLE_TV_PROBE_TIMEOUT_MS = 10000;
 // BAOFLIX_CUSTOM_MOVIE_LAG_FIX
 const DRIVE_RELAY_COOLDOWN_MS = 5 * 60 * 1000;
 const DRIVE_RELAY_FAIL_UNTIL_KEY = "baoflix_drive_relay_fail_until";
@@ -199,6 +202,13 @@ export default function CustomDrivePlayer({
     [fileId]
   );
   const activeCandidate = directCandidates[candidateIndex] || "";
+  const hasExternalSubtitles = useMemo(
+    () =>
+      subtitles.some((track) =>
+        Boolean(String(track?.url || "").trim())
+      ),
+    [subtitles]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -208,7 +218,17 @@ export default function CustomDrivePlayer({
       setResolvedSubtitleTracks([]);
       setSubtitleLoadError("");
 
-      if (mode !== "native" || subtitles.length === 0) return;
+      if (subtitles.length === 0) return;
+
+      if (mode !== "native") {
+        if (mode === "iframe") {
+          setSubtitleLoadError(
+            "Phụ đề đã lưu nhưng video đang chạy bằng Google Drive iframe. " +
+              "Iframe Drive không nhận track phụ đề từ BảoFlix; cần Drive Relay/native player."
+          );
+        }
+        return;
+      }
 
       const relayBase = String(
         process.env.NEXT_PUBLIC_DRIVE_RELAY_URL || ""
@@ -301,7 +321,7 @@ export default function CustomDrivePlayer({
     setNativeSrc("");
     setFallbackReason("");
 
-    if (!fileId || directCandidates.length === 0) {
+    if (!fileId) {
       setMode("iframe");
       setFallbackReason(
         "Không lấy được file ID từ link Drive, đang dùng player Drive dự phòng."
@@ -309,8 +329,17 @@ export default function CustomDrivePlayer({
       return;
     }
 
-    // BAOFLIX_PERF_PHASE1: relay vừa timeout thì đừng bắt tập kế tiếp chờ lại.
-    if (isDriveRelayCoolingDown()) {
+    if (directCandidates.length === 0) {
+      setMode("iframe");
+      setFallbackReason(
+        hasExternalSubtitles
+          ? "Thiếu NEXT_PUBLIC_DRIVE_RELAY_URL nên Drive đang chạy iframe. Phụ đề ngoài cần Native/Drive Relay."
+          : "Không có Drive Relay, đang dùng player Drive dự phòng."
+      );
+      return;
+    }
+
+    if (isDriveRelayCoolingDown() && !hasExternalSubtitles) {
       setMode("iframe");
       setFallbackReason(
         "Drive Relay vừa phản hồi chậm, tạm dùng iframe để vào phim nhanh hơn."
@@ -319,17 +348,41 @@ export default function CustomDrivePlayer({
     }
 
     setMode("probing");
-  }, [directCandidates.length, fileId, src, tvMode]);
+  }, [
+    directCandidates.length,
+    fileId,
+    hasExternalSubtitles,
+    src,
+    tvMode,
+  ]);
 
   useEffect(() => {
     if (mode !== "probing" || !activeCandidate) return;
 
+    const timeoutMs = hasExternalSubtitles
+      ? tvMode
+        ? SUBTITLE_TV_PROBE_TIMEOUT_MS
+        : SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS
+      : tvMode
+        ? PROBE_TIMEOUT_MS
+        : PERSONAL_PROBE_TIMEOUT_MS;
+
     const timeout = window.setTimeout(() => {
-      tryNextCandidate("Nguồn direct tải quá lâu.", true);
-    }, tvMode ? PROBE_TIMEOUT_MS : PERSONAL_PROBE_TIMEOUT_MS);
+      tryNextCandidate(
+        hasExternalSubtitles
+          ? "Drive Relay chưa vào native kịp nên không thể gắn phụ đề ngoài."
+          : "Nguồn direct tải quá lâu.",
+        true
+      );
+    }, timeoutMs);
 
     return () => window.clearTimeout(timeout);
-  }, [activeCandidate, mode, tvMode]);
+  }, [
+    activeCandidate,
+    hasExternalSubtitles,
+    mode,
+    tvMode,
+  ]);
 
   useEffect(() => {
     const saved = readEstimate(progressKey);
@@ -439,7 +492,9 @@ export default function CustomDrivePlayer({
 
     setMode("iframe");
     setFallbackReason(
-      "Drive Relay không trả về video native. Đã chuyển sang iframe dự phòng."
+      hasExternalSubtitles
+        ? "Drive Relay không trả về video native. Video đã chuyển sang iframe nên phụ đề ngoài không thể hiển thị."
+        : "Drive Relay không trả về video native. Đã chuyển sang iframe dự phòng."
     );
   }
 
@@ -508,8 +563,8 @@ export default function CustomDrivePlayer({
         </div>
       )}
 
-      {tvMode && subtitleLoadError && (
-        <div className="pointer-events-none absolute left-1/2 top-[18%] z-20 max-w-[70vw] -translate-x-1/2 rounded-xl border border-yellow-300/20 bg-black/75 px-4 py-2 text-center text-xs font-bold text-yellow-100 shadow-xl backdrop-blur">
+      {subtitleLoadError && (
+        <div className="pointer-events-none absolute left-1/2 top-[18%] z-20 max-w-[88vw] -translate-x-1/2 rounded-xl border border-yellow-300/20 bg-black/80 px-4 py-2 text-center text-xs font-bold text-yellow-100 shadow-xl backdrop-blur">
           {subtitleLoadError}
         </div>
       )}
