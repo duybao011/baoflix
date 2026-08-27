@@ -28,18 +28,21 @@ type CustomDrivePlayerProps = {
   onOpenEpisodes: () => void;
 };
 
-type PlayerMode = "native" | "iframe";
+type PlayerMode = "probing" | "native" | "iframe";
 
 type StoredDriveEstimate = {
   seconds: number;
   updatedAt: string;
 };
 
-// BAOFLIX_V14_DIRECT_NATIVE_NO_PROBE
-// V3 Relay đã xử lý Range lớn/open-ended. Không probe bằng một <video> ẩn
-// rồi tải lại lần hai nữa: mỗi attempt phải chính là player thật.
+// BAOFLIX_V13_NATIVE_FIRST
+// Relay/Drive có thể cold-start hoặc phản hồi metadata không đều.
+// 1.8s trước đây quá gắt và làm file hợp lệ rơi iframe ngẫu nhiên.
+const PROBE_TIMEOUT_MS = 6000;
+const PERSONAL_PROBE_TIMEOUT_MS = 4500;
+const SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS = 7000;
+const SUBTITLE_TV_PROBE_TIMEOUT_MS = 9000;
 const DRIVE_NATIVE_RETRY_COUNT = 3;
-const DRIVE_NATIVE_RETRY_DELAYS_MS = [1500, 3500] as const;
 const SAVE_INTERVAL_SECONDS = 5;
 const EMPTY_SUBTITLES: EpisodeSubtitle[] = [];
 // BAOFLIX_CUSTOM_DRIVE_PERSONAL_PROGRESS
@@ -163,10 +166,9 @@ export default function CustomDrivePlayer({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const estimateSecondsRef = useRef(0);
   const estimateSaveTickRef = useRef(0);
-  const nativeRetryTimerRef = useRef<number | null>(null);
 
   const [tvMode, setTvMode] = useState(false);
-  const [mode, setMode] = useState<PlayerMode>("native");
+  const [mode, setMode] = useState<PlayerMode>("probing");
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [nativeSrc, setNativeSrc] = useState("");
   const [iframeSrc, setIframeSrc] = useState(src);
@@ -182,7 +184,7 @@ export default function CustomDrivePlayer({
     () => buildDirectCandidates(fileId),
     [fileId]
   );
-  const firstCandidate = directCandidates[0] || "";
+  const activeCandidate = directCandidates[candidateIndex] || "";
   const hasExternalSubtitles = useMemo(
     () =>
       subtitles.some((track) =>
@@ -297,11 +299,6 @@ export default function CustomDrivePlayer({
   }, []);
 
   useEffect(() => {
-    if (nativeRetryTimerRef.current !== null) {
-      window.clearTimeout(nativeRetryTimerRef.current);
-      nativeRetryTimerRef.current = null;
-    }
-
     setIframeSrc(src);
     setCandidateIndex(0);
     setNativeSrc("");
@@ -315,7 +312,7 @@ export default function CustomDrivePlayer({
       return;
     }
 
-    if (!firstCandidate) {
+    if (directCandidates.length === 0) {
       setMode("iframe");
       setFallbackReason(
         hasExternalSubtitles
@@ -325,38 +322,56 @@ export default function CustomDrivePlayer({
       return;
     }
 
-    // Native thật được mount ngay. Không tạo request probe riêng.
-    setNativeSrc(firstCandidate);
-    setMode("native");
+    // Luôn thử Native cho chính file hiện tại.
+    // Timeout của phim/tập trước không được làm phim này rơi iframe.
+    setMode("probing");
   }, [
+    directCandidates.length,
     fileId,
-    firstCandidate,
     hasExternalSubtitles,
     src,
     tvMode,
   ]);
 
   useEffect(() => {
-    return () => {
-      if (nativeRetryTimerRef.current !== null) {
-        window.clearTimeout(nativeRetryTimerRef.current);
-        nativeRetryTimerRef.current = null;
-      }
-    };
-  }, []);
+    if (mode !== "probing" || !activeCandidate) return;
+
+    const baseTimeoutMs = hasExternalSubtitles
+      ? tvMode
+        ? SUBTITLE_TV_PROBE_TIMEOUT_MS
+        : SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS
+      : tvMode
+        ? PROBE_TIMEOUT_MS
+        : PERSONAL_PROBE_TIMEOUT_MS;
+
+    const timeoutMs =
+      baseTimeoutMs + candidateIndex * 1000;
+
+    const timeout = window.setTimeout(() => {
+      tryNextCandidate(
+        hasExternalSubtitles
+          ? "Drive Relay đang chậm; thử lại Native trước khi dùng iframe."
+          : "Nguồn Drive phản hồi chậm; đang thử lại Native."
+      );
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    activeCandidate,
+    candidateIndex,
+    hasExternalSubtitles,
+    mode,
+    tvMode,
+  ]);
 
   useEffect(() => {
     function handleNativeFatal(event: Event) {
       if (mode !== "native") return;
-      if (nativeRetryTimerRef.current !== null) return;
 
       const detail = (
         event as CustomEvent<{
           progressKey?: string;
           src?: string;
-          errorCode?: number;
-          errorMessage?: string;
-          reason?: string;
         }>
       ).detail;
 
@@ -378,31 +393,18 @@ export default function CustomDrivePlayer({
       const nextIndex = candidateIndex + 1;
 
       if (nextIndex < directCandidates.length) {
-        const delayMs =
-          DRIVE_NATIVE_RETRY_DELAYS_MS[
-            Math.min(
-              candidateIndex,
-              DRIVE_NATIVE_RETRY_DELAYS_MS.length - 1
-            )
-          ];
-
+        setCandidateIndex(nextIndex);
+        setNativeSrc("");
         setFallbackReason(
-          `Native tạm lỗi; thử lại sau ${Math.round(delayMs / 100) / 10}s.`
+          "Native gặp lỗi khi phát; đang thử lại nguồn Drive."
         );
-
-        nativeRetryTimerRef.current = window.setTimeout(() => {
-          nativeRetryTimerRef.current = null;
-          setCandidateIndex(nextIndex);
-          setNativeSrc(directCandidates[nextIndex] || "");
-          setMode("native");
-        }, delayMs);
-
+        setMode("probing");
         return;
       }
 
       setNativeSrc("");
       setFallbackReason(
-        "Native gặp lỗi sau nhiều lần thử thực tế. Đã chuyển sang Drive iframe dự phòng."
+        "Native gặp lỗi sau nhiều lần thử. Đã chuyển sang Drive iframe dự phòng."
       );
       setMode("iframe");
     }
@@ -420,7 +422,7 @@ export default function CustomDrivePlayer({
     };
   }, [
     candidateIndex,
-    directCandidates,
+    directCandidates.length,
     mode,
     nativeSrc,
     progressKey,
@@ -518,6 +520,33 @@ export default function CustomDrivePlayer({
     };
   }, [mode, src, tvMode]);
 
+  function tryNextCandidate(reason: string) {
+    const nextIndex = candidateIndex + 1;
+
+    if (nextIndex < directCandidates.length) {
+      setCandidateIndex(nextIndex);
+      setNativeSrc("");
+      setMode("probing");
+      setFallbackReason(reason);
+      return;
+    }
+
+    setMode("iframe");
+    setFallbackReason(
+      hasExternalSubtitles
+        ? "Đã thử Native nhiều lần nhưng nguồn Drive vẫn không ổn định. Chuyển sang iframe; phụ đề ngoài sẽ không hoạt động."
+        : "Đã thử Native nhiều lần nhưng nguồn Drive vẫn không ổn định. Chuyển sang iframe dự phòng."
+    );
+  }
+
+  function handleProbeReady() {
+    if (!activeCandidate) return;
+
+    setNativeSrc(activeCandidate);
+    setMode("native");
+    setFallbackReason("");
+  }
+
   const serverForOverlay: EpisodeServer =
     currentSeason || {
       server_name: `Mùa ${seasonIndex + 1}`,
@@ -526,9 +555,25 @@ export default function CustomDrivePlayer({
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
+      {mode === "probing" && activeCandidate && (
+        <video
+          key={activeCandidate}
+          src={activeCandidate}
+          muted
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={handleProbeReady}
+          onCanPlay={handleProbeReady}
+          onError={() =>
+            tryNextCandidate("Nguồn direct hiện tại không phát được.")
+          }
+          className="pointer-events-none absolute h-px w-px opacity-0"
+          aria-hidden="true"
+        />
+      )}
+
       {mode === "native" && nativeSrc ? (
         <NativeVideoPlayer
-          key={`${fileId}:${candidateIndex}`}
           src={nativeSrc}
           title={title}
           subtitle={serverForOverlay.server_name}
@@ -561,6 +606,12 @@ export default function CustomDrivePlayer({
       {subtitleLoadError && (
         <div className="pointer-events-none absolute left-1/2 top-[18%] z-20 max-w-[88vw] -translate-x-1/2 rounded-xl border border-yellow-300/20 bg-black/80 px-4 py-2 text-center text-xs font-bold text-yellow-100 shadow-xl backdrop-blur">
           {subtitleLoadError}
+        </div>
+      )}
+
+      {tvMode && mode === "probing" && (
+        <div className="pointer-events-none absolute left-1/2 top-[12%] -translate-x-1/2 rounded-2xl border border-white/10 bg-black/75 px-4 py-3 text-center text-sm font-bold text-white shadow-2xl backdrop-blur">
+          Đang thử mở video Drive bằng player native...
         </div>
       )}
 

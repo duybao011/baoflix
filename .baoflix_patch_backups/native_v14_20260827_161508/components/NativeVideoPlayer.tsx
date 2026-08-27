@@ -31,9 +31,6 @@ const PLAYBACK_PROGRESS_CHANGE_EVENT = "baoflix-playback-progress-change";
 const PLAYBACK_PROGRESS_URGENT_EVENT = "baoflix-playback-progress-urgent";
 const PLAYBACK_PROGRESS_SYNCED_EVENT = "baoflix-playback-progress-synced";
 const NATIVE_PLAYER_FATAL_EVENT = "baoflix-native-player-fatal";
-// BAOFLIX_V14_DIRECT_NATIVE_STARTUP_WATCHDOG
-const DIRECT_NATIVE_STARTUP_TIMEOUT_MS = 15000;
-const DIRECT_NATIVE_TV_STARTUP_TIMEOUT_MS = 20000;
 // BAOFLIX_PLAYBACK_PROGRESS_SYNC
 const EMPTY_SUBTITLE_TRACKS: ResolvedSubtitleTrack[] = [];
 
@@ -148,7 +145,6 @@ export default function NativeVideoPlayer({
   const lastProgressSaveRef = useRef(0);
   const playerSourceStartedAtRef = useRef(0);
   const lastRestoredProgressUpdatedAtRef = useRef("");
-  const sourceReadyRef = useRef(false);
   const [error, setError] = useState<string>("");
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);
 
@@ -380,7 +376,6 @@ export default function NativeVideoPlayer({
     lastProgressSaveRef.current = 0;
     playerSourceStartedAtRef.current = Date.now();
     lastRestoredProgressUpdatedAtRef.current = "";
-    sourceReadyRef.current = false;
 
     video.controls = !tvMode;
     video.autoplay = tvMode;
@@ -443,23 +438,7 @@ export default function NativeVideoPlayer({
       saveProgressNow();
     }
 
-    let startupTimer: number | null = null;
-
-    function clearStartupTimer() {
-      if (startupTimer !== null) {
-        window.clearTimeout(startupTimer);
-        startupTimer = null;
-      }
-    }
-
-    function markSourceReady() {
-      sourceReadyRef.current = true;
-      clearStartupTimer();
-      setError("");
-    }
-
     function handleLoadedMetadata() {
-      markSourceReady();
       restoreProgressIfNeeded();
       autoplayQuietly();
     }
@@ -469,11 +448,6 @@ export default function NativeVideoPlayer({
       if (userPausedRef.current || autoplayDoneRef.current) return;
 
       void attemptPlay({ showError: false, forced: false });
-    }
-
-    function handleCanPlay() {
-      markSourceReady();
-      autoplayQuietly();
     }
 
     video.addEventListener("loadedmetadata", handleLoadedMetadata);
@@ -487,28 +461,7 @@ export default function NativeVideoPlayer({
     video.addEventListener("timeupdate", saveProgressThrottled);
     video.addEventListener("pause", saveProgressUrgent);
     video.addEventListener("ended", saveProgressUrgent);
-    video.addEventListener("canplay", handleCanPlay, { once: true });
-
-    startupTimer = window.setTimeout(() => {
-      if (sourceReadyRef.current) return;
-
-      setError(
-        "Nguồn Native khởi động quá lâu. BảoFlix đang thử lại Drive..."
-      );
-
-      window.dispatchEvent(
-        new CustomEvent(NATIVE_PLAYER_FATAL_EVENT, {
-          detail: {
-            progressKey,
-            src,
-            reason: "startup-timeout",
-          },
-        })
-      );
-    }, tvMode
-      ? DIRECT_NATIVE_TV_STARTUP_TIMEOUT_MS
-      : DIRECT_NATIVE_STARTUP_TIMEOUT_MS
-    );
+    video.addEventListener("canplay", autoplayQuietly, { once: true });
 
     const isHlsSource = /\.m3u8(?:$|[?#])/i.test(src);
 
@@ -576,8 +529,7 @@ export default function NativeVideoPlayer({
         video.removeEventListener("timeupdate", saveProgressThrottled);
         video.removeEventListener("pause", saveProgressUrgent);
         video.removeEventListener("ended", saveProgressUrgent);
-        video.removeEventListener("canplay", handleCanPlay);
-        clearStartupTimer();
+        video.removeEventListener("canplay", autoplayQuietly);
         hls.destroy();
       };
     }
@@ -592,73 +544,11 @@ export default function NativeVideoPlayer({
       video.removeEventListener("timeupdate", saveProgressThrottled);
       video.removeEventListener("pause", saveProgressUrgent);
       video.removeEventListener("ended", saveProgressUrgent);
-      video.removeEventListener("canplay", handleCanPlay);
-      clearStartupTimer();
+      video.removeEventListener("canplay", autoplayQuietly);
       video.removeAttribute("src");
       video.load();
     };
   }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
-
-  // BAOFLIX_PC_SEEK_10S_ONLY_V2
-  // Chỉ PC/điện thoại: ArrowLeft / ArrowRight = ±10 giây.
-  // TV giữ nguyên toàn bộ logic bridge/overlay/remote hiện tại.
-  useEffect(() => {
-    const player = videoRef.current;
-
-    if (!player || tvMode) return;
-
-    function handleDesktopSeekKey(event: KeyboardEvent) {
-      if (
-        event.key !== "ArrowLeft" &&
-        event.key !== "ArrowRight"
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      // Một lần nhấn = đúng một lần tua.
-      // Không cho key-repeat cộng dồn thành 20/30/40 giây.
-      if (event.repeat) return;
-
-      // Đọc ref lại trong callback để TypeScript biết rõ
-      // element có thể đã unmount giữa hai thời điểm.
-      const currentVideo = videoRef.current;
-      if (!currentVideo) return;
-
-      const duration =
-        Number.isFinite(currentVideo.duration) &&
-        currentVideo.duration > 0
-          ? currentVideo.duration
-          : Number.MAX_SAFE_INTEGER;
-
-      const delta =
-        event.key === "ArrowRight"
-          ? DEFAULT_SEEK_SECONDS
-          : -DEFAULT_SEEK_SECONDS;
-
-      currentVideo.currentTime = clamp(
-        currentVideo.currentTime + delta,
-        0,
-        duration
-      );
-    }
-
-    player.addEventListener(
-      "keydown",
-      handleDesktopSeekKey,
-      true
-    );
-
-    return () => {
-      player.removeEventListener(
-        "keydown",
-        handleDesktopSeekKey,
-        true
-      );
-    };
-  }, [tvMode]);
 
   useEffect(() => {
     if (!progressKey) return;
@@ -858,10 +748,8 @@ export default function NativeVideoPlayer({
         controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload"}
         // BAOFLIX_V13_DIRECT_FATAL
         onError={() => {
-          const currentVideo = videoRef.current;
           const currentSrc =
-            currentVideo?.currentSrc || src;
-          const mediaError = currentVideo?.error;
+            videoRef.current?.currentSrc || src;
 
           setError(
             "Nguồn Native gặp lỗi. BảoFlix đang thử lại Drive..."
@@ -872,9 +760,6 @@ export default function NativeVideoPlayer({
               detail: {
                 progressKey,
                 src: currentSrc || src,
-                errorCode: mediaError?.code,
-                errorMessage: mediaError?.message || "",
-                reason: "media-error",
               },
             })
           );
@@ -885,7 +770,6 @@ export default function NativeVideoPlayer({
           );
         }}
         onCanPlay={() => {
-          sourceReadyRef.current = true;
           setError("");
         }}
         className={[

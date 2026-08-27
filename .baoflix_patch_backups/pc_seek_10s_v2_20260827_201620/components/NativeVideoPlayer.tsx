@@ -599,67 +599,6 @@ export default function NativeVideoPlayer({
     };
   }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
 
-  // BAOFLIX_PC_SEEK_10S_ONLY_V2
-  // Chỉ PC/điện thoại: ArrowLeft / ArrowRight = ±10 giây.
-  // TV giữ nguyên toàn bộ logic bridge/overlay/remote hiện tại.
-  useEffect(() => {
-    const player = videoRef.current;
-
-    if (!player || tvMode) return;
-
-    function handleDesktopSeekKey(event: KeyboardEvent) {
-      if (
-        event.key !== "ArrowLeft" &&
-        event.key !== "ArrowRight"
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      // Một lần nhấn = đúng một lần tua.
-      // Không cho key-repeat cộng dồn thành 20/30/40 giây.
-      if (event.repeat) return;
-
-      // Đọc ref lại trong callback để TypeScript biết rõ
-      // element có thể đã unmount giữa hai thời điểm.
-      const currentVideo = videoRef.current;
-      if (!currentVideo) return;
-
-      const duration =
-        Number.isFinite(currentVideo.duration) &&
-        currentVideo.duration > 0
-          ? currentVideo.duration
-          : Number.MAX_SAFE_INTEGER;
-
-      const delta =
-        event.key === "ArrowRight"
-          ? DEFAULT_SEEK_SECONDS
-          : -DEFAULT_SEEK_SECONDS;
-
-      currentVideo.currentTime = clamp(
-        currentVideo.currentTime + delta,
-        0,
-        duration
-      );
-    }
-
-    player.addEventListener(
-      "keydown",
-      handleDesktopSeekKey,
-      true
-    );
-
-    return () => {
-      player.removeEventListener(
-        "keydown",
-        handleDesktopSeekKey,
-        true
-      );
-    };
-  }, [tvMode]);
-
   useEffect(() => {
     if (!progressKey) return;
 
