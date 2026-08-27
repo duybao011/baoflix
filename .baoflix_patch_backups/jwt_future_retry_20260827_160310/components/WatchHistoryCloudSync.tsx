@@ -37,64 +37,6 @@ const MIN_SYNC_INTERVAL_MS = 5000;
 const PERIODIC_SYNC_MS = 60000;
 const PROGRESS_SYNC_DELAY_MS = 12000;
 
-// BAOFLIX_JWT_FUTURE_RETRY
-const JWT_FUTURE_RETRY_DELAYS_MS = [1500, 5000] as const;
-const JWT_FUTURE_FINAL_RETRY_MS = 15000;
-
-function isJwtIssuedAtFutureError(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-
-  const candidate = error as {
-    code?: unknown;
-    message?: unknown;
-  };
-
-  return (
-    String(candidate.code || "") === "PGRST303" &&
-    String(candidate.message || "")
-      .toLowerCase()
-      .includes("jwt issued at future")
-  );
-}
-
-function waitForJwtClockSkew(delayMs: number) {
-  return new Promise<void>((resolve) => {
-    window.setTimeout(resolve, delayMs);
-  });
-}
-
-async function withJwtFutureRetry<
-  T extends { error: unknown }
->(
-  operation: () => PromiseLike<T>,
-  label: string
-): Promise<T> {
-  let result = await operation();
-
-  for (
-    let attempt = 0;
-    attempt < JWT_FUTURE_RETRY_DELAYS_MS.length;
-    attempt += 1
-  ) {
-    if (!isJwtIssuedAtFutureError(result.error)) {
-      return result;
-    }
-
-    const delayMs =
-      JWT_FUTURE_RETRY_DELAYS_MS[attempt];
-
-    console.info(
-      `[BảoFlix] Supabase JWT clock-skew tạm thời (${label}); ` +
-        `thử lại sau ${delayMs}ms.`
-    );
-
-    await waitForJwtClockSkew(delayMs);
-    result = await operation();
-  }
-
-  return result;
-}
-
 type StoredVideoProgress = {
   currentTime: number;
   duration: number;
@@ -381,18 +323,14 @@ export default function WatchHistoryCloudSync() {
 
         ensureLocalStateForUser(user.id);
 
-        const { data, error } = await withJwtFutureRetry(
-          () =>
-            supabase
-              .from(TABLE)
-              .select(
-                "history,watched_episodes,playback_progress"
-              )
-              .eq("user_id", user.id)
-              .eq("sync_group", SYNC_GROUP)
-              .maybeSingle(),
-          "history/progress select"
-        );
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select(
+            "history,watched_episodes,playback_progress"
+          )
+          .eq("user_id", user.id)
+          .eq("sync_group", SYNC_GROUP)
+          .maybeSingle();
 
         if (error) throw error;
 
@@ -448,23 +386,18 @@ export default function WatchHistoryCloudSync() {
             stableProgressJson(mergedProgress);
 
         if (remoteChanged) {
-          const { error: upsertError } =
-            await withJwtFutureRetry(
-              () =>
-                supabase
-                  .from(TABLE)
-                  .upsert(
-                    {
-                      user_id: user.id,
-                      sync_group: SYNC_GROUP,
-                      history: mergedHistory,
-                      watched_episodes: mergedWatched,
-                      playback_progress: mergedProgress,
-                      updated_at: new Date().toISOString(),
-                    },
-                    { onConflict: "user_id,sync_group" }
-                  ),
-              "history/progress upsert"
+          const { error: upsertError } = await supabase
+            .from(TABLE)
+            .upsert(
+              {
+                user_id: user.id,
+                sync_group: SYNC_GROUP,
+                history: mergedHistory,
+                watched_episodes: mergedWatched,
+                playback_progress: mergedProgress,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id,sync_group" }
             );
 
           if (upsertError) throw upsertError;
@@ -472,22 +405,10 @@ export default function WatchHistoryCloudSync() {
 
         lastCompletedRef.current = Date.now();
       } catch (error) {
-        if (isJwtIssuedAtFutureError(error)) {
-          queuedRef.current = false;
-          lastCompletedRef.current = Date.now();
-
-          console.info(
-            "[BảoFlix] Supabase JWT vẫn lệch clock sau retry; " +
-              "hoãn cloud sync 15 giây. Local history/progress vẫn được giữ."
-          );
-
-          schedule(JWT_FUTURE_FINAL_RETRY_MS, true);
-        } else {
-          console.warn(
-            "[BảoFlix] History/progress sync thất bại:",
-            error
-          );
-        }
+        console.warn(
+          "[BảoFlix] History/progress sync thất bại:",
+          error
+        );
       } finally {
         runningRef.current = false;
 
@@ -570,8 +491,7 @@ export default function WatchHistoryCloudSync() {
         switchLocalStateToAnonymous();
         lastCompletedRef.current = 0;
       } else if (event === "TOKEN_REFRESHED") {
-        // Tránh chọc Data API ngay sát thời điểm Auth vừa phát JWT mới.
-        schedule(1800, false);
+        schedule(500, false);
       }
     });
 
