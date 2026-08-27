@@ -38,6 +38,9 @@ export type EpisodeSubtitle = {
   label: string;
   lang: string;
   url: string;
+  source?: "external" | "upload";
+  storagePath?: string;
+  originalName?: string;
   default?: boolean;
 };
 

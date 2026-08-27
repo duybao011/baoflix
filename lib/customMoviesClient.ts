@@ -2,6 +2,12 @@
 
 import type { EpisodeSubtitle, MovieDetailResponse } from "@/lib/kkphim";
 import { slugify } from "@/lib/slugify";
+import {
+  collectCustomSubtitleStoragePaths,
+  getCustomSubtitleStoragePathFromUrl,
+  markCustomSubtitlePathsCommitted,
+  removeCustomSubtitleFiles,
+} from "@/lib/customSubtitleStorage";
 
 export const CUSTOM_MOVIES_KEY = "baoflix_custom_movies";
 
@@ -195,11 +201,26 @@ export function getCustomMovieBySlugClient(slug: string) {
   return readCustomMovies().find((item) => item.movie.slug === slug);
 }
 
+// BAOFLIX_SUBTITLE_STORAGE_CLEANUP
 export function deleteCustomMovie(slug: string) {
-  const next = readCustomMovies().filter((item) => item.movie.slug !== slug);
+  const movies = readCustomMovies();
+  const oldMovie = movies.find((item) => item.movie.slug === slug);
+  const next = movies.filter((item) => item.movie.slug !== slug);
 
   rememberPendingCustomMovieDeletion(slug);
   saveCustomMovies(next, { type: "delete", slug });
+
+  const oldSubtitlePaths =
+    collectCustomSubtitleStoragePaths(oldMovie);
+
+  if (oldSubtitlePaths.length) {
+    void removeCustomSubtitleFiles(oldSubtitlePaths).catch((error) => {
+      console.warn(
+        "[BảoFlix] Không dọn được subtitle Storage khi xóa phim:",
+        error
+      );
+    });
+  }
 
   return next;
 }
@@ -221,6 +242,26 @@ export function upsertCustomMovie(movie: StoredCustomMovie) {
   ];
 
   saveCustomMovies(next);
+
+  const oldSubtitlePaths =
+    collectCustomSubtitleStoragePaths(oldMovie);
+  const nextSubtitlePaths =
+    collectCustomSubtitleStoragePaths(nextMovie);
+  const keepingPaths = new Set(nextSubtitlePaths);
+  const orphanPaths = oldSubtitlePaths.filter(
+    (path) => !keepingPaths.has(path)
+  );
+
+  markCustomSubtitlePathsCommitted(nextSubtitlePaths);
+
+  if (orphanPaths.length) {
+    void removeCustomSubtitleFiles(orphanPaths).catch((error) => {
+      console.warn(
+        "[BảoFlix] Không dọn được subtitle Storage cũ:",
+        error
+      );
+    });
+  }
 
   return next;
 }
@@ -347,6 +388,8 @@ function buildDefaultEpisodeSubtitles(
   url: string
 ): EpisodeSubtitle[] {
   const cleanUrl = String(url || "").trim();
+  const storagePath =
+    getCustomSubtitleStoragePathFromUrl(cleanUrl);
 
   return cleanUrl
     ? [
@@ -354,6 +397,8 @@ function buildDefaultEpisodeSubtitles(
           label: "Tiếng Việt",
           lang: "vi",
           url: cleanUrl,
+          source: storagePath ? "upload" : "external",
+          ...(storagePath ? { storagePath } : {}),
           default: true,
         },
       ]

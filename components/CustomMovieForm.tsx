@@ -9,6 +9,7 @@ import {
   upsertCustomMovie,
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
+import CustomSubtitleUploadPanel from "@/components/CustomSubtitleUploadPanel";
 
 const CUSTOM_POSTER_DIR = "/custom-posters";
 
@@ -450,6 +451,12 @@ Tập 02 | https://drive.google.com/file/d/video04/view`}
             dán link video, app tự đặt Tập 01, Tập 02...
           </span>
         </label>
+
+        <CustomSubtitleUploadPanel
+          movieSlug={finalSlug}
+          episodesText={episodesText}
+          onEpisodesTextChange={setEpisodesText}
+        />
 
         <button
           type="button"

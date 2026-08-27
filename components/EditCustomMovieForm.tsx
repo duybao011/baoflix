@@ -9,6 +9,7 @@ import {
   type StoredCustomMovie,
 } from "@/lib/customMoviesClient";
 import { slugify } from "@/lib/slugify";
+import StoredCustomSubtitleManager from "@/components/StoredCustomSubtitleManager";
 
 type EditCustomMovieFormProps = {
   params: Promise<{ slug: string }>;
@@ -265,6 +266,11 @@ export default function EditCustomMovieForm({ params }: EditCustomMovieFormProps
             className="rounded-2xl border border-white/10 bg-[#10131d] px-4 py-3 text-white outline-none"
           />
         </label>
+
+        <StoredCustomSubtitleManager
+          movie={movieData}
+          onMovieChange={setMovieData}
+        />
 
         <div className="flex flex-wrap gap-3">
           <button
