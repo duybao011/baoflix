@@ -746,6 +746,32 @@ export default function NativeVideoPlayer({
         poster={poster}
         controls={!tvMode}
         controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload"}
+        // BAOFLIX_V13_DIRECT_FATAL
+        onError={() => {
+          const currentSrc =
+            videoRef.current?.currentSrc || src;
+
+          setError(
+            "Nguồn Native gặp lỗi. BảoFlix đang thử lại Drive..."
+          );
+
+          window.dispatchEvent(
+            new CustomEvent(NATIVE_PLAYER_FATAL_EVENT, {
+              detail: {
+                progressKey,
+                src: currentSrc || src,
+              },
+            })
+          );
+        }}
+        onStalled={() => {
+          setError(
+            "Nguồn Drive đang phản hồi chậm, tiếp tục chờ dữ liệu..."
+          );
+        }}
+        onCanPlay={() => {
+          setError("");
+        }}
         className={[
           tvMode ? "pointer-events-none" : "",
           "h-full w-full bg-black object-contain outline-none",

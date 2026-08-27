@@ -35,14 +35,14 @@ type StoredDriveEstimate = {
   updatedAt: string;
 };
 
-const PROBE_TIMEOUT_MS = 3500;
-const PERSONAL_PROBE_TIMEOUT_MS = 1800;
-// BAOFLIX_V11_SUBTITLE_NATIVE_PRIORITY
-const SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS = 8000;
-const SUBTITLE_TV_PROBE_TIMEOUT_MS = 10000;
-// BAOFLIX_CUSTOM_MOVIE_LAG_FIX
-const DRIVE_RELAY_COOLDOWN_MS = 5 * 60 * 1000;
-const DRIVE_RELAY_FAIL_UNTIL_KEY = "baoflix_drive_relay_fail_until";
+// BAOFLIX_V13_NATIVE_FIRST
+// Relay/Drive có thể cold-start hoặc phản hồi metadata không đều.
+// 1.8s trước đây quá gắt và làm file hợp lệ rơi iframe ngẫu nhiên.
+const PROBE_TIMEOUT_MS = 6000;
+const PERSONAL_PROBE_TIMEOUT_MS = 4500;
+const SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS = 7000;
+const SUBTITLE_TV_PROBE_TIMEOUT_MS = 9000;
+const DRIVE_NATIVE_RETRY_COUNT = 3;
 const SAVE_INTERVAL_SECONDS = 5;
 const EMPTY_SUBTITLES: EpisodeSubtitle[] = [];
 // BAOFLIX_CUSTOM_DRIVE_PERSONAL_PROGRESS
@@ -68,9 +68,26 @@ function buildDirectCandidates(fileId: string) {
 
   if (!fileId || !relayBase) return [];
 
-  return [
-    `${relayBase}/video/${encodeURIComponent(fileId)}`,
-  ];
+  const baseUrl =
+    `${relayBase}/video/${encodeURIComponent(fileId)}`;
+
+  return Array.from(
+    { length: DRIVE_NATIVE_RETRY_COUNT },
+    (_, index) => {
+      if (index === 0) return baseUrl;
+
+      try {
+        const parsed = new URL(baseUrl);
+        parsed.searchParams.set(
+          "baoflix_native_retry",
+          String(index)
+        );
+        return parsed.toString();
+      } catch {
+        return `${baseUrl}?baoflix_native_retry=${index}`;
+      }
+    }
+  );
 }
 
 function addAutoplayHint(url: string) {
@@ -127,40 +144,6 @@ function saveEstimate(storageKey: string, seconds: number) {
     );
   } catch {
     // Bỏ qua lỗi storage trên WebView hạn chế.
-  }
-}
-
-function isDriveRelayCoolingDown() {
-  try {
-    const failUntil = Number(
-      sessionStorage.getItem(DRIVE_RELAY_FAIL_UNTIL_KEY) || 0
-    );
-    if (!Number.isFinite(failUntil) || failUntil <= Date.now()) {
-      sessionStorage.removeItem(DRIVE_RELAY_FAIL_UNTIL_KEY);
-      return false;
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function rememberDriveRelayTimeout() {
-  try {
-    sessionStorage.setItem(
-      DRIVE_RELAY_FAIL_UNTIL_KEY,
-      String(Date.now() + DRIVE_RELAY_COOLDOWN_MS)
-    );
-  } catch {
-    // Bỏ qua storage bị chặn.
-  }
-}
-
-function clearDriveRelayTimeout() {
-  try {
-    sessionStorage.removeItem(DRIVE_RELAY_FAIL_UNTIL_KEY);
-  } catch {
-    // Bỏ qua storage bị chặn.
   }
 }
 
@@ -339,14 +322,8 @@ export default function CustomDrivePlayer({
       return;
     }
 
-    if (isDriveRelayCoolingDown() && !hasExternalSubtitles) {
-      setMode("iframe");
-      setFallbackReason(
-        "Drive Relay vừa phản hồi chậm, tạm dùng iframe để vào phim nhanh hơn."
-      );
-      return;
-    }
-
+    // Luôn thử Native cho chính file hiện tại.
+    // Timeout của phim/tập trước không được làm phim này rơi iframe.
     setMode("probing");
   }, [
     directCandidates.length,
@@ -359,7 +336,7 @@ export default function CustomDrivePlayer({
   useEffect(() => {
     if (mode !== "probing" || !activeCandidate) return;
 
-    const timeoutMs = hasExternalSubtitles
+    const baseTimeoutMs = hasExternalSubtitles
       ? tvMode
         ? SUBTITLE_TV_PROBE_TIMEOUT_MS
         : SUBTITLE_DESKTOP_PROBE_TIMEOUT_MS
@@ -367,21 +344,88 @@ export default function CustomDrivePlayer({
         ? PROBE_TIMEOUT_MS
         : PERSONAL_PROBE_TIMEOUT_MS;
 
+    const timeoutMs =
+      baseTimeoutMs + candidateIndex * 1000;
+
     const timeout = window.setTimeout(() => {
       tryNextCandidate(
         hasExternalSubtitles
-          ? "Drive Relay chưa vào native kịp nên không thể gắn phụ đề ngoài."
-          : "Nguồn direct tải quá lâu.",
-        true
+          ? "Drive Relay đang chậm; thử lại Native trước khi dùng iframe."
+          : "Nguồn Drive phản hồi chậm; đang thử lại Native."
       );
     }, timeoutMs);
 
     return () => window.clearTimeout(timeout);
   }, [
     activeCandidate,
+    candidateIndex,
     hasExternalSubtitles,
     mode,
     tvMode,
+  ]);
+
+  useEffect(() => {
+    function handleNativeFatal(event: Event) {
+      if (mode !== "native") return;
+
+      const detail = (
+        event as CustomEvent<{
+          progressKey?: string;
+          src?: string;
+        }>
+      ).detail;
+
+      if (
+        detail?.progressKey &&
+        detail.progressKey !== progressKey
+      ) {
+        return;
+      }
+
+      if (
+        detail?.src &&
+        nativeSrc &&
+        detail.src !== nativeSrc
+      ) {
+        return;
+      }
+
+      const nextIndex = candidateIndex + 1;
+
+      if (nextIndex < directCandidates.length) {
+        setCandidateIndex(nextIndex);
+        setNativeSrc("");
+        setFallbackReason(
+          "Native gặp lỗi khi phát; đang thử lại nguồn Drive."
+        );
+        setMode("probing");
+        return;
+      }
+
+      setNativeSrc("");
+      setFallbackReason(
+        "Native gặp lỗi sau nhiều lần thử. Đã chuyển sang Drive iframe dự phòng."
+      );
+      setMode("iframe");
+    }
+
+    window.addEventListener(
+      "baoflix-native-player-fatal",
+      handleNativeFatal as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        "baoflix-native-player-fatal",
+        handleNativeFatal as EventListener
+      );
+    };
+  }, [
+    candidateIndex,
+    directCandidates.length,
+    mode,
+    nativeSrc,
+    progressKey,
   ]);
 
   useEffect(() => {
@@ -476,32 +520,28 @@ export default function CustomDrivePlayer({
     };
   }, [mode, src, tvMode]);
 
-  function tryNextCandidate(
-    reason: string,
-    rememberTimeout = false
-  ) {
+  function tryNextCandidate(reason: string) {
     const nextIndex = candidateIndex + 1;
 
     if (nextIndex < directCandidates.length) {
       setCandidateIndex(nextIndex);
+      setNativeSrc("");
+      setMode("probing");
       setFallbackReason(reason);
       return;
     }
 
-    if (rememberTimeout) rememberDriveRelayTimeout();
-
     setMode("iframe");
     setFallbackReason(
       hasExternalSubtitles
-        ? "Drive Relay không trả về video native. Video đã chuyển sang iframe nên phụ đề ngoài không thể hiển thị."
-        : "Drive Relay không trả về video native. Đã chuyển sang iframe dự phòng."
+        ? "Đã thử Native nhiều lần nhưng nguồn Drive vẫn không ổn định. Chuyển sang iframe; phụ đề ngoài sẽ không hoạt động."
+        : "Đã thử Native nhiều lần nhưng nguồn Drive vẫn không ổn định. Chuyển sang iframe dự phòng."
     );
   }
 
   function handleProbeReady() {
     if (!activeCandidate) return;
 
-    clearDriveRelayTimeout();
     setNativeSrc(activeCandidate);
     setMode("native");
     setFallbackReason("");
