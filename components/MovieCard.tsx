@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { MovieItem } from "@/lib/kkphim";
 import {
-  FAVORITES_CHANGE_EVENT,
   isFavorite,
+  subscribeFavorites,
   toggleFavorite as toggleFavoriteStore,
 } from "@/lib/favoritesStore";
 const IMAGE_BASE = "https://phimimg.com";
@@ -39,21 +39,18 @@ export default function MovieCard({
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  // BAOFLIX_PERF_PHASE2A_FAVORITES_CACHE
+  // Mỗi card chỉ subscribe vào store trong RAM.
+  // Store tự giữ đúng một bộ listener storage/focus cho toàn trang.
   useEffect(() => {
     function refresh() {
       setSaved(isFavorite(movie.slug));
     }
 
+    const unsubscribe = subscribeFavorites(refresh);
     refresh();
-    window.addEventListener(FAVORITES_CHANGE_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    window.addEventListener("focus", refresh);
 
-    return () => {
-      window.removeEventListener(FAVORITES_CHANGE_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("focus", refresh);
-    };
+    return unsubscribe;
   }, [movie.slug]);
 
   function toggleFavorite() {

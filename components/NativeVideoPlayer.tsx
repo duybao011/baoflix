@@ -599,31 +599,61 @@ export default function NativeVideoPlayer({
     };
   }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
 
-  // BAOFLIX_PC_SEEK_10S_ONLY_V2
-  // Chỉ PC/điện thoại: ArrowLeft / ArrowRight = ±10 giây.
-  // TV giữ nguyên toàn bộ logic bridge/overlay/remote hiện tại.
+  // BAOFLIX_PC_SEEK_10S_ONLY_V3_CAPTURE
+  // PC/điện thoại: ArrowLeft / ArrowRight = đúng ±10 giây.
+  // Bắt ở document capture để chặn keyboard seek mặc định
+  // của browser controls trước khi browser tự cộng thêm bước tua.
+  // TV giữ nguyên hoàn toàn vì tvMode=true thoát ngay.
   useEffect(() => {
-    const player = videoRef.current;
+    if (tvMode) return;
 
-    if (!player || tvMode) return;
+    function isSeekKey(event: KeyboardEvent) {
+      return (
+        event.key === "ArrowLeft" ||
+        event.key === "ArrowRight"
+      );
+    }
 
-    function handleDesktopSeekKey(event: KeyboardEvent) {
+    function belongsToCurrentVideo(event: KeyboardEvent) {
+      const currentVideo = videoRef.current;
+      if (!currentVideo) return false;
+
+      if (event.target === currentVideo) return true;
+      if (document.activeElement === currentVideo) return true;
+
+      try {
+        return event.composedPath().includes(currentVideo);
+      } catch {
+        return false;
+      }
+    }
+
+    function blockBrowserSeek(event: KeyboardEvent) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    }
+
+    function handleDesktopSeekKeyDown(event: KeyboardEvent) {
+      if (!isSeekKey(event)) return;
+
       if (
-        event.key !== "ArrowLeft" &&
-        event.key !== "ArrowRight"
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey
       ) {
         return;
       }
 
-      event.preventDefault();
-      event.stopPropagation();
+      if (!belongsToCurrentVideo(event)) return;
 
-      // Một lần nhấn = đúng một lần tua.
-      // Không cho key-repeat cộng dồn thành 20/30/40 giây.
+      // Chặn default action của browser media controls trước.
+      blockBrowserSeek(event);
+
+      // Một lần nhấn vật lý = đúng một lần tua.
+      // Giữ phím không cộng dồn thành 20/30/40 giây.
       if (event.repeat) return;
 
-      // Đọc ref lại trong callback để TypeScript biết rõ
-      // element có thể đã unmount giữa hai thời điểm.
       const currentVideo = videoRef.current;
       if (!currentVideo) return;
 
@@ -645,16 +675,35 @@ export default function NativeVideoPlayer({
       );
     }
 
-    player.addEventListener(
+    function handleDesktopSeekKeyUp(event: KeyboardEvent) {
+      if (!isSeekKey(event)) return;
+      if (!belongsToCurrentVideo(event)) return;
+
+      // Một số browser controls hoàn tất hành động keyboard ở keyup.
+      // Chặn luôn để không phát sinh bước tua thứ hai.
+      blockBrowserSeek(event);
+    }
+
+    document.addEventListener(
       "keydown",
-      handleDesktopSeekKey,
+      handleDesktopSeekKeyDown,
+      true
+    );
+    document.addEventListener(
+      "keyup",
+      handleDesktopSeekKeyUp,
       true
     );
 
     return () => {
-      player.removeEventListener(
+      document.removeEventListener(
         "keydown",
-        handleDesktopSeekKey,
+        handleDesktopSeekKeyDown,
+        true
+      );
+      document.removeEventListener(
+        "keyup",
+        handleDesktopSeekKeyUp,
         true
       );
     };

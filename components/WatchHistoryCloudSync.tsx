@@ -371,13 +371,22 @@ export default function WatchHistoryCloudSync() {
       runningRef.current = true;
 
       try {
+        // BAOFLIX_PERF_PHASE2A_AUTH_SESSION_GATE
+        // getSession() đọc session local trước. Guest không còn gọi getUser()
+        // ra Auth server chỉ để nhận AuthSessionMissingError.
+        // Data API phía dưới vẫn dùng JWT/RLS của Supabase như cũ.
         const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+          data: { session },
+          error: sessionError,
+        } = await supabase.auth.getSession();
 
-        if (userError) throw userError;
-        if (!user) return;
+        if (sessionError) throw sessionError;
+
+        const user = session?.user;
+        if (!user) {
+          lastCompletedRef.current = Date.now();
+          return;
+        }
 
         ensureLocalStateForUser(user.id);
 

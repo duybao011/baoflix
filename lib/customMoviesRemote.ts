@@ -75,13 +75,20 @@ function writeCustomMoviesCache(movies: StoredCustomMovie[]) {
 
 async function getAuthenticatedUser() {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase.auth.getUser();
 
-  if (error || !data.user) {
+  // BAOFLIX_PERF_PHASE2A_AUTH_SESSION_GATE
+  // Chỉ cần biết local client hiện có session hay không trước khi sync.
+  // Các query custom_movies phía sau vẫn được Supabase JWT/RLS bảo vệ.
+  const {
+    data: { session },
+    error,
+  } = await supabase.auth.getSession();
+
+  if (error || !session?.user) {
     return null;
   }
 
-  return data.user;
+  return session.user;
 }
 
 async function fetchRemoteRows(userId: string) {

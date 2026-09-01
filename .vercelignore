@@ -33,3 +33,6 @@ scripts
 tools
 docs
 android
+
+# BAOFLIX_PERF_PHASE2A: local patch backups
+.baoflix_patch_backups/

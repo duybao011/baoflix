@@ -102,3 +102,6 @@ backup/
 baoflix_drive_relay_public/
 worker/
 cloudflare-worker/
+
+# BAOFLIX_PERF_PHASE2A: local patch backups
+.baoflix_patch_backups/
