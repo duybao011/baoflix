@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { setTvModeSession } from "@/lib/tvMode";
 import SupabaseAccountPanel from "@/components/SupabaseAccountPanel";
+import SubtitleAppearanceSettings from "@/components/SubtitleAppearanceSettings";
 
 const TV_LAUNCH_MODE_KEY = "baoflix_tv_launch_mode";
 
@@ -163,6 +164,8 @@ export default function SettingsPage() {
           </Link>
         </div>
       </section>
+
+      <SubtitleAppearanceSettings />
 
       <SupabaseAccountPanel />
 

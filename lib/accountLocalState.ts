@@ -9,6 +9,7 @@ const PERSONAL_KEYS = [
   "baoflix_history_tombstones_v1",
   "baoflix_watched_episodes",
   "baoflix_video_progress_v1",
+  "baoflix_subtitle_appearance_v1",
   "baoflix_custom_movies",
   "baoflix_custom_movies_pending_deletes",
 ] as const;

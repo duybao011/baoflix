@@ -3,6 +3,16 @@
 import Hls from "hls.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ResolvedSubtitleTrack } from "@/lib/subtitleTools";
+import SubtitleAppearanceSettings from "@/components/SubtitleAppearanceSettings";
+import {
+  DEFAULT_SUBTITLE_APPEARANCE,
+  getSubtitleBottom,
+  getSubtitleTextStyle,
+  readSubtitleAppearance,
+  SUBTITLE_APPEARANCE_CHANGE_EVENT,
+  SUBTITLE_APPEARANCE_KEY,
+  type SubtitleAppearance,
+} from "@/lib/subtitleAppearance";
 
 type PlayerCommandAction = "seek" | "toggle-play" | "play" | "pause" | "focus-player" | "cycle-subtitle";
 
@@ -36,6 +46,7 @@ const DIRECT_NATIVE_STARTUP_TIMEOUT_MS = 15000;
 const DIRECT_NATIVE_TV_STARTUP_TIMEOUT_MS = 20000;
 // BAOFLIX_PLAYBACK_PROGRESS_SYNC
 const EMPTY_SUBTITLE_TRACKS: ResolvedSubtitleTrack[] = [];
+// BAOFLIX_SUBTITLE_APPEARANCE_V1
 
 type StoredVideoProgress = {
   currentTime: number;
@@ -121,6 +132,45 @@ function focusRemoteSurface() {
   window.dispatchEvent(new Event("baoflix-focus-tv-player-surface"));
 }
 
+type ExtendedVideoElement = HTMLVideoElement & {
+  webkitDisplayingFullscreen?: boolean;
+  webkitEnterFullscreen?: () => void;
+};
+
+function shouldUseNativeSubtitleLayer(video: HTMLVideoElement) {
+  const extendedVideo = video as ExtendedVideoElement;
+  const pictureInPictureElement = (
+    document as Document & { pictureInPictureElement?: Element | null }
+  ).pictureInPictureElement;
+
+  return (
+    document.fullscreenElement === video ||
+    Boolean(extendedVideo.webkitDisplayingFullscreen) ||
+    pictureInPictureElement === video
+  );
+}
+
+function cleanCueText(value: string) {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .trim();
+}
+
+function readActiveCueTexts(track?: TextTrack | null) {
+  if (!track?.activeCues) return [];
+
+  return Array.from(track.activeCues)
+    .map((cue) => cleanCueText(String((cue as VTTCue).text || "")))
+    .filter(Boolean);
+}
+
 function safeSetMediaSessionHandler(
   action: MediaSessionAction,
   handler: MediaSessionActionHandler | null
@@ -141,6 +191,7 @@ export default function NativeVideoPlayer({
   subtitleTracks = EMPTY_SUBTITLE_TRACKS,
   tvMode = false,
 }: NativeVideoPlayerProps) {
+  const playerShellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const userPausedRef = useRef(false);
   const autoplayDoneRef = useRef(false);
@@ -151,6 +202,11 @@ export default function NativeVideoPlayer({
   const sourceReadyRef = useRef(false);
   const [error, setError] = useState<string>("");
   const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(-1);
+  const [activeCueTexts, setActiveCueTexts] = useState<string[]>([]);
+  const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [subtitleAppearance, setSubtitleAppearance] =
+    useState<SubtitleAppearance>(DEFAULT_SUBTITLE_APPEARANCE);
 
   const attemptPlay = useCallback(
     async ({
@@ -231,12 +287,23 @@ export default function NativeVideoPlayer({
     });
   }, [tvMode]);
 
-  const applySubtitleMode = useCallback((index: number) => {
+  const applySubtitleMode = useCallback((
+    index: number,
+    forceNativeLayer = false
+  ) => {
     const video = videoRef.current;
     if (!video) return;
 
+    const useNativeLayer =
+      forceNativeLayer || shouldUseNativeSubtitleLayer(video);
+
     Array.from(video.textTracks).forEach((track, trackIndex) => {
-      track.mode = trackIndex === index ? "showing" : "disabled";
+      track.mode =
+        trackIndex === index
+          ? useNativeLayer
+            ? "showing"
+            : "hidden"
+          : "disabled";
     });
   }, []);
 
@@ -318,6 +385,150 @@ export default function NativeVideoPlayer({
       video?.removeEventListener("loadedmetadata", sync);
     };
   }, [applySubtitleMode, progressKey, subtitleTracks]);
+
+  useEffect(() => {
+    const syncAppearance = () => {
+      setSubtitleAppearance(readSubtitleAppearance());
+    };
+
+    function handleStorage(event: StorageEvent) {
+      if (!event.key || event.key === SUBTITLE_APPEARANCE_KEY) {
+        syncAppearance();
+      }
+    }
+
+    syncAppearance();
+    window.addEventListener(
+      SUBTITLE_APPEARANCE_CHANGE_EVENT,
+      syncAppearance
+    );
+    window.addEventListener("storage", handleStorage);
+
+    return () => {
+      window.removeEventListener(
+        SUBTITLE_APPEARANCE_CHANGE_EVENT,
+        syncAppearance
+      );
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const currentVideo = video;
+
+    const tracks = Array.from(currentVideo.textTracks);
+
+    function syncCueText() {
+      if (activeSubtitleIndex < 0) {
+        setActiveCueTexts([]);
+        return;
+      }
+
+      const activeTrack = tracks[activeSubtitleIndex];
+      if (!activeTrack) {
+        setActiveCueTexts([]);
+        return;
+      }
+
+      if (!shouldUseNativeSubtitleLayer(currentVideo)) {
+        activeTrack.mode = "hidden";
+      }
+
+      setActiveCueTexts(readActiveCueTexts(activeTrack));
+    }
+
+    tracks.forEach((track) => {
+      track.addEventListener("cuechange", syncCueText);
+    });
+    currentVideo.addEventListener("timeupdate", syncCueText);
+    currentVideo.addEventListener("seeked", syncCueText);
+    currentVideo.addEventListener("loadeddata", syncCueText);
+
+    const timers = [
+      window.setTimeout(syncCueText, 0),
+      window.setTimeout(syncCueText, 250),
+      window.setTimeout(syncCueText, 900),
+    ];
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      tracks.forEach((track) => {
+        track.removeEventListener("cuechange", syncCueText);
+      });
+      currentVideo.removeEventListener("timeupdate", syncCueText);
+      currentVideo.removeEventListener("seeked", syncCueText);
+      currentVideo.removeEventListener("loadeddata", syncCueText);
+    };
+  }, [activeSubtitleIndex, subtitleTracks]);
+
+  useEffect(() => {
+    const shell = playerShellRef.current;
+    const video = videoRef.current;
+    if (!video) return;
+
+    function syncFullscreenMode() {
+      setIsFullscreen(document.fullscreenElement === shell);
+      applySubtitleMode(activeSubtitleIndex);
+    }
+
+    function useNativeLayer() {
+      applySubtitleMode(activeSubtitleIndex, true);
+    }
+
+    document.addEventListener("fullscreenchange", syncFullscreenMode);
+    video.addEventListener("webkitbeginfullscreen", useNativeLayer);
+    video.addEventListener("webkitendfullscreen", syncFullscreenMode);
+    video.addEventListener("enterpictureinpicture", useNativeLayer);
+    video.addEventListener("leavepictureinpicture", syncFullscreenMode);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenMode);
+      video.removeEventListener("webkitbeginfullscreen", useNativeLayer);
+      video.removeEventListener("webkitendfullscreen", syncFullscreenMode);
+      video.removeEventListener("enterpictureinpicture", useNativeLayer);
+      video.removeEventListener("leavepictureinpicture", syncFullscreenMode);
+    };
+  }, [activeSubtitleIndex, applySubtitleMode]);
+
+  useEffect(() => {
+    if (subtitleTracks.length) return;
+    setActiveCueTexts([]);
+    setSubtitleSettingsOpen(false);
+  }, [subtitleTracks.length]);
+
+  useEffect(() => {
+    if (!subtitleSettingsOpen) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setSubtitleSettingsOpen(false);
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [subtitleSettingsOpen]);
+
+  const togglePlayerFullscreen = useCallback(async () => {
+    const shell = playerShellRef.current;
+    const video = videoRef.current as ExtendedVideoElement | null;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (shell?.requestFullscreen) {
+        await shell.requestFullscreen();
+        return;
+      }
+
+      video?.webkitEnterFullscreen?.();
+    } catch {
+      video?.webkitEnterFullscreen?.();
+    }
+  }, []);
 
   const handleCommand = useCallback(
     (detail: PlayerCommandDetail) => {
@@ -892,7 +1103,11 @@ export default function NativeVideoPlayer({
   }, [tvMode]);
 
   return (
-    <div className="relative h-full w-full bg-black">
+    <div
+      ref={playerShellRef}
+      data-baoflix-subtitle-layer="custom"
+      className="relative h-full w-full overflow-hidden bg-black"
+    >
       <video
         ref={videoRef}
         data-tv-player={tvMode ? "native-video" : undefined}
@@ -904,7 +1119,7 @@ export default function NativeVideoPlayer({
         preload={tvMode ? "auto" : "metadata"}
         poster={poster}
         controls={!tvMode}
-        controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload"}
+        controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload nofullscreen"}
         // BAOFLIX_V13_DIRECT_FATAL
         onError={() => {
           const currentVideo = videoRef.current;
@@ -959,7 +1174,7 @@ export default function NativeVideoPlayer({
             src={track.url}
             srcLang={track.lang || "vi"}
             label={track.label || `Phụ đề ${index + 1}`}
-            default={Boolean(track.default && index === 0)}
+            default={false}
             // BAOFLIX_V11_TRACK_ONLOAD_SYNC
             onLoad={() => {
               window.setTimeout(() => {
@@ -970,8 +1185,83 @@ export default function NativeVideoPlayer({
         ))}
       </video>
 
+      {activeCueTexts.length > 0 && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-3 z-20 flex flex-col items-center gap-2 text-center"
+          style={{ bottom: getSubtitleBottom(subtitleAppearance) }}
+        >
+          {activeCueTexts.map((cueText, index) => (
+            <span
+              key={`${index}:${cueText}`}
+              className="inline-block max-w-full"
+              style={getSubtitleTextStyle(subtitleAppearance)}
+            >
+              {cueText}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {!tvMode && (
+        <div className="absolute right-3 top-3 z-30 flex items-center gap-2">
+          {subtitleTracks.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={cycleSubtitle}
+                className="rounded-xl border border-white/15 bg-black/65 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur hover:bg-black/85"
+                aria-label="Đổi hoặc tắt phụ đề"
+                title="Đổi hoặc tắt phụ đề"
+              >
+                CC
+              </button>
+              <button
+                type="button"
+                onClick={() => setSubtitleSettingsOpen(true)}
+                className="rounded-xl border border-white/15 bg-black/65 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur hover:bg-black/85"
+                aria-label="Mở giao diện phụ đề"
+                title="Giao diện phụ đề"
+              >
+                Aa
+              </button>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={() => void togglePlayerFullscreen()}
+            className="rounded-xl border border-white/15 bg-black/65 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur hover:bg-black/85"
+            aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+            title={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
+          >
+            {isFullscreen ? "Thu nhỏ" : "Toàn màn hình"}
+          </button>
+        </div>
+      )}
+
+      {subtitleSettingsOpen && !tvMode && (
+        <div
+          data-tv-modal
+          data-tv-scope="subtitle-style"
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm sm:p-6"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSubtitleSettingsOpen(false);
+            }
+          }}
+        >
+          <div className="max-h-[92dvh] w-full max-w-2xl overflow-y-auto">
+            <SubtitleAppearanceSettings
+              embedded
+              onClose={() => setSubtitleSettingsOpen(false)}
+            />
+          </div>
+        </div>
+      )}
+
       {error && (
-        <div className="pointer-events-none absolute left-1/2 top-[12%] max-w-[70vw] -translate-x-1/2 rounded-2xl bg-black/72 px-4 py-3 text-center text-sm font-bold text-yellow-100 shadow-2xl backdrop-blur">
+        <div className="pointer-events-none absolute left-1/2 top-[12%] z-20 max-w-[70vw] -translate-x-1/2 rounded-2xl bg-black/72 px-4 py-3 text-center text-sm font-bold text-yellow-100 shadow-2xl backdrop-blur">
           {error}
         </div>
       )}
