@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   DEFAULT_SUBTITLE_APPEARANCE,
+  getSubtitleFontFamily,
   getSubtitleTextStyle,
   readSubtitleAppearance,
   saveSubtitleAppearance,
@@ -129,7 +130,7 @@ export default function SubtitleAppearanceSettings({
 
         <div>
           <p className="mb-2 text-sm font-black text-white">Font chữ</p>
-          <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div data-tv-row data-tv-row-wrap="true" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {SUBTITLE_FONT_OPTIONS.map((option) => (
               <button
                 key={option.value}
@@ -137,6 +138,7 @@ export default function SubtitleAppearanceSettings({
                 data-tv-focus-key={`subtitle-style:font:${option.value}`}
                 onClick={() => update({ font: option.value })}
                 className={optionClass(appearance.font === option.value)}
+                style={{ fontFamily: getSubtitleFontFamily(option.value) }}
               >
                 {option.label}
               </button>

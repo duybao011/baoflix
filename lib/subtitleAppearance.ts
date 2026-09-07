@@ -3,12 +3,18 @@
 import type { CSSProperties } from "react";
 
 // BAOFLIX_SUBTITLE_APPEARANCE_V1
+// BAOFLIX_SUBTITLE_FONTS_V2
 export const SUBTITLE_APPEARANCE_KEY = "baoflix_subtitle_appearance_v1";
 export const SUBTITLE_APPEARANCE_CHANGE_EVENT =
   "baoflix-subtitle-appearance-change";
 
 export type SubtitleSize = "small" | "medium" | "large" | "xlarge";
-export type SubtitleFont = "sans" | "rounded" | "serif" | "mono";
+export type SubtitleFont =
+  | "be-vietnam-pro"
+  | "arimo"
+  | "open-sans"
+  | "nunito-sans"
+  | "lato";
 export type SubtitleColor = "white" | "yellow" | "cyan" | "lime";
 export type SubtitleBackground = "none" | "soft" | "solid";
 export type SubtitleOutline = "none" | "soft" | "strong";
@@ -25,7 +31,7 @@ export type SubtitleAppearance = {
 
 export const DEFAULT_SUBTITLE_APPEARANCE: SubtitleAppearance = {
   size: "medium",
-  font: "rounded",
+  font: "be-vietnam-pro",
   color: "white",
   background: "soft",
   outline: "strong",
@@ -46,10 +52,11 @@ export const SUBTITLE_FONT_OPTIONS: ReadonlyArray<{
   value: SubtitleFont;
   label: string;
 }> = [
-  { value: "sans", label: "Gọn" },
-  { value: "rounded", label: "Bo tròn" },
-  { value: "serif", label: "Có chân" },
-  { value: "mono", label: "Mono" },
+  { value: "be-vietnam-pro", label: "Be Vietnam Pro" },
+  { value: "arimo", label: "Arimo" },
+  { value: "open-sans", label: "Open Sans" },
+  { value: "nunito-sans", label: "Nunito Sans" },
+  { value: "lato", label: "Lato" },
 ];
 
 export const SUBTITLE_COLOR_OPTIONS: ReadonlyArray<{
@@ -106,7 +113,13 @@ export function normalizeSubtitleAppearance(
     size: isOneOf(raw.size, ["small", "medium", "large", "xlarge"])
       ? raw.size
       : DEFAULT_SUBTITLE_APPEARANCE.size,
-    font: isOneOf(raw.font, ["sans", "rounded", "serif", "mono"])
+    font: isOneOf(raw.font, [
+      "be-vietnam-pro",
+      "arimo",
+      "open-sans",
+      "nunito-sans",
+      "lato",
+    ])
       ? raw.font
       : DEFAULT_SUBTITLE_APPEARANCE.font,
     color: isOneOf(raw.color, ["white", "yellow", "cyan", "lime"])
@@ -170,11 +183,24 @@ const SIZE_MAP: Record<SubtitleSize, string> = {
 };
 
 const FONT_MAP: Record<SubtitleFont, string> = {
-  sans: "Arial, Helvetica, sans-serif",
-  rounded: '"Arial Rounded MT Bold", "Trebuchet MS", Arial, sans-serif',
-  serif: 'Georgia, "Times New Roman", serif',
-  mono: '"Courier New", Consolas, monospace',
+  "be-vietnam-pro": '"BaoFlix Be Vietnam Pro", Arial, Helvetica, sans-serif',
+  arimo: '"BaoFlix Arimo", Arial, Helvetica, sans-serif',
+  "open-sans": '"BaoFlix Open Sans", Arial, Helvetica, sans-serif',
+  "nunito-sans": '"BaoFlix Nunito Sans", Arial, Helvetica, sans-serif',
+  lato: '"BaoFlix Lato", Arial, Helvetica, sans-serif',
 };
+
+const FONT_WEIGHT_MAP: Record<SubtitleFont, number> = {
+  "be-vietnam-pro": 800,
+  arimo: 700,
+  "open-sans": 700,
+  "nunito-sans": 800,
+  lato: 800,
+};
+
+export function getSubtitleFontFamily(font: SubtitleFont): string {
+  return FONT_MAP[font];
+}
 
 const COLOR_MAP: Record<SubtitleColor, string> = {
   white: "#ffffff",
@@ -210,9 +236,9 @@ export function getSubtitleTextStyle(
 
   return {
     color: COLOR_MAP[normalized.color],
-    fontFamily: FONT_MAP[normalized.font],
+    fontFamily: getSubtitleFontFamily(normalized.font),
     fontSize: SIZE_MAP[normalized.size],
-    fontWeight: 800,
+    fontWeight: FONT_WEIGHT_MAP[normalized.font],
     lineHeight: 1.35,
     letterSpacing: "0.01em",
     textShadow: OUTLINE_MAP[normalized.outline],

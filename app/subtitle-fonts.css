@@ -1,0 +1,46 @@
+/* BAOFLIX_SUBTITLE_FONTS_V2
+ * Font được tự lưu trong app, không phụ thuộc font cài trên máy người xem.
+ * Giấy phép đi kèm tại /public/fonts/subtitles/licenses/.
+ */
+
+@font-face {
+  font-family: "BaoFlix Be Vietnam Pro";
+  src: url("/fonts/subtitles/BeVietnamPro-ExtraBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "BaoFlix Arimo";
+  src: url("/fonts/subtitles/Arimo-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "BaoFlix Open Sans";
+  src: url("/fonts/subtitles/OpenSans-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 300 800;
+  font-stretch: 75% 100%;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "BaoFlix Nunito Sans";
+  src: url("/fonts/subtitles/NunitoSans-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 1000;
+  font-stretch: 75% 125%;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "BaoFlix Lato";
+  src: url("/fonts/subtitles/Lato-ExtraBold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+}

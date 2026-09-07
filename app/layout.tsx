@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import "./globals.css";
+import "./subtitle-fonts.css";
 import Header from "@/components/Header";
 import PwaRegister from "@/components/PwaRegister";
 import CustomMoviesCloudSync from "@/components/CustomMoviesCloudSync";

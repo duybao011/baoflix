@@ -1,0 +1,39 @@
+BẢOFLIX SUBTITLE FONTS V2
+
+Các font trong thư mục này được tải từ kho chính thức google/fonts tại revision:
+5e35378e6bda803962ee6fd257e444a7d459660d
+
+Tất cả đều dùng SIL Open Font License 1.1 và có bộ chữ Vietnamese:
+
+1. Be Vietnam Pro ExtraBold
+   Source: https://github.com/google/fonts/tree/5e35378e6bda803962ee6fd257e444a7d459660d/ofl/bevietnampro
+   File: BeVietnamPro-ExtraBold.ttf
+   SHA-256: 44dbfa01553d227bec76ba6446c5618870a76a4a3297f41630dde859d0650d02
+   License: licenses/BeVietnamPro-OFL.txt
+
+2. Arimo Variable (400-700)
+   Source: https://github.com/google/fonts/tree/5e35378e6bda803962ee6fd257e444a7d459660d/ofl/arimo
+   File: Arimo-Variable.ttf
+   SHA-256: e43898b143ec826ac8cb4034816458a7047fbe0836558de2a1f8c6223ae3e0ca
+   License: licenses/Arimo-OFL.txt
+
+3. Open Sans Variable (300-800)
+   Source: https://github.com/google/fonts/tree/5e35378e6bda803962ee6fd257e444a7d459660d/ofl/opensans
+   File: OpenSans-Variable.ttf
+   SHA-256: 36643644f318a812aab2d2ed3bb98f8cf0872527f835fe9398d95fe6b9adb878
+   License: licenses/OpenSans-OFL.txt
+
+4. Nunito Sans Variable (200-1000)
+   Source: https://github.com/google/fonts/tree/5e35378e6bda803962ee6fd257e444a7d459660d/ofl/nunitosans
+   File: NunitoSans-Variable.ttf
+   SHA-256: f934d7142fb4784bf828da485b7dcbd90c0c80d514e9d49a5da0ed3a1ae2491d
+   License: licenses/NunitoSans-OFL.txt
+
+5. Lato ExtraBold
+   Source: https://github.com/google/fonts/tree/5e35378e6bda803962ee6fd257e444a7d459660d/ofl/lato
+   File: Lato-ExtraBold.ttf
+   SHA-256: 61018de62bdaf90d4ac80b1d53c5c130756c8e9219aea3d2773fc9bd5869af97
+   License: licenses/Lato-OFL.txt
+
+Font được self-host trong BảoFlix. Sau khi patch xong, trình xem phim không cần
+Internet để tải font và cũng không phụ thuộc font cài trên Windows/TV.
