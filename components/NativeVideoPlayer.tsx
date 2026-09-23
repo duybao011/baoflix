@@ -205,6 +205,8 @@ export default function NativeVideoPlayer({
   const [activeCueTexts, setActiveCueTexts] = useState<string[]>([]);
   const [subtitleSettingsOpen, setSubtitleSettingsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [screenshotNotice, setScreenshotNotice] = useState("");
+  const screenshotNoticeTimerRef = useRef<number | null>(null);
   const [subtitleAppearance, setSubtitleAppearance] =
     useState<SubtitleAppearance>(DEFAULT_SUBTITLE_APPEARANCE);
 
@@ -1102,6 +1104,91 @@ export default function NativeVideoPlayer({
     };
   }, [tvMode]);
 
+  // BAOFLIX_VIDEO_SCREENSHOT_V1
+  const showScreenshotNotice = useCallback((message: string) => {
+    setScreenshotNotice(message);
+
+    if (screenshotNoticeTimerRef.current !== null) {
+      window.clearTimeout(screenshotNoticeTimerRef.current);
+    }
+
+    screenshotNoticeTimerRef.current = window.setTimeout(() => {
+      setScreenshotNotice("");
+      screenshotNoticeTimerRef.current = null;
+    }, 2600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (screenshotNoticeTimerRef.current !== null) {
+        window.clearTimeout(screenshotNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const captureVideoFrame = useCallback(() => {
+    const video = videoRef.current;
+
+    if (
+      !video ||
+      video.readyState < 2 ||
+      video.videoWidth < 1 ||
+      video.videoHeight < 1
+    ) {
+      showScreenshotNotice("Phim chưa sẵn sàng để chụp.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      showScreenshotNotice("Trình duyệt không hỗ trợ chụp ảnh.");
+      return;
+    }
+
+    try {
+      // Chỉ vẽ pixel video: không kèm phụ đề, nút điều khiển hay overlay.
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          showScreenshotNotice("Không thể tạo ảnh từ nguồn phim này.");
+          return;
+        }
+
+        const safeTitle = title
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/g, "d")
+          .replace(/Đ/g, "D")
+          .replace(/[^a-zA-Z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "")
+          .slice(0, 80)
+          .toLowerCase();
+        const capturedAt = new Date()
+          .toISOString()
+          .replace(/\.\d{3}Z$/, "")
+          .replace(/[T:]/g, "-");
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = objectUrl;
+        link.download = `baoflix-${safeTitle || "phim"}-${capturedAt}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        showScreenshotNotice("Đã lưu ảnh khung hình.");
+      }, "image/png");
+    } catch {
+      // Canvas bị khóa khi máy chủ video không cho phép đọc pixel qua CORS.
+      showScreenshotNotice("Nguồn phim này không cho phép chụp ảnh.");
+    }
+  }, [showScreenshotNotice, title]);
+
   return (
     <div
       ref={playerShellRef}
@@ -1230,6 +1317,28 @@ export default function NativeVideoPlayer({
 
           <button
             type="button"
+            onClick={captureVideoFrame}
+            className="rounded-xl border border-white/15 bg-black/65 p-2 text-white shadow-xl backdrop-blur hover:bg-black/85"
+            aria-label="Chụp khung hình phim"
+            title="Chụp khung hình phim"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14.5 4 16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.5-3h5Z" />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+          </button>
+
+          <button
+            type="button"
             onClick={() => void togglePlayerFullscreen()}
             className="rounded-xl border border-white/15 bg-black/65 px-3 py-2 text-xs font-black text-white shadow-xl backdrop-blur hover:bg-black/85"
             aria-label={isFullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"}
@@ -1257,6 +1366,15 @@ export default function NativeVideoPlayer({
               onClose={() => setSubtitleSettingsOpen(false)}
             />
           </div>
+        </div>
+      )}
+
+      {screenshotNotice && !tvMode && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute left-3 top-3 z-40 max-w-[70vw] rounded-xl bg-black/75 px-3 py-2 text-sm font-bold text-white shadow-2xl backdrop-blur"
+        >
+          {screenshotNotice}
         </div>
       )}
 
