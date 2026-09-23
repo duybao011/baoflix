@@ -34,6 +34,7 @@ type NativeVideoPlayerProps = {
    * false: desktop/mobile dùng browser controls bình thường.
    */
   tvMode?: boolean;
+  captureCors?: boolean;
 };
 
 const VIDEO_PROGRESS_KEY = "baoflix_video_progress_v1";
@@ -190,6 +191,7 @@ export default function NativeVideoPlayer({
   progressKey,
   subtitleTracks = EMPTY_SUBTITLE_TRACKS,
   tvMode = false,
+  captureCors = false,
 }: NativeVideoPlayerProps) {
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -1197,6 +1199,8 @@ export default function NativeVideoPlayer({
     >
       <video
         ref={videoRef}
+        // BAOFLIX_PERSONAL_SCREENSHOT_V2_NATIVE
+        crossOrigin={captureCors && !tvMode ? "anonymous" : undefined}
         data-tv-player={tvMode ? "native-video" : undefined}
         data-tv-player-native={tvMode ? "true" : undefined}
         data-tv-skip={tvMode ? true : undefined}

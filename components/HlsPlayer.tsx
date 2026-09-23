@@ -3,7 +3,8 @@
 // BAOFLIX_CUSTOM_HLS_PERSONAL_PROGRESS
 
 import Hls from "hls.js";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { isTvModeActive } from "@/lib/tvMode";
 
 type HlsPlayerProps = {
   src: string;
@@ -146,6 +147,29 @@ export default function HlsPlayer({
   const lastSaveRef = useRef(0);
   const sourceStartedAtRef = useRef(0);
   const lastAppliedUpdatedAtRef = useRef("");
+  const captureNoticeTimerRef = useRef<number | null>(null);
+  const [captureNotice, setCaptureNotice] = useState("");
+  const [tvMode, setTvMode] = useState(false);
+
+  useEffect(() => {
+    function refreshTvMode() {
+      setTvMode(isTvModeActive({ allowSessionOnDesktop: false }));
+    }
+
+    refreshTvMode();
+    window.addEventListener("baoflix-tv-mode-change", refreshTvMode);
+    window.addEventListener("storage", refreshTvMode);
+    window.addEventListener("focus", refreshTvMode);
+
+    return () => {
+      window.removeEventListener("baoflix-tv-mode-change", refreshTvMode);
+      window.removeEventListener("storage", refreshTvMode);
+      window.removeEventListener("focus", refreshTvMode);
+      if (captureNoticeTimerRef.current !== null) {
+        window.clearTimeout(captureNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -414,15 +438,106 @@ export default function HlsPlayer({
     };
   }, [src, storageKey, autoResume]);
 
+  // BAOFLIX_PERSONAL_SCREENSHOT_V2_HLS
+  function showCaptureNotice(message: string) {
+    setCaptureNotice(message);
+    if (captureNoticeTimerRef.current !== null) {
+      window.clearTimeout(captureNoticeTimerRef.current);
+    }
+    captureNoticeTimerRef.current = window.setTimeout(() => {
+      setCaptureNotice("");
+      captureNoticeTimerRef.current = null;
+    }, 2600);
+  }
+
+  function captureVideoFrame() {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      showCaptureNotice("Phim chưa sẵn sàng để chụp.");
+      return;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext("2d");
+    if (!context) {
+      showCaptureNotice("Trình duyệt không hỗ trợ chụp ảnh.");
+      return;
+    }
+
+    try {
+      // Chỉ xuất pixel của video; không vẽ sub hoặc nút điều khiển.
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          showCaptureNotice("Không thể tạo ảnh từ nguồn phim này.");
+          return;
+        }
+
+        const capturedAt = new Date()
+          .toISOString()
+          .replace(/\.\d{3}Z$/, "")
+          .replace(/[T:]/g, "-");
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = `baoflix-phim-rieng-${capturedAt}.png`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        showCaptureNotice("Đã lưu ảnh khung hình.");
+      }, "image/png");
+    } catch {
+      showCaptureNotice("Nguồn phim này không cho phép chụp ảnh.");
+    }
+  }
+
   return (
-    <video
-      ref={videoRef}
-      controls
-      playsInline
-      tabIndex={0}
-      data-tv-player="video"
-      data-tv-skip
-      className="h-full w-full bg-black object-contain outline-none"
-    />
+    <div className="relative h-full w-full bg-black">
+      <video
+        ref={videoRef}
+        controls
+        playsInline
+        tabIndex={0}
+        data-tv-player="video"
+        data-tv-skip
+        className="h-full w-full bg-black object-contain outline-none"
+      />
+
+      {!tvMode && (
+        <button
+          type="button"
+          onClick={captureVideoFrame}
+          className="absolute right-3 top-3 z-30 rounded-xl border border-white/15 bg-black/65 p-2 text-white shadow-xl backdrop-blur hover:bg-black/85"
+          aria-label="Chụp khung hình phim"
+          title="Chụp khung hình phim"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14.5 4 16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h3l1.5-3h5Z" />
+            <circle cx="12" cy="13" r="3" />
+          </svg>
+        </button>
+      )}
+
+      {captureNotice && !tvMode && (
+        <div
+          aria-live="polite"
+          className="pointer-events-none absolute left-3 top-3 z-40 max-w-[70vw] rounded-xl bg-black/75 px-3 py-2 text-sm font-bold text-white shadow-2xl backdrop-blur"
+        >
+          {captureNotice}
+        </div>
+      )}
+    </div>
   );
 }

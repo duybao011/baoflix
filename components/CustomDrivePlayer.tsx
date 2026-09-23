@@ -169,6 +169,8 @@ export default function CustomDrivePlayer({
   const [mode, setMode] = useState<PlayerMode>("native");
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [nativeSrc, setNativeSrc] = useState("");
+  // BAOFLIX_PERSONAL_SCREENSHOT_V2_DRIVE
+  const [captureCorsEnabled, setCaptureCorsEnabled] = useState(true);
   const [iframeSrc, setIframeSrc] = useState(src);
   const [fallbackReason, setFallbackReason] = useState("");
   const [estimateSeconds, setEstimateSeconds] = useState(0);
@@ -305,6 +307,7 @@ export default function CustomDrivePlayer({
     setIframeSrc(src);
     setCandidateIndex(0);
     setNativeSrc("");
+    setCaptureCorsEnabled(true);
     setFallbackReason("");
 
     if (!fileId) {
@@ -375,6 +378,12 @@ export default function CustomDrivePlayer({
         return;
       }
 
+      // Nếu một relay khác chặn CORS, phát lại nguồn cũ không CORS.
+      if (!tvMode && captureCorsEnabled && detail?.reason === "media-error") {
+        setCaptureCorsEnabled(false);
+        return;
+      }
+
       const nextIndex = candidateIndex + 1;
 
       if (nextIndex < directCandidates.length) {
@@ -420,10 +429,12 @@ export default function CustomDrivePlayer({
     };
   }, [
     candidateIndex,
+    captureCorsEnabled,
     directCandidates,
     mode,
     nativeSrc,
     progressKey,
+    tvMode,
   ]);
 
   useEffect(() => {
@@ -528,13 +539,14 @@ export default function CustomDrivePlayer({
     <div className="relative h-full w-full overflow-hidden bg-black">
       {mode === "native" && nativeSrc ? (
         <NativeVideoPlayer
-          key={`${fileId}:${candidateIndex}`}
+          key={`${fileId}:${candidateIndex}:${captureCorsEnabled ? "capture" : "play"}`}
           src={nativeSrc}
           title={title}
           subtitle={serverForOverlay.server_name}
           poster={poster}
           progressKey={progressKey}
           tvMode={tvMode}
+          captureCors={!tvMode && captureCorsEnabled}
           subtitleTracks={resolvedSubtitleTracks}
         />
       ) : mode === "iframe" ? (
