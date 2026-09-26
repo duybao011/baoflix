@@ -35,6 +35,8 @@ type NativeVideoPlayerProps = {
    */
   tvMode?: boolean;
   captureCors?: boolean;
+  // BAOFLIX_DRIVE_SMOOTH_V1: only personal Drive opts into earlier buffering.
+  preloadAuto?: boolean;
 };
 
 const VIDEO_PROGRESS_KEY = "baoflix_video_progress_v1";
@@ -192,6 +194,7 @@ export default function NativeVideoPlayer({
   subtitleTracks = EMPTY_SUBTITLE_TRACKS,
   tvMode = false,
   captureCors = false,
+  preloadAuto = false,
 }: NativeVideoPlayerProps) {
   const playerShellRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -599,7 +602,7 @@ export default function NativeVideoPlayer({
 
     video.controls = !tvMode;
     video.autoplay = tvMode;
-    video.preload = tvMode ? "auto" : "metadata";
+    video.preload = tvMode || preloadAuto ? "auto" : "metadata";
 
     if (tvMode) {
       video.removeAttribute("controls");
@@ -812,7 +815,7 @@ export default function NativeVideoPlayer({
       video.removeAttribute("src");
       video.load();
     };
-  }, [attemptPlay, progressKey, src, subtitle, title, tvMode]);
+  }, [attemptPlay, preloadAuto, progressKey, src, subtitle, title, tvMode]);
 
   // BAOFLIX_PC_SEEK_10S_ONLY_V3_CAPTURE
   // PC/điện thoại: ArrowLeft / ArrowRight = đúng ±10 giây.
@@ -1207,7 +1210,7 @@ export default function NativeVideoPlayer({
         tabIndex={tvMode ? -1 : 0}
         autoPlay={tvMode}
         playsInline
-        preload={tvMode ? "auto" : "metadata"}
+        preload={tvMode || preloadAuto ? "auto" : "metadata"}
         poster={poster}
         controls={!tvMode}
         controlsList={tvMode ? "nodownload nofullscreen noremoteplayback" : "nodownload nofullscreen"}

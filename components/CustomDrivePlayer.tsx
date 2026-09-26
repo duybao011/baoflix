@@ -547,6 +547,7 @@ export default function CustomDrivePlayer({
           progressKey={progressKey}
           tvMode={tvMode}
           captureCors={!tvMode && captureCorsEnabled}
+          preloadAuto
           subtitleTracks={resolvedSubtitleTracks}
         />
       ) : mode === "iframe" ? (
